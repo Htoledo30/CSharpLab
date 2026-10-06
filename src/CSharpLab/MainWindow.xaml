@@ -108,6 +108,16 @@
                         <Separator />
                         <MenuItem Header="Formatar documento" InputGestureText="Ctrl+Shift+F" Click="OnFormat" />
                         <MenuItem Header="Mostrar sugestões" InputGestureText="Ctrl+Space" Click="OnShowCompletion" />
+                        <MenuItem Header="Correções rápidas" InputGestureText="Ctrl+." Click="OnQuickFix" />
+                        <Separator />
+                        <MenuItem Header="Ir para definição" InputGestureText="F12" Click="OnGoToDefinition" />
+                        <MenuItem Header="Renomear…" InputGestureText="F2" Click="OnRenameSymbol" />
+                        <Separator />
+                        <MenuItem Header="Comentar / descomentar" InputGestureText="Ctrl+/" Click="OnToggleComment" />
+                        <MenuItem Header="Duplicar linha" InputGestureText="Ctrl+D" Click="OnDuplicateLine" />
+                        <MenuItem Header="Mover linha para cima" InputGestureText="Alt+↑" Click="OnMoveLineUp" />
+                        <MenuItem Header="Mover linha para baixo" InputGestureText="Alt+↓" Click="OnMoveLineDown" />
+                        <MenuItem Header="Apagar linha" InputGestureText="Ctrl+Shift+K" Click="OnDeleteLine" />
                     </MenuItem>
                     <MenuItem Header="_Projeto">
                         <MenuItem Header="Executar" InputGestureText="F5" Command="{Binding RunCommand}"
@@ -118,6 +128,7 @@
                                   Visibility="{Binding HasMultipleProjects, Converter={StaticResource BoolToVis}}" />
                         <MenuItem Header="Mostrar explorador" InputGestureText="Ctrl+B" Command="{Binding ToggleExplorerCommand}" />
                         <MenuItem Header="Mostrar terminal e problemas" InputGestureText="Ctrl+J" Command="{Binding TogglePanelCommand}" />
+                        <MenuItem Header="Expandir terminal" InputGestureText="Ctrl+Shift+J" Command="{Binding TogglePanelMaximizedCommand}" />
                     </MenuItem>
                 </Menu>
 

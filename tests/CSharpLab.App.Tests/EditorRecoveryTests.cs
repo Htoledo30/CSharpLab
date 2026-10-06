@@ -137,6 +137,16 @@ public sealed class EditorRecoveryTests
                 editor.CompletionController.Commit(new CompletionEntry(item, result), "Console.".Length, word.Length + extra.Length);
                 await Ui.WaitUntil(() => doc.Document.Text == "Console.WriteLine", what: "completion sem sufixo duplicado");
             }
+
+            // Tab seguido de "(" antes do Roslyn responder: a sugestão entra e o "(" fica depois dela.
+            doc.Document.Text = "Console.Wri";
+            editor.CaretOffset = doc.Document.TextLength;
+            var r = await vm.Language!.GetCompletionsAsync(doc.LanguageKey, editor.CaretOffset, null, CancellationToken.None);
+            var writeLine = Assert.Single(r!.Items, i => i.DisplayText == "WriteLine");
+            editor.CompletionController.Commit(new CompletionEntry(writeLine, r), "Console.".Length, "Wri".Length);
+            editor.TextArea.PerformTextInput("(");
+            await Ui.WaitUntil(() => doc.Document.Text.StartsWith("Console.WriteLine("), what: "completion com tecla digitada logo depois");
+            Assert.Equal(doc.Document.Text.IndexOf('(') + 1, editor.CaretOffset);
         }
         finally { editor.Detach(); }
     });

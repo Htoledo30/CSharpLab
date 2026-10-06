@@ -220,7 +220,7 @@ public sealed class CompletionController
         var endAnchor = document.CreateAnchor(start + length);
         endAnchor.MovementType = AnchorMovementType.BeforeInsertion;
         int originalStart = entry.Result.Span.Start;
-        int version = _editor.Doc.Version;
+        string typed = document.GetText(start, length);
         string key = _editor.Doc.LanguageKey;
 
         CompletionChangeResult? change;
@@ -233,14 +233,19 @@ public sealed class CompletionController
             Core.Settings.AppPaths.Log(ex, "Aplicando sugestão");
             return;
         }
+        // Digitar depois da palavra (ex.: "(" logo após o Tab) não cancela a sugestão;
+        // só desiste se a própria palavra mudou enquanto o Roslyn respondia.
         if (change == null || startAnchor.IsDeleted || endAnchor.IsDeleted ||
-            version != _editor.Doc.Version || key != _editor.Doc.LanguageKey || _editor.IsDetached) return;
+            key != _editor.Doc.LanguageKey || _editor.IsDetached ||
+            endAnchor.Offset - startAnchor.Offset != length ||
+            document.GetText(startAnchor.Offset, length) != typed) return;
 
         int delta = startAnchor.Offset - originalStart;
         int replaceStart = change.ReplaceStart + delta;
         int replaceEnd = endAnchor.Offset + change.ReplaceStart + change.ReplaceLength - entry.Result.Span.End;
         if (replaceStart < 0 || replaceEnd < replaceStart || replaceEnd > document.TextLength) return;
+        bool caretInWord = textArea.Caret.Offset >= startAnchor.Offset && textArea.Caret.Offset <= endAnchor.Offset;
         document.Replace(replaceStart, replaceEnd - replaceStart, change.NewText);
-        textArea.Caret.Offset = Math.Min(document.TextLength, replaceStart + (change.CaretOffsetInNewText ?? change.NewText.Length));
+        if (caretInWord) textArea.Caret.Offset = Math.Min(document.TextLength, replaceStart + (change.CaretOffsetInNewText ?? change.NewText.Length));
     }
 }

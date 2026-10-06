@@ -258,6 +258,23 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Executa uma ação no editor ativo e devolve o foco a ele.</summary>
+    private void WithEditor(Action<Editor.CodeEditor> action)
+    {
+        if (Editors.ActiveEditor is not { } editor) return;
+        editor.TextArea.Focus();
+        action(editor);
+    }
+
+    private void OnQuickFix(object sender, RoutedEventArgs e) => WithEditor(ed => _ = ed.ShowQuickFixesAsync());
+    private void OnGoToDefinition(object sender, RoutedEventArgs e) => WithEditor(ed => _ = ed.GoToDefinitionAsync());
+    private void OnRenameSymbol(object sender, RoutedEventArgs e) => WithEditor(ed => _ = ed.RenameSymbolAsync());
+    private void OnToggleComment(object sender, RoutedEventArgs e) => WithEditor(ed => ed.ToggleComment());
+    private void OnDuplicateLine(object sender, RoutedEventArgs e) => WithEditor(ed => ed.DuplicateLines());
+    private void OnMoveLineUp(object sender, RoutedEventArgs e) => WithEditor(ed => ed.MoveLines(-1));
+    private void OnMoveLineDown(object sender, RoutedEventArgs e) => WithEditor(ed => ed.MoveLines(1));
+    private void OnDeleteLine(object sender, RoutedEventArgs e) => WithEditor(ed => ed.DeleteLines());
+
     private void OnShowCompletion(object sender, RoutedEventArgs e)
     {
         if (Editors.ActiveEditor is { } editor)
