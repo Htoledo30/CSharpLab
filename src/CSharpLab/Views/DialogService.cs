@@ -3,7 +3,6 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
-using CSharpLab.Core.Files;
 using CSharpLab.Core.Projects;
 using CSharpLab.ViewModels;
 using Microsoft.Win32;

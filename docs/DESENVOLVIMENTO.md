@@ -48,12 +48,12 @@ oferecer versões novas, mas uma cópia anterior ao recurso precisa ser instalad
 | Pasta | Responsabilidade |
 | --- | --- |
 | `src/CSharpLab.Core/Files` | Leitura com detecção de codificação, gravação atômica, Lixeira, validação de nomes |
-| `src/CSharpLab.Core/Projects` | SDK (`dotnet --list-sdks`, `global.json`), localizar/criar projetos console, avaliação MSBuild |
-| `src/CSharpLab.Core/Language` | Roslyn: workspace, completion, assinatura, diagnósticos traduzidos, formatação, classificação, snippets |
-| `src/CSharpLab.Core/Build` | `dotnet restore/build` com diagnósticos SARIF e comando de execução |
+| `src/CSharpLab.Core/Projects` | SDK (`dotnet --list-sdks`, `global.json`), localizar/criar projetos console, avaliação MSBuild, o que cada evento do disco exige (`FolderChanges`) |
+| `src/CSharpLab.Core/Language` | Roslyn: workspace (`LanguageService.cs`), consultas (`LanguageService.Queries.cs`: completion, assinatura, dica, definição, renomear, formatação, cores, diagnósticos), erros traduzidos, dicas para iniciantes, snippets |
+| `src/CSharpLab.Core/Build` | `dotnet restore/build` com diagnósticos SARIF, comando de execução e o que o F5 reaproveita na sessão (`RunCache`) |
 | `src/CSharpLab.Core/Terminal` | Sessão ConPTY + Job Object (processo do usuário fora do editor) |
 | `src/CSharpLab.Core/Settings` | Preferências JSON, recentes, recuperação de rascunhos |
-| `src/CSharpLab/ViewModels` | MVVM: documentos, explorador, problemas, execução |
+| `src/CSharpLab/ViewModels` | MVVM. `MainViewModel` é dividido por assunto: `.cs` (estado, início, painéis, avisos, encerramento), `.Documents` (abas, salvar, recuperação), `.Folders` (pasta e projetos), `.FileSystem` (mudanças no disco), `.Analysis` (erros ao vivo, navegação), `.Run` (SDK → salvar → compilar → terminal), `.Updates`. Mais explorador e problemas. |
 | `src/CSharpLab/Editor` | AvalonEdit + recursos de C# (cores, sublinhados, sugestões, assinatura, snippets, indentação) |
 | `src/CSharpLab/Views` | Explorador, terminal, busca, diálogos, host de editores |
 | `tests/CSharpLab.Tests` | Tradução de erros, arquivos, projetos, build real, cancelamento e terminal |

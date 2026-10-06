@@ -14,7 +14,7 @@ cobrem esses cenários, incluindo Parar/fechar enquanto o processo real de MSBui
 leitura e quatro combinações de recuo com tabs. O encerramento cancela a preparação, descarta resultados
 atrasados e desliga os handlers e timers; a classificação do editor descarta resultados de contexto antigo.
 
-Revisão "melhorar tudo" (06/10/2026): **125 de 125 aprovados** (94 do Core e 31 de ViewModels/editor),
+Revisão "melhorar tudo" (06/10/2026): **134 de 134 aprovados** (102 do Core e 32 de ViewModels/editor),
 cobrindo as ajudas do editor (dica do mouse, F12, F2, Ctrl+., comandos de linha), 31 erros comuns traduzidos,
 dicas DICA01/DICA02, reaproveitamento da compilação e salvar sem recarregar o projeto. Conferido também na
 tela: dica do mouse em português, "Adicionar using System.Text;", F12 entre arquivos, renomear, menu do

@@ -14,7 +14,7 @@ public sealed class LifecycleRegressionTests
         { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
 
     private static void Event(MainViewModel vm, WatcherChangeTypes type, string path, string? oldPath = null) =>
-        typeof(MainViewModel).GetMethod("Enqueue", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(vm, [type, path, oldPath]);
+        typeof(MainViewModel).GetMethod("Enqueue", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(vm, [new FolderEvent(type, path, oldPath)]);
 
     [Fact]
     public void Evento_ja_enfileirado_nao_reinicia_monitor_apos_fechar() => Ui.Run(async () =>

@@ -50,4 +50,37 @@ public sealed class PerformanceRegressionTests(ITestOutputHelper output)
         Assert.False(vm.LastRunReusedBuild);
         Assert.False(doc.IsDirty);
     }, 300);
+
+    [Fact]
+    public void Erro_de_compilacao_mostra_Problemas_e_nunca_reaproveita_build_antigo() => Ui.Run(async () =>
+    {
+        using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
+        await vm.InitializeAsync();
+        var created = ProjectCreator.CreateConsoleProject(Ui.NewFolder("falha"), "Falha", "Console.WriteLine(\"ok\");" + Environment.NewLine);
+        await vm.OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: false);
+
+        async Task Run(RunState expected)
+        {
+            vm.RunOrStopCommand.Execute(null);
+            await Ui.WaitUntil(() => vm.RunState == expected, 120_000, expected.ToString());
+            if (expected == RunState.Running) vm.StopRun();
+            await Ui.WaitUntil(() => vm.RunState == RunState.Idle, 15_000, "fim");
+        }
+
+        await Run(RunState.Running);
+        vm.PanelTab = "terminal";
+
+        var doc = vm.OpenFile(created.ProgramPath)!;
+        doc.Document.Text = "Console.WriteLine(\"ok\")" + Environment.NewLine; // faltou ";"
+        vm.RunOrStopCommand.Execute(null);
+        await Ui.WaitUntil(() => vm.RunState == RunState.Idle && vm.StatusText.Contains("falhou"), 120_000, "compilação com erro");
+        Assert.False(vm.LastRunReusedBuild);
+        Assert.Equal("problems", vm.PanelTab);
+        Assert.True(vm.IsPanelOpen);
+
+        // Volta ao texto que já compilou antes: compila de novo em vez de usar o programa velho.
+        doc.Document.Text = "Console.WriteLine(\"ok\");" + Environment.NewLine;
+        await Run(RunState.Running);
+        Assert.False(vm.LastRunReusedBuild);
+    }, 300);
 }

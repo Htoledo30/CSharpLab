@@ -1,11 +1,9 @@
 using System.Reflection;
 using CSharpLab.Core.Files;
-using CSharpLab.Core.Language;
 using CSharpLab.Core.Projects;
 using CSharpLab.Core.Settings;
 using CSharpLab.Editor;
 using CSharpLab.ViewModels;
-using Microsoft.CodeAnalysis.CSharp;
 
 namespace CSharpLab.App.Tests;
 
