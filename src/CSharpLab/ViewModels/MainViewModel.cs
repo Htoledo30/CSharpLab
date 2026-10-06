@@ -1690,6 +1690,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void TogglePanel() => IsPanelOpen = !IsPanelOpen;
 
+    /// <summary>Painel inferior ocupando quase toda a altura (bom para jogos no terminal). Não é salvo.</summary>
+    [ObservableProperty]
+    public partial bool IsPanelMaximized { get; set; }
+
+    partial void OnIsPanelOpenChanged(bool oldValue, bool newValue)
+    {
+        if (!newValue) IsPanelMaximized = false;
+    }
+
+    [RelayCommand]
+    private void TogglePanelMaximized()
+    {
+        IsPanelMaximized = !IsPanelMaximized;
+        if (IsPanelMaximized) IsPanelOpen = true;
+    }
+
     [RelayCommand]
     private void ShowPanelTab(string tab)
     {

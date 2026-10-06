@@ -17,7 +17,7 @@ public sealed class ProblemItem
     public CodeDiagnostic Diagnostic { get; }
     public string FileName { get; }
     public bool IsError => Diagnostic.Level == DiagnosticLevel.Error;
-    public string LevelLabel => IsError ? "Erro" : "Aviso";
+    public string LevelLabel => IsError ? "Erro" : Diagnostic.Id.StartsWith("DICA", StringComparison.Ordinal) ? "Dica" : "Aviso";
     public string Location => Diagnostic.HasLocation ? $"Linha {Diagnostic.Line}" : "Projeto";
 
     /// <summary>"Program.cs · Linha 12 — Faltou ";"."</summary>

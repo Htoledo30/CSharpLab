@@ -16,6 +16,7 @@ public sealed class DiagnosticRenderer : IBackgroundRenderer
 {
     private static readonly Pen ErrorPen = MakePen(SyntaxTheme.ErrorColor);
     private static readonly Pen WarningPen = MakePen(SyntaxTheme.WarningColor);
+    private static readonly Pen HintPen = MakePen((Color)ColorConverter.ConvertFromString("#7C8CF8"));
 
     private readonly TextDocument _document;
 
@@ -87,7 +88,9 @@ public sealed class DiagnosticRenderer : IBackgroundRenderer
         // Avisos primeiro, erros por cima.
         foreach (var marker in Markers.FindOverlappingSegments(viewStart, viewEnd - viewStart).OrderByDescending(m => m.Diagnostic.Level))
         {
-            var pen = marker.Diagnostic.Level == DiagnosticLevel.Error ? ErrorPen : WarningPen;
+            var pen = marker.Diagnostic.Level == DiagnosticLevel.Error ? ErrorPen
+                : marker.Diagnostic.Id.StartsWith("DICA", StringComparison.Ordinal) ? HintPen
+                : WarningPen;
             foreach (var rect in BackgroundGeometryBuilder.GetRectsForSegment(textView, marker))
             {
                 var geometry = new StreamGeometry();

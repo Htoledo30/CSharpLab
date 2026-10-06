@@ -105,6 +105,8 @@ public static partial class DiagnosticTranslator
             "CS0103" when Has(1) => $"\"{Arg(0)}\" não foi encontrado neste trecho.",
             "CS0117" when Has(2) => $"\"{Arg(0)}\" não possui um membro chamado \"{Arg(1)}\".",
             "CS1061" when Has(2) => $"\"{Arg(0)}\" não possui \"{Arg(1)}\" acessível aqui. Verifique o nome e as referências necessárias.",
+            "CS0029" when Has(2) && Arg(0) == "int" && Arg(1) == "bool" =>
+                "Um número não é verdadeiro/falso. Para comparar, use == (dois sinais de igual).",
             "CS0029" when Has(2) && Arg(0) == "string" && NumericTypes.Contains(Arg(1)) =>
                 $"Não é possível colocar texto em uma variável {Arg(1)}.",
             "CS0029" when Has(2) && NumericTypes.Contains(Arg(0)) && Arg(1) == "string" =>
@@ -127,6 +129,30 @@ public static partial class DiagnosticTranslator
             "CS8602" => "Este valor pode ser nulo aqui.",
             "CS8604" when Has(1) => $"O argumento \"{Arg(0)}\" pode ser nulo aqui.",
             "CS8618" when Has(2) => $"\"{Arg(1)}\" precisa receber um valor no construtor, pois não aceita nulo.",
+            // Erros frequentes de quem está começando.
+            "CS0120" when Has(1) => $"\"{MemberName(Arg(0))}\" não é static: crie um objeto com new para usá-lo, ou marque-o como static.",
+            "CS0122" when Has(1) => $"\"{MemberName(Arg(0))}\" não é public e não pode ser usado daqui.",
+            "CS7036" when Has(2) => $"Falta o argumento \"{Arg(0)}\" na chamada de \"{MemberName(Arg(1))}\".",
+            "CS1955" when Has(1) => $"\"{MemberName(Arg(0))}\" não é um método: tire os parênteses.",
+            "CS0428" when Has(1) => $"\"{MemberName(Arg(0))}\" é um método: faltaram os parênteses para chamá-lo.",
+            "CS0201" => "Esta linha não faz nada sozinha. Talvez falte uma atribuição (=) ou os parênteses de uma chamada.",
+            "CS0815" when Has(1) => $"Não é possível guardar {Arg(0)} numa variável declarada com var.",
+            "CS0664" when Has(2) => $"Números com vírgula são double. Para {Arg(1)}, use o sufixo {Arg(0)} (ex.: 1.5{Arg(0)}).",
+            "CS1525" when Has(1) => $"\"{Arg(0)}\" não pode aparecer aqui.",
+            "CS1001" => "Era esperado um nome aqui.",
+            "CS1022" => "Há uma \"}\" a mais ou um trecho fora do lugar.",
+            "CS1519" when Has(1) => $"\"{Arg(0)}\" está fora do lugar: código de instruções precisa ficar dentro de um método.",
+            "CS0102" when Has(2) => $"\"{Arg(0)}\" já tem algo chamado \"{Arg(1)}\".",
+            "CS0111" when Has(2) => $"\"{Arg(1)}\" já tem um método \"{Arg(0)}\" com os mesmos parâmetros.",
+            "CS0127" when Has(1) => $"\"{MemberName(Arg(0))}\" é void: o return não pode devolver um valor.",
+            "CS0126" when Has(1) => $"Este return precisa devolver um valor do tipo {Arg(0)}.",
+            "CS8625" => "Este lugar não aceita null.",
+            "CS5001" => "O programa não tem por onde começar: escreva algum código fora das classes (ou um método static Main).",
+            "CS0023" when Has(2) => $"O operador \"{Arg(0)}\" não pode ser usado com \"{Arg(1)}\".",
+            "CS0030" when Has(2) => $"Não é possível converter \"{Arg(0)}\" para \"{Arg(1)}\".",
+            "CS0116" => "Métodos e campos precisam ficar dentro de uma classe.",
+            "CS0106" when Has(1) => $"O modificador \"{Arg(0)}\" não pode ser usado aqui.",
+            "CS8803" => "Instruções soltas (fora de classe) precisam vir antes das declarações de classes no arquivo.",
             _ => null,
         };
     }

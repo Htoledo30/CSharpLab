@@ -28,6 +28,7 @@
         <KeyBinding Key="F5" Modifiers="Shift" Command="{Binding StopCommand}" />
         <KeyBinding Key="B" Modifiers="Ctrl" Command="{Binding ToggleExplorerCommand}" />
         <KeyBinding Key="J" Modifiers="Ctrl" Command="{Binding TogglePanelCommand}" />
+        <KeyBinding Key="J" Modifiers="Ctrl+Shift" Command="{Binding TogglePanelMaximizedCommand}" />
     </Window.InputBindings>
 
     <Border x:Name="RootBorder">
@@ -409,6 +410,19 @@
                                         <TextBlock Style="{StaticResource Icon}" Text="{StaticResource IconArrowDown}" FontSize="10" Margin="0,0,6,0" />
                                         <TextBlock Text="Ir para o fim" FontSize="12" />
                                     </StackPanel>
+                                </Button>
+                                <Button Width="24" Height="24" FontSize="11" Command="{Binding TogglePanelMaximizedCommand}"
+                                        AutomationProperties.Name="Expandir ou restaurar o painel" ToolTip="Expandir/restaurar o painel (Ctrl+Shift+J)">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                            <Setter Property="Content" Value="&#xE740;" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPanelMaximized}" Value="True">
+                                                    <Setter Property="Content" Value="&#xE73F;" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
                                 </Button>
                                 <Button Width="24" Height="24" FontSize="9" Command="{Binding TogglePanelCommand}"
                                         AutomationProperties.Name="Mostrar ou ocultar painel" ToolTip="Mostrar/ocultar painel (Ctrl+J)">

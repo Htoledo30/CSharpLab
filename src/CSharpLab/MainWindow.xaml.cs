@@ -40,6 +40,10 @@ public partial class MainWindow : Window
         RestorePlacement(vm.Settings.Window);
         ApplyExplorerLayout();
         ApplyPanelLayout();
+        MainArea.SizeChanged += (_, _) =>
+        {
+            if (_vm.IsPanelMaximized) ApplyPanelLayout();
+        };
         vm.PropertyChanged += OnVmPropertyChanged;
 
         SourceInitialized += (_, _) => ApplyWindowFrame();
@@ -79,6 +83,7 @@ public partial class MainWindow : Window
                 break;
             case nameof(MainViewModel.IsPanelOpen):
             case nameof(MainViewModel.PanelTab):
+            case nameof(MainViewModel.IsPanelMaximized):
                 ApplyPanelLayout();
                 break;
         }
@@ -110,7 +115,13 @@ public partial class MainWindow : Window
         if (open)
         {
             var height = _vm.PanelHeight;
-            if (height < 120)
+            if (_vm.IsPanelMaximized)
+            {
+                // Deixa só algumas linhas do editor à vista.
+                var available = MainArea.ActualHeight > 0 ? MainArea.ActualHeight : ActualHeight - 100;
+                height = Math.Max(160, available - 130);
+            }
+            else if (height < 120)
             {
                 // Primeira abertura: cerca de 25% da altura disponível.
                 var available = MainArea.ActualHeight > 0 ? MainArea.ActualHeight : ActualHeight - 100;
@@ -141,6 +152,7 @@ public partial class MainWindow : Window
     private void OnPanelResized(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
     {
         var height = PanelRow.ActualHeight;
+        _vm.IsPanelMaximized = false;
         if (height < 80)
         {
             _vm.IsPanelOpen = false;

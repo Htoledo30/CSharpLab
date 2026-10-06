@@ -85,6 +85,10 @@
                 <Setter TargetName="Glyph" Property="Text" Value="{StaticResource IconWarning}" />
                 <Setter TargetName="Glyph" Property="Foreground" Value="{StaticResource WarningBrush}" />
             </DataTrigger>
+            <DataTrigger Binding="{Binding LevelLabel}" Value="Dica">
+                <Setter TargetName="Glyph" Property="Text" Value="&#xE946;" />
+                <Setter TargetName="Glyph" Property="Foreground" Value="{StaticResource Accent}" />
+            </DataTrigger>
         </DataTemplate.Triggers>
     </DataTemplate>
 </ResourceDictionary>

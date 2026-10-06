@@ -651,6 +651,21 @@ public sealed class LanguageService : IDisposable
                     tree != null ? d.Location.SourceSpan.Length : 0,
                     FromBuild: false));
             }
+
+            // Dicas para armadilhas que o compilador aceita (lista impressa direto, divisão inteira…).
+            foreach (var tree in compilation.SyntaxTrees)
+            {
+                var docId = solution.GetDocumentId(tree);
+                if (docId == null || generated.Contains(docId) || !keysById.TryGetValue(docId, out var hintKey)) continue;
+                var model = compilation.GetSemanticModel(tree);
+                foreach (var (id, message, location) in BeginnerHints.Analyze(model, ct))
+                {
+                    var span = location.GetLineSpan();
+                    result.Add(new CodeDiagnostic(id, DiagnosticLevel.Warning, message, "Dica do CSharp Lab", hintKey,
+                        span.StartLinePosition.Line + 1, span.StartLinePosition.Character + 1,
+                        location.SourceSpan.Start, location.SourceSpan.Length, FromBuild: false));
+                }
+            }
         }
 
         var ordered = result
