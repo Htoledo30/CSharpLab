@@ -32,6 +32,27 @@ public sealed record ProjectModel
 
     public bool IsConsole => string.Equals(OutputType, "Exe", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Verdadeiro se os dois modelos produzem a mesma compilação (arquivos, referências, opções).
+    /// Usado para não reconstruir o projeto do Roslyn — e perder o que já estava calculado — sem necessidade.
+    /// </summary>
+    public bool HasSameAnalysisAs(ProjectModel? other)
+    {
+        if (other == null) return false;
+        static bool Same(IEnumerable<string> a, IEnumerable<string> b) =>
+            a.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(b);
+        return string.Equals(ProjectPath, other.ProjectPath, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(Directory, other.Directory, StringComparison.OrdinalIgnoreCase) &&
+               Name == other.Name && AssemblyName == other.AssemblyName &&
+               TargetFramework == other.TargetFramework && LangVersion == other.LangVersion &&
+               Nullable == other.Nullable && OutputType == other.OutputType &&
+               AllowUnsafeBlocks == other.AllowUnsafeBlocks && TreatWarningsAsErrors == other.TreatWarningsAsErrors &&
+               WarningLevel == other.WarningLevel &&
+               Same(CompileFiles, other.CompileFiles) && Same(References, other.References) &&
+               Same(DefineConstants, other.DefineConstants) && Same(NoWarn, other.NoWarn) &&
+               Usings.ToHashSet().SetEquals(other.Usings);
+    }
+
     public static readonly IReadOnlyList<GlobalUsingItem> ImplicitConsoleUsings =
     [
         new("System"),

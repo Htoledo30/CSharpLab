@@ -46,6 +46,57 @@ public static partial class BuildService
     [GeneratedRegex(@"^\s*(?:(?<file>.+?)\s*:\s*)?(?<sev>error|warning)\s+(?<code>[A-Za-z]+\d+)\s*:\s*(?<msg>.*?)(?:\s+\[(?<proj>[^\[\]]+)\])?\s*$")]
     private static partial Regex UnlocatedLine();
 
+    /// <summary>
+    /// "Impressão digital" das entradas da compilação: todos os arquivos da pasta do projeto
+    /// (menos bin/obj e pastas de ferramentas), o project.assets.json e os arquivos acima do
+    /// projeto que mudam a compilação. Se não mudou desde a última compilação bem-sucedida,
+    /// o programa pode ser executado de novo sem compilar.
+    /// </summary>
+    public static string InputFingerprint(string projectPath)
+    {
+        var dir = Path.GetDirectoryName(Path.GetFullPath(projectPath))!;
+        long newest = 0, count = 0, size = 0;
+        void Add(string file)
+        {
+            try
+            {
+                var info = new FileInfo(file);
+                if (!info.Exists) return;
+                newest = Math.Max(newest, Math.Max(info.LastWriteTimeUtc.Ticks, info.CreationTimeUtc.Ticks));
+                count++;
+                size += info.Length;
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
+        var stack = new Stack<string>();
+        stack.Push(dir);
+        while (stack.Count > 0)
+        {
+            var current = stack.Pop();
+            try
+            {
+                foreach (var f in Directory.EnumerateFiles(current))
+                {
+                    if (!Files.TextFileIO.IsTempName(Path.GetFileName(f))) Add(f);
+                }
+                foreach (var sub in Directory.EnumerateDirectories(current))
+                {
+                    var name = Path.GetFileName(sub);
+                    if (ProjectLocator.IsSkippedDirectory(name)) continue;
+                    if (File.GetAttributes(sub).HasFlag(FileAttributes.ReparsePoint)) continue;
+                    stack.Push(sub);
+                }
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        Add(Path.Combine(dir, "obj", "project.assets.json"));
+        foreach (var f in ProjectEvaluator.RestoreInputs(projectPath)) Add(f);
+        return $"{newest}|{count}|{size}";
+    }
+
     public static async Task<BuildResult> BuildAsync(string projectPath, Action<string>? progress, CancellationToken ct)
     {
         var sw = Stopwatch.StartNew();

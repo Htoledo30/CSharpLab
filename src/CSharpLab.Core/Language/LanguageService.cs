@@ -54,6 +54,7 @@ public sealed class LanguageService : IDisposable
     private Solution _solution;
     private ProjectId? _mainProject;
     private ProjectModel? _mainModel;
+    private string _mainEditorConfigs = "";
     private DocumentId? _mainGlobalUsings;
 
     /// <summary>Documento de cada chave (caminho completo ou "untitled:…").</summary>
@@ -92,6 +93,16 @@ public sealed class LanguageService : IDisposable
     {
         lock (_gate)
         {
+            // Mesma compilação de antes (ex.: reavaliação depois de salvar): mantém o projeto e tudo
+            // o que o Roslyn já calculou, para sugestões e erros continuarem instantâneos.
+            var editorConfigs = model != null ? EditorConfigStamp(model.Directory) : "";
+            if (model != null && _mainProject != null && model.HasSameAnalysisAs(_mainModel) && editorConfigs == _mainEditorConfigs)
+            {
+                _mainModel = model;
+                return;
+            }
+            _mainEditorConfigs = editorConfigs;
+
             var solution = _solution;
             if (_mainProject != null)
             {
@@ -231,6 +242,24 @@ public sealed class LanguageService : IDisposable
             }
         }
         return list;
+    }
+
+    /// <summary>Caminho e data de cada .editorconfig que vale para a pasta.</summary>
+    private static string EditorConfigStamp(string directory)
+    {
+        var parts = new List<string>();
+        try
+        {
+            for (var dir = directory; !string.IsNullOrEmpty(dir); dir = Path.GetDirectoryName(dir))
+            {
+                var file = Path.Combine(dir, ".editorconfig");
+                if (File.Exists(file)) parts.Add(file + "|" + File.GetLastWriteTimeUtc(file).Ticks);
+            }
+        }
+        catch
+        {
+        }
+        return string.Join(";", parts);
     }
 
     private static IEnumerable<DocumentInfo> EditorConfigs(ProjectId projectId, string directory)

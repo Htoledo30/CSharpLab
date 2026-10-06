@@ -200,8 +200,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var session = Settings.Session;
         if (session?.Folder != null)
         {
+            // A pasta abre na hora; o projeto termina de carregar em segundo plano, sem segurar as abas.
             if (Directory.Exists(session.Folder))
-                await OpenFolderAsync(session.Folder, null, promptForUnsaved: false);
+                await OpenFolderAsync(session.Folder, null, promptForUnsaved: false, waitForProject: false);
             else
                 NotifyInfo($"A pasta \"{session.Folder}\" não existe mais.");
         }
@@ -833,7 +834,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ScheduleSettingsSave();
     }
 
-    public async Task<bool> OpenFolderAsync(string folder, string? preferredProject, bool promptForUnsaved, bool partOfRun = false, CancellationToken ct = default)
+    public async Task<bool> OpenFolderAsync(string folder, string? preferredProject, bool promptForUnsaved, bool partOfRun = false,
+        CancellationToken ct = default, bool waitForProject = true)
     {
         if (_disposed) return false;
         ct.ThrowIfCancellationRequested();
@@ -866,7 +868,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             AddRecent(folder, RecentKind.Folder);
         }
 
-        await LoadProjectsAsync(ct: ct);
+        var loading = LoadProjectsAsync(ct: ct);
+        if (!waitForProject)
+        {
+            _ = loading.ContinueWith(t => AppPaths.Log(t.Exception!, "Carregando projetos"), TaskContinuationOptions.OnlyOnFaulted);
+            ScheduleSettingsSave();
+            return true;
+        }
+        await loading;
         ct.ThrowIfCancellationRequested();
         if (_disposed) return false;
         ScheduleSettingsSave();
@@ -893,6 +902,25 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _evaluationCts?.Cancel();
         var candidates = await Task.Run(() => ProjectLocator.FindProjects(folder));
         if (_disposed || scan.IsCancellationRequested || CurrentFolder != folder || version != _projectLoadVersion) return;
+
+        // Contexto imediato para as sugestões: o projeto provável, do cache (ou estimado), antes
+        // de o SDK confirmar as propriedades de cada .csproj (isso leva ~1 s por projeto).
+        if (useCache && _model == null)
+        {
+            var quickConsoles = ProjectLocator.ConsoleProjects(candidates);
+            var guess = (Settings.ProjectChoices.TryGetValue(folder, out var remembered)
+                            ? candidates.FirstOrDefault(p => string.Equals(p.Path, remembered, StringComparison.OrdinalIgnoreCase))
+                            : null)
+                        ?? (quickConsoles.Count == 1 ? quickConsoles[0] : null)
+                        ?? (candidates.Count == 1 ? candidates[0] : null);
+            if (guess != null)
+            {
+                var quickModel = await Task.Run(() => ProjectEvaluator.TryLoadCached(guess.Path) ?? ProjectEvaluator.Estimate(guess.Path));
+                if (_disposed || scan.IsCancellationRequested || CurrentFolder != folder || version != _projectLoadVersion) return;
+                ApplyModel(quickModel);
+            }
+        }
+
         ProjectFile[] projects;
         try
         {
@@ -930,6 +958,13 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private int _evaluationsInFlight;
+    private readonly HashSet<string> _sdkVerified = new(StringComparer.OrdinalIgnoreCase);
+    private (string ProjectPath, string Fingerprint, ProcessLaunch Launch)? _lastGoodBuild;
+
+    /// <summary>A última execução reaproveitou a compilação anterior (nada tinha mudado).</summary>
+    public bool LastRunReusedBuild { get; private set; }
+
     private async Task LoadModelAsync(string projectPath, bool useCache = true, CancellationToken ct = default)
     {
         if (_disposed || ct.IsCancellationRequested) return;
@@ -940,6 +975,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ApplyModel(quick);
         if (quick.IsEvaluated) return;
 
+        _evaluationsInFlight++;
         try
         {
             var evaluated = await Task.Run(() => ProjectEvaluator.EvaluateAsync(projectPath, allowRestore: true, cts.Token));
@@ -952,6 +988,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         catch (Exception ex)
         {
             AppPaths.Log(ex, "Avaliando projeto");
+        }
+        finally
+        {
+            _evaluationsInFlight--;
         }
     }
 
@@ -1132,7 +1172,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             {
                 var name = Path.GetFileName(path);
                 if (TextFileIO.IsTempName(name)) continue;
-                if (name.Equals("project.assets.json", StringComparison.OrdinalIgnoreCase)) reevaluate = true;
+                // Restore feito pela própria avaliação em andamento: o resultado dela já vai incluir isso.
+                if (name.Equals("project.assets.json", StringComparison.OrdinalIgnoreCase) && _evaluationsInFlight == 0) reevaluate = true;
                 if (ProjectLocator.IsInsideSkippedDirectory(path, folder)) continue;
 
                 if (e.Type != WatcherChangeTypes.Changed || Directory.Exists(path) == false)
@@ -1148,11 +1189,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 }
                 if (name.Equals(".editorconfig", StringComparison.OrdinalIgnoreCase)) reevaluate = true;
 
+                // Decide pelo estado final no disco: salvar grava um temporário e substitui o
+                // arquivo, o que gera "apagado"/"renomeado" para um arquivo que continua existindo.
+                bool exists = File.Exists(path);
                 if (e.Type != WatcherChangeTypes.Changed && name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
-                    reevaluate = true;
+                {
+                    bool inModel = _model?.CompileFiles.Contains(path, StringComparer.OrdinalIgnoreCase) == true;
+                    if (exists != inModel) reevaluate = true;
+                }
 
-                if (deleted) _ls?.OnFileDeleted(path);
-                else _ls?.OnFileCreatedOrChanged(path);
+                if (exists) _ls?.OnFileCreatedOrChanged(path);
+                else if (!Directory.Exists(path)) _ls?.OnFileDeleted(path);
             }
         }
 
@@ -1160,7 +1207,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         else Explorer.RefreshPaths(dirs);
 
         CheckAllExternalChanges();
-        if (reloadProjects || fullRefresh) _ = LoadProjectsAsync(useCache: false);
+        if (reloadProjects || fullRefresh)
+        {
+            _sdkVerified.Clear();
+            _lastGoodBuild = null;
+            _ = LoadProjectsAsync(useCache: false);
+        }
         else if (reevaluate && _model?.ProjectPath is { } analyzed) _ = ReevaluateAsync(analyzed);
         else if (reevaluate) _ = LoadProjectsAsync(useCache: false);
         ScheduleDiagnostics();
@@ -1171,6 +1223,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (_disposed) return;
         _evaluationCts?.Cancel();
         var cts = _evaluationCts = new CancellationTokenSource();
+        _evaluationsInFlight++;
         try
         {
             var model = await Task.Run(() => ProjectEvaluator.EvaluateAsync(projectPath, allowRestore: true, cts.Token));
@@ -1180,6 +1233,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
         }
         catch (Exception ex) { AppPaths.Log(ex, "Reavaliando projeto"); }
+        finally { _evaluationsInFlight--; }
     }
 
     /// <summary>Compara cada aba com o arquivo no disco (chamado em eventos da pasta e ao ativar a janela).</summary>
@@ -1357,14 +1411,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 return;
             }
 
-            // SDK (considerando global.json e o framework do projeto).
-            var file = await ProjectFile.ReadEvaluatedAsync(project.Path, ct);
-            while (true)
+            // SDK (considerando global.json e o framework do projeto). O projeto já foi lido pelo SDK
+            // ao abrir a pasta; uma verificação que deu certo vale para a sessão inteira.
+            var file = project;
+            var requiredMajor = SdkLocator.RequiredMajorFor(file.EffectiveTargetFramework);
+            var sdkKey = file.Directory + "|" + requiredMajor;
+            while (!_sdkVerified.Contains(sdkKey))
             {
-                var sdk = await SdkLocator.CheckAsync(file.Directory, SdkLocator.RequiredMajorFor(file.EffectiveTargetFramework), ct);
+                var sdk = await SdkLocator.CheckAsync(file.Directory, requiredMajor, ct);
                 ct.ThrowIfCancellationRequested();
-                SdkMissing = sdk.IsMissingSdk && SdkLocator.RequiredMajorFor(file.EffectiveTargetFramework) == SdkLocator.DefaultMajor;
-                if (sdk.CanBuild) break;
+                SdkMissing = sdk.IsMissingSdk && requiredMajor == SdkLocator.DefaultMajor;
+                if (sdk.CanBuild)
+                {
+                    _sdkVerified.Add(sdkKey);
+                    break;
+                }
                 if (sdk.IsMissingSdk)
                 {
                     if (!Dialogs.ShowSdkMissing(sdk.Problem!, sdk.Detail)) { StatusText = ""; return; }
@@ -1387,35 +1448,51 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (_stopRequested) return;
 
             RunState = RunState.Building;
-            StatusText = "Compilando…";
-            var result = await Task.Run(() => BuildService.BuildAsync(project.Path,
-                msg => Application.Current?.Dispatcher.BeginInvoke(() =>
+            // Nada mudou desde a última compilação bem-sucedida: executa direto o mesmo programa.
+            var fingerprint = await Task.Run(() => BuildService.InputFingerprint(project.Path), ct);
+            ProcessLaunch launch;
+            if (_lastGoodBuild is { } last &&
+                string.Equals(last.ProjectPath, project.Path, StringComparison.OrdinalIgnoreCase) &&
+                last.Fingerprint == fingerprint && File.Exists(last.Launch.FileName))
+            {
+                launch = last.Launch;
+                LastRunReusedBuild = true;
+            }
+            else
+            {
+                LastRunReusedBuild = false;
+                StatusText = "Compilando…";
+                var result = await Task.Run(() => BuildService.BuildAsync(project.Path,
+                    msg => Application.Current?.Dispatcher.BeginInvoke(() =>
+                    {
+                        if (!_disposed && !ct.IsCancellationRequested) StatusText = msg;
+                    }), ct));
+
+                if (result.Outcome == BuildOutcome.Cancelled || _stopRequested)
                 {
-                    if (!_disposed && !ct.IsCancellationRequested) StatusText = msg;
-                }), ct));
+                    StatusText = "Compilação interrompida.";
+                    return;
+                }
 
-            if (result.Outcome == BuildOutcome.Cancelled || _stopRequested)
-            {
-                StatusText = "Compilação interrompida.";
-                return;
+                Problems.SetBuild(result);
+                RefreshDocumentDiagnostics();
+                if (!result.Success)
+                {
+                    _lastGoodBuild = null;
+                    StatusText = result.Outcome == BuildOutcome.RestoreFailed
+                        ? "Não foi possível restaurar as dependências."
+                        : "A compilação falhou. Veja Problemas.";
+                    PanelTab = "problems";
+                    IsPanelOpen = true;
+                    return;
+                }
+
+                var model = _model is { IsEvaluated: true } m && string.Equals(m.ProjectPath, project.Path, StringComparison.OrdinalIgnoreCase)
+                    ? m
+                    : await Task.Run(() => ProjectEvaluator.EvaluateAsync(project.Path, allowRestore: false, ct));
+                launch = await BuildService.GetLaunchAsync(model, ct);
+                _lastGoodBuild = (project.Path, fingerprint, launch);
             }
-
-            Problems.SetBuild(result);
-            RefreshDocumentDiagnostics();
-            if (!result.Success)
-            {
-                StatusText = result.Outcome == BuildOutcome.RestoreFailed
-                    ? "Não foi possível restaurar as dependências."
-                    : "A compilação falhou. Veja Problemas.";
-                PanelTab = "problems";
-                IsPanelOpen = true;
-                return;
-            }
-
-            var model = _model is { IsEvaluated: true } m && string.Equals(m.ProjectPath, project.Path, StringComparison.OrdinalIgnoreCase)
-                ? m
-                : await Task.Run(() => ProjectEvaluator.EvaluateAsync(project.Path, allowRestore: false, ct));
-            var launch = await BuildService.GetLaunchAsync(model, ct);
             ct.ThrowIfCancellationRequested();
 
             PanelTab = "terminal";
@@ -1613,7 +1690,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void ShowSdkHelp()
     {
         if (Dialogs.ShowSdkMissing(SdkLocator.MissingMessage, null))
+        {
+            _sdkVerified.Clear();
             _ = CheckSdkInBackgroundAsync();
+        }
     }
 
     // ================================================================ recuperação e preferências

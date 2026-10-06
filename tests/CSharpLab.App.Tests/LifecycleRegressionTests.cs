@@ -72,7 +72,7 @@ public sealed class LifecycleRegressionTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Parar_ou_fechar_cancela_MSBuild_durante_leitura_das_propriedades(bool close) => Ui.Run(async () =>
+    public void Parar_ou_fechar_cancela_MSBuild_travado_no_projeto(bool close) => Ui.Run(async () =>
     {
         using var vm = Create();
         await vm.InitializeAsync();
@@ -90,7 +90,8 @@ public sealed class LifecycleRegressionTests
         try
         {
             await connection;
-            Assert.Equal(RunState.Preparing, vm.RunState);
+            // O MSBuild está travado avaliando o .csproj (antes ou durante a compilação).
+            Assert.True(vm.RunState is RunState.Preparing or RunState.Building, $"Estado: {vm.RunState}");
             if (close) vm.Dispose();
             else vm.StopRun();
             await Task.WhenAny(run, Task.Delay(1500));
