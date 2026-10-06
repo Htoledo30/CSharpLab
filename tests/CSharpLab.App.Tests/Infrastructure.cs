@@ -14,40 +14,43 @@ namespace CSharpLab.App.Tests;
 /// <summary>Roda um teste assíncrono numa thread STA com Dispatcher, como na interface real.</summary>
 public static class Ui
 {
+    private static readonly Dispatcher TestDispatcher;
     static Ui()
     {
         // Preferências e recuperação dos testes ficam numa pasta própria.
         AppPaths.Root = Path.Combine(Path.GetTempPath(), "csharplab-apptests", Guid.NewGuid().ToString("N")[..8]);
         Directory.CreateDirectory(AppPaths.Root);
+        using var ready = new ManualResetEventSlim();
+        Exception? failure = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                var app = (System.Windows.Application)Activator.CreateInstance(
+                    typeof(MainViewModel).Assembly.GetType("CSharpLab.App", throwOnError: true)!)!;
+                app.GetType().GetMethod("InitializeComponent")!.Invoke(app, null);
+                SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
+                ready.Set();
+                Dispatcher.Run();
+            }
+            catch (Exception ex) { failure = ex; ready.Set(); }
+        }) { IsBackground = true };
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        ready.Wait();
+        if (failure != null) throw failure;
+        TestDispatcher = System.Windows.Application.Current.Dispatcher;
     }
 
     public static void Run(Func<Task> test, int timeoutSeconds = 120)
     {
-        Exception? failure = null;
-        var thread = new Thread(() =>
+        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        TestDispatcher.BeginInvoke(async () =>
         {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            var frame = new DispatcherFrame();
-            var timer = new DispatcherTimer(TimeSpan.FromSeconds(timeoutSeconds), DispatcherPriority.Normal, (_, _) =>
-            {
-                failure ??= new TimeoutException("O teste não terminou a tempo.");
-                frame.Continue = false;
-            }, dispatcher);
-            dispatcher.BeginInvoke(async () =>
-            {
-                try { await test(); }
-                catch (Exception ex) { failure ??= ex; }
-                finally { frame.Continue = false; }
-            });
-            Dispatcher.PushFrame(frame);
-            timer.Stop();
-            dispatcher.InvokeShutdown();
+            try { await test(); completion.SetResult(); }
+            catch (Exception ex) { completion.SetException(ex); }
         });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (failure != null) throw new Exception(failure.Message, failure);
+        completion.Task.WaitAsync(TimeSpan.FromSeconds(timeoutSeconds)).GetAwaiter().GetResult();
     }
 
     public static async Task WaitUntil(Func<bool> condition, int timeoutMs = 30000, string? what = null)

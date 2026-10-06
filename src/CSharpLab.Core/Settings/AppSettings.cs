@@ -46,6 +46,10 @@ public sealed class AppSettings
     /// <summary>Projeto escolhido para executar em cada pasta com vários projetos.</summary>
     public Dictionary<string, string> ProjectChoices { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public string? LastProjectLocation { get; set; }
+    /// <summary>Procura uma versão nova nas Releases do GitHub ao abrir.</summary>
+    public bool CheckForUpdates { get; set; } = true;
+    /// <summary>Versão aberta da última vez (para avisar "atualizado para…").</summary>
+    public string? LastRunVersion { get; set; }
 
     public const int MaxRecent = 10;
 

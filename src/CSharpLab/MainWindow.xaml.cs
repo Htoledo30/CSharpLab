@@ -26,6 +26,11 @@ public partial class MainWindow : Window
         vm.Terminal = Terminal;
         Terminal.Bind(vm);
         Editors.Bind(vm);
+        vm.ShutdownForUpdateRequested += () =>
+        {
+            _closingForUpdate = true;
+            Close();
+        };
         Terminal.ScrolledAwayChanged += away =>
         {
             _terminalScrolledAway = away;
@@ -276,9 +281,12 @@ public partial class MainWindow : Window
 
     private void OnExit(object sender, RoutedEventArgs e) => Close();
 
+    private bool _closingForUpdate;
+
     protected override void OnClosing(CancelEventArgs e)
     {
-        if (!_vm.ConfirmExit())
+        // Para atualizar, as alterações já foram confirmadas pelo comando "Reiniciar agora".
+        if (!_closingForUpdate && !_vm.ConfirmExit())
         {
             e.Cancel = true;
             return;

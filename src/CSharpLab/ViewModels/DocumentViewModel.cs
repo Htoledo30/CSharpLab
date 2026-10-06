@@ -17,8 +17,9 @@ public sealed partial class DocumentViewModel : ObservableObject
     private SourceText _sourceText;
     private int _changesSinceBaseline;
 
-    public DocumentViewModel(string text, string? filePath, Encoding encoding, FileStamp? stamp, int untitledNumber = 0)
+    public DocumentViewModel(string text, string? filePath, Encoding encoding, FileStamp? stamp, int untitledNumber = 0, string? recoveryId = null)
     {
+        Id = recoveryId ?? Guid.NewGuid().ToString("N");
         Document = new TextDocument(text);
         Document.UndoStack.MarkAsOriginalFile();
         _sourceText = SourceText.From(text);
@@ -32,7 +33,7 @@ public sealed partial class DocumentViewModel : ObservableObject
         Document.UndoStack.PropertyChanged += OnUndoStackChanged;
     }
 
-    public string Id { get; } = Guid.NewGuid().ToString("N");
+    public string Id { get; }
     public TextDocument Document { get; }
     private Encoding _encoding = TextFileIO.Utf8NoBom;
 
@@ -145,6 +146,12 @@ public sealed partial class DocumentViewModel : ObservableObject
 
     /// <summary>Verdadeiro se o texto é igual ao que o editor leu ou gravou por último no disco.</summary>
     public bool MatchesDiskVersion(string text) => _diskHash != null && Hash(text).AsSpan().SequenceEqual(_diskHash);
+
+    public void SetDiskBaseline(string text, FileStamp stamp)
+    {
+        DiskStamp = stamp;
+        _diskHash = Hash(text);
+    }
 
     private void UpdateDirty() => IsDirty = _forceDirty || !Document.UndoStack.IsOriginalFile;
 

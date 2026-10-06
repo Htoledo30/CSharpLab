@@ -5,6 +5,7 @@
 ```powershell
 dotnet build CSharpLab.slnx                 # compila tudo
 dotnet test CSharpLab.slnx                  # testes do Core e dos ViewModels (precisa do SDK .NET 10)
+./tests/Installer.Tests.ps1                # testa instalação e rollback numa pasta temporária
 dotnet run --project src/CSharpLab          # abre o editor em modo Debug
 powershell -ExecutionPolicy Bypass -File build\publish.ps1   # gera artifacts\CSharpLab-win-x64.zip
 ```
@@ -14,6 +15,33 @@ mexer na sua sessão).
 
 Publicar uma versão no GitHub: crie uma tag `v1.2.3` e envie (`git push --tags`). O workflow
 `.github/workflows/release.yml` compila, testa, gera o zip e cria a Release com ele anexado.
+
+## Atualização automática
+
+O workflow grava `${{ github.repository }}` no executável como metadado `UpdateRepository` e anexa
+`CSharpLab-win-x64.zip` e `CSharpLab-win-x64.zip.sha256` à Release. O editor usa a
+[API de Releases do GitHub](https://docs.github.com/en/rest/releases/releases#get-the-latest-release)
+para procurar versões estáveis mais novas. O repositório deve ser público para a consulta sem autenticação.
+
+Para gerar o pacote localmente com esse recurso:
+
+```powershell
+./build/publish.ps1 -Version 1.0.1 -UpdateRepository usuario/repositorio
+```
+
+Sem `UpdateRepository`, o pacote abre e edita normalmente, mas a busca de atualizações fica sem fonte.
+`CSHARPLAB_UPDATE_FEED` permite um JSON local no formato da Release para os testes; `CSHARPLAB_UPDATE_REPO`
+substitui o repositório embutido. Use `CSHARPLAB_DATA` numa pasta própria em qualquer validação isolada.
+
+O pacote só fica pronto após conferir o SHA-256. Um manifesto guarda os hashes dos arquivos extraídos;
+eles são conferidos novamente antes de aplicar. O auxiliar PowerShell espera o processo antigo terminar,
+adquire a trava de instância e prepara a nova pasta antes da troca. Preserva o desinstalador e arquivos
+pessoais; só remove arquivos conhecidos do pacote anterior. Falhas na troca restauram a versão anterior.
+Falhas ficam no log `Updates/atualizacao.log` e são avisadas na próxima abertura. Fechar o editor cancela
+consultas e downloads pendentes. As cópias preparadas ficam em `Updates` até instalar ou ficarem inválidas.
+
+As versões devem usar três números, como `1.2.3`. Não é necessário republicar versões antigas para
+oferecer versões novas, mas uma cópia anterior ao recurso precisa ser instalada manualmente uma vez.
 
 ## Estrutura
 
@@ -29,7 +57,7 @@ Publicar uma versão no GitHub: crie uma tag `v1.2.3` e envie (`git push --tags`
 | `src/CSharpLab/Editor` | AvalonEdit + recursos de C# (cores, sublinhados, sugestões, assinatura, snippets, indentação) |
 | `src/CSharpLab/Views` | Explorador, terminal, busca, diálogos, host de editores |
 | `tests/CSharpLab.Tests` | Tradução de erros, arquivos, projetos, build real, cancelamento e terminal |
-| `tests/CSharpLab.App.Tests` | ViewModels numa thread STA com Dispatcher real: execução/parada, exclusão, salvamento, pasta |
+| `tests/CSharpLab.App.Tests` | ViewModels e editor numa thread STA com recursos WPF reais: execução/parada, arquivos, recuperação e completion |
 
 ## Decisões técnicas
 
@@ -70,6 +98,14 @@ Publicar uma versão no GitHub: crie uma tag `v1.2.3` e envie (`git push --tags`
 - **Recuperação**: cópias de documentos alterados em `%LocalAppData%\CSharpLab\Recovery` (1,5 s após a
   última edição, gravação atômica), apagadas ao salvar ou descartar. Gravações e exclusões passam por uma
   fila única e ordenada, então uma gravação atrasada nunca recria um rascunho já descartado.
+  Ao restaurar, a cópia mantém o mesmo identificador e continua no disco até salvar ou descartar,
+  inclusive se o aplicativo encerrar inesperadamente de novo. Uma trava exclusiva impede duas
+  instâncias de usarem a mesma pasta de preferências/recuperação.
+- **Contexto do editor**: renomear entre `.cs` e outras extensões atualiza colorização e indentação.
+  Mudanças no projeto atualizam opções de sintaxe, inclusive símbolos de pré-processador, e o
+  `.editorconfig` define tabs/espaços e tamanho da indentação usada por Tab e Enter.
+- **Instalação**: os arquivos são copiados para uma pasta temporária irmã antes da troca. A versão
+  anterior fica disponível para rollback até a nova pasta ocupar o destino com sucesso.
 - **Salvar** confere o arquivo no disco antes de gravar (data, tamanho e conteúdo) e pergunta antes de
   substituir uma versão alterada por outro programa. Codificações antigas (Windows-1252) nunca trocam
   caracteres em silêncio: se faltar algum, o editor oferece salvar em UTF-8.

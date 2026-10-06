@@ -12,6 +12,7 @@ using CSharpLab.Core.Language;
 using CSharpLab.Core.Projects;
 using CSharpLab.Core.Settings;
 using CSharpLab.Core.Terminal;
+using CSharpLab.Core.Updates;
 
 namespace CSharpLab.ViewModels;
 
@@ -195,6 +196,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public async Task InitializeAsync()
     {
+        if (_disposed) return;
         var session = Settings.Session;
         if (session?.Folder != null)
         {
@@ -204,6 +206,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 NotifyInfo($"A pasta \"{session.Folder}\" não existe mais.");
         }
 
+        if (_disposed) return;
         RestoreRecoveredDocuments();
 
         if (session != null)
@@ -222,8 +225,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         try
         {
-            _ls = await _languageTask;
-            _ls.ProjectChanged += () => Application.Current?.Dispatcher.BeginInvoke(ScheduleDiagnostics);
+            var language = await _languageTask;
+            if (_disposed) return;
+            _ls = language;
+            _ls.ProjectChanged += OnLanguageProjectChanged;
             if (_model != null) _ls.LoadProject(_model);
             foreach (var d in Documents) AttachLanguage(d);
             LanguageStatus = null;
@@ -237,16 +242,161 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             LanguageStatus = "Sugestões indisponíveis";
         }
 
+        if (_disposed) return;
         _ = CheckSdkInBackgroundAsync();
+        AnnounceVersionChange();
+        if (Settings.CheckForUpdates) _ = CheckForUpdatesAsync(manual: false);
+    }
+
+    // ================================================================ atualizações
+
+    private (Version Version, string AppDir)? _stagedUpdate;
+    private bool _relaunchAfterUpdate;
+    private readonly CancellationTokenSource _updatesCts = new();
+    private bool _disposed;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CheckUpdatesNowCommand))]
+    public partial bool IsCheckingForUpdates { get; set; }
+
+    /// <summary>A janela deve fechar (sem perguntar de novo) para aplicar a atualização.</summary>
+    public event Action? ShutdownForUpdateRequested;
+
+    [ObservableProperty]
+    public partial string? UpdateMessage { get; set; }
+
+    [ObservableProperty]
+    public partial bool UpdateReady { get; set; }
+
+    public bool CheckForUpdatesOnStart
+    {
+        get => Settings.CheckForUpdates;
+        set
+        {
+            Settings.CheckForUpdates = value;
+            OnPropertyChanged();
+            ScheduleSettingsSave();
+        }
+    }
+
+    public string VersionText => "Versão " + UpdateService.CurrentVersion.ToString(3);
+
+    private void AnnounceVersionChange()
+    {
+        var current = UpdateService.CurrentVersion;
+        if (UpdateService.TakeApplyFailure() is { } failure)
+            NotifyError("A atualização não foi aplicada: " + failure);
+        else if (UpdateService.TryParseVersion(Settings.LastRunVersion ?? "", out var last) && last < current)
+            NotifyInfo($"CSharp Lab atualizado para a versão {current.ToString(3)}.");
+        if (Settings.LastRunVersion != current.ToString(3))
+        {
+            Settings.LastRunVersion = current.ToString(3);
+            ScheduleSettingsSave();
+        }
+    }
+
+    private bool CanCheckUpdates() => !IsCheckingForUpdates && !_disposed;
+
+    [RelayCommand(CanExecute = nameof(CanCheckUpdates))]
+    private Task CheckUpdatesNow() => CheckForUpdatesAsync(manual: true);
+
+    /// <summary>
+    /// Procura uma versão nova e, se houver, já baixa e confere em segundo plano. O aviso só
+    /// aparece quando ela está pronta; aplicar é decisão do usuário (agora ou ao fechar).
+    /// </summary>
+    public async Task CheckForUpdatesAsync(bool manual)
+    {
+        if (IsCheckingForUpdates || _disposed) return;
+        if (!UpdateService.IsConfigured)
+        {
+            if (manual) NotifyInfo("Esta cópia ainda não tem um repositório de atualizações configurado.");
+            return;
+        }
+        if (_stagedUpdate != null)
+        {
+            ShowUpdateReady();
+            return;
+        }
+
+        IsCheckingForUpdates = true;
+        var current = UpdateService.CurrentVersion;
+        var ct = _updatesCts.Token;
+        try
+        {
+            if (!manual)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(3), ct);
+                if (!Settings.CheckForUpdates) return;
+            }
+            if (manual) UpdateMessage = "Procurando atualizações…";
+            var staged = await Task.Run(() => { UpdateService.CleanUp(current); return UpdateService.FindStaged(current); }, ct);
+            ct.ThrowIfCancellationRequested();
+            _stagedUpdate = staged;
+            if (_stagedUpdate == null)
+            {
+                var info = await UpdateService.CheckAsync(current, ct);
+                if (info == null)
+                {
+                    if (manual) NotifyInfo($"Você já está na versão mais recente ({current.ToString(3)}).");
+                    UpdateMessage = null;
+                    return;
+                }
+                UpdateMessage = $"Baixando a versão {info.Version.ToString(3)}…";
+                var appDir = await Task.Run(() => UpdateService.DownloadAndStageAsync(info, null, ct), ct);
+                ct.ThrowIfCancellationRequested();
+                _stagedUpdate = (info.Version, appDir);
+            }
+            ShowUpdateReady();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (Exception ex)
+        {
+            AppPaths.Log(ex, "Atualização");
+            UpdateMessage = null;
+            UpdateReady = false;
+            // Sem internet ou GitHub fora do ar: só incomoda se o usuário pediu.
+            if (manual) NotifyError("Não foi possível procurar atualizações: " + ex.Message);
+        }
+        finally
+        {
+            IsCheckingForUpdates = false;
+        }
+    }
+
+    private void ShowUpdateReady()
+    {
+        if (_stagedUpdate is not { } staged) return;
+        UpdateReady = true;
+        UpdateMessage = $"A versão {staged.Version.ToString(3)} do CSharp Lab está pronta.";
+    }
+
+    /// <summary>Reinicia agora para atualizar (pergunta antes sobre arquivos não salvos).</summary>
+    [RelayCommand]
+    private void RestartToUpdate()
+    {
+        if (_stagedUpdate == null || IsBusy && !Dialogs.Confirm("Atualizar agora",
+                "Um programa está em execução e será encerrado.", "Encerrar e atualizar")) return;
+        if (!ConfirmCloseAll(Documents)) return;
+        _relaunchAfterUpdate = true;
+        ShutdownForUpdateRequested?.Invoke();
+    }
+
+    /// <summary>Esconde o aviso; a atualização é aplicada quando o editor for fechado.</summary>
+    [RelayCommand]
+    private void UpdateLater()
+    {
+        UpdateMessage = null;
+        UpdateReady = false;
     }
 
     private async Task CheckSdkInBackgroundAsync()
     {
         try
         {
-            var status = await SdkLocator.CheckAsync(null);
-            SdkMissing = status.IsMissingSdk;
+            var status = await SdkLocator.CheckAsync(null, ct: _updatesCts.Token);
+            if (!_disposed) SdkMissing = status.IsMissingSdk;
         }
+        catch (OperationCanceledException) when (_disposed) { }
         catch (Exception ex)
         {
             AppPaths.Log(ex, "Verificando SDK");
@@ -264,21 +414,29 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 {
                     var existing = FindDocument(entry.OriginalPath);
                     if (existing != null)
+                        doc = new DocumentViewModel(entry.Text, null, entry.GetEncoding(), null, ++_untitledCounter, entry.Id);
+                    else
                     {
-                        _recovery.Delete(entry.Id);
-                        continue;
+                        doc = new DocumentViewModel(entry.Text, entry.OriginalPath, entry.GetEncoding(), null, recoveryId: entry.Id);
+                        if (File.Exists(entry.OriginalPath))
+                        {
+                            try
+                            {
+                                var disk = TextFileIO.Read(entry.OriginalPath);
+                                doc.SetDiskBaseline(disk.Text, disk.Stamp);
+                            }
+                            catch (Exception ex) { AppPaths.Log(ex, "Lendo arquivo de uma recuperação"); }
+                        }
                     }
-                    var stamp = FileStamp.Of(entry.OriginalPath);
-                    doc = new DocumentViewModel(entry.Text, entry.OriginalPath, entry.GetEncoding(), stamp);
                 }
                 else
                 {
-                    doc = new DocumentViewModel(entry.Text, null, entry.GetEncoding(), null, ++_untitledCounter);
+                    doc = new DocumentViewModel(entry.Text, null, entry.GetEncoding(), null, ++_untitledCounter, entry.Id);
                 }
                 doc.ForceDirty();
-                _recovery.Delete(entry.Id);
                 AddDocument(doc, activate: true);
-                _recoveryVersions[doc.RecoveryId] = -1;
+                // A cópia existente continua válida até salvar ou descartar explicitamente.
+                _recoveryVersions[doc.RecoveryId] = doc.IsUntitled && entry.OriginalPath != null ? -1 : doc.Version;
             }
             catch (Exception ex)
             {
@@ -372,10 +530,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         Documents.Add(doc);
         doc.TextChanged += OnDocumentTextChanged;
-        doc.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(DocumentViewModel.IsDirty)) ScheduleRecovery();
-        };
+        doc.PropertyChanged += OnDocumentPropertyChanged;
         AttachLanguage(doc);
         UpdateHints();
         if (activate) ActiveDocument = doc;
@@ -391,10 +546,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void OnDocumentTextChanged(DocumentViewModel doc)
     {
+        if (_disposed) return;
         if (doc.IsCSharp) _ls?.UpdateDocument(doc.LanguageKey, doc.SourceText, doc.Version);
         Problems.InvalidateBuildFor(doc.LanguageKey);
         ScheduleDiagnostics();
         ScheduleRecovery();
+    }
+
+    private void OnDocumentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(DocumentViewModel.IsDirty)) ScheduleRecovery();
     }
 
     /// <summary>Distingue abas com o mesmo nome mostrando a pasta.</summary>
@@ -436,6 +597,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var index = Documents.IndexOf(doc);
         if (index < 0) return;
         doc.TextChanged -= OnDocumentTextChanged;
+        doc.PropertyChanged -= OnDocumentPropertyChanged;
         if (doc.IsCSharp) _ls?.CloseDocument(doc.LanguageKey);
         _recovery.Delete(doc.RecoveryId);
         _recoveryVersions.Remove(doc.RecoveryId);
@@ -602,7 +764,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         var path = Dialogs.PickFile("Abrir projeto", "Projeto C# (*.csproj)|*.csproj", CurrentFolder ?? Settings.LastProjectLocation);
         if (path == null) return;
-        var file = ProjectFile.Read(path);
+        ProjectFile file;
+        try { file = await ProjectFile.ReadEvaluatedAsync(path, _updatesCts.Token); }
+        catch (OperationCanceledException) when (_disposed) { return; }
+        if (_disposed) return;
         if (file.Error != null)
         {
             Dialogs.ShowError("Não foi possível abrir o projeto", "O arquivo .csproj não pôde ser lido.", file.Error);
@@ -652,6 +817,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void CloseFolderCore()
     {
+        _projectLoadVersion++;
+        _projectScanCts?.Cancel();
+        _fsTimer.Stop();
+        _fsEvents.Clear();
+        _model = null;
         _evaluationCts?.Cancel();
         _evaluationCts = null;
         _watcher?.Dispose();
@@ -663,9 +833,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         ScheduleSettingsSave();
     }
 
-    public async Task<bool> OpenFolderAsync(string folder, string? preferredProject, bool promptForUnsaved, bool partOfRun = false)
+    public async Task<bool> OpenFolderAsync(string folder, string? preferredProject, bool promptForUnsaved, bool partOfRun = false, CancellationToken ct = default)
     {
-        folder = Path.GetFullPath(folder).TrimEnd('\\');
+        if (_disposed) return false;
+        ct.ThrowIfCancellationRequested();
+        folder = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folder));
         if (!Directory.Exists(folder))
         {
             NotifyError($"A pasta \"{folder}\" não existe.");
@@ -694,7 +866,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             AddRecent(folder, RecentKind.Folder);
         }
 
-        await LoadProjectsAsync();
+        await LoadProjectsAsync(ct: ct);
+        ct.ThrowIfCancellationRequested();
+        if (_disposed) return false;
         ScheduleSettingsSave();
         return true;
     }
@@ -706,12 +880,32 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         foreach (var r in Settings.Recent) RecentItems.Add(r);
     }
 
-    private async Task LoadProjectsAsync()
+    private int _projectLoadVersion;
+    private CancellationTokenSource? _projectScanCts;
+
+    private async Task LoadProjectsAsync(bool useCache = true, CancellationToken ct = default)
     {
         var folder = CurrentFolder;
-        if (folder == null) return;
-        var projects = await Task.Run(() => ProjectLocator.FindProjects(folder));
-        if (CurrentFolder != folder) return;
+        if (_disposed || folder == null) return;
+        var version = ++_projectLoadVersion;
+        _projectScanCts?.Cancel();
+        var scan = _projectScanCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _evaluationCts?.Cancel();
+        var candidates = await Task.Run(() => ProjectLocator.FindProjects(folder));
+        if (_disposed || scan.IsCancellationRequested || CurrentFolder != folder || version != _projectLoadVersion) return;
+        ProjectFile[] projects;
+        try
+        {
+            using var slots = new SemaphoreSlim(4);
+            projects = await Task.WhenAll(candidates.Select(async p =>
+            {
+                await slots.WaitAsync(scan.Token);
+                try { return await ProjectFile.ReadEvaluatedAsync(p.Path, scan.Token); }
+                finally { slots.Release(); }
+            }));
+        }
+        catch (OperationCanceledException) { return; }
+        if (_disposed || scan.IsCancellationRequested || CurrentFolder != folder || version != _projectLoadVersion) return;
         Projects = projects;
         var consoles = ProjectLocator.ConsoleProjects(projects);
 
@@ -724,23 +918,25 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var analysis = chosen ?? consoles.FirstOrDefault() ?? projects.FirstOrDefault(p => p.IsSdkStyle && p.Error == null);
         if (analysis != null)
         {
-            await LoadModelAsync(analysis.Path);
+            await LoadModelAsync(analysis.Path, useCache, scan.Token);
         }
         else
         {
             // Pasta sem projeto: os arquivos .cs são analisados juntos, como um projeto console.
             var files = await Task.Run(() => ProjectLocator.DefaultCompileFiles(folder));
+            if (_disposed || scan.IsCancellationRequested || CurrentFolder != folder || version != _projectLoadVersion) return;
             var model = ProjectModel.Loose(Path.GetFileName(folder), folder) with { CompileFiles = files.Count <= 300 ? files : [] };
             ApplyModel(model);
         }
     }
 
-    private async Task LoadModelAsync(string projectPath)
+    private async Task LoadModelAsync(string projectPath, bool useCache = true, CancellationToken ct = default)
     {
+        if (_disposed || ct.IsCancellationRequested) return;
         _evaluationCts?.Cancel();
-        var cts = _evaluationCts = new CancellationTokenSource();
-        var quick = await Task.Run(() => ProjectEvaluator.TryLoadCached(projectPath) ?? ProjectEvaluator.Estimate(projectPath));
-        if (cts.IsCancellationRequested) return;
+        var cts = _evaluationCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var quick = await Task.Run(() => (useCache ? ProjectEvaluator.TryLoadCached(projectPath) : null) ?? ProjectEvaluator.Estimate(projectPath));
+        if (_disposed || cts.IsCancellationRequested) return;
         ApplyModel(quick);
         if (quick.IsEvaluated) return;
 
@@ -762,7 +958,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private void ApplyModel(ProjectModel model)
     {
         // Resultado de uma avaliação que terminou depois de a pasta mudar: descarta.
-        if (CurrentFolder == null || !FileOperations.IsSameOrInside(model.Directory, CurrentFolder)) return;
+        if (_disposed || CurrentFolder == null || !FileOperations.IsSameOrInside(model.Directory, CurrentFolder)) return;
         _model = model;
         _ls?.LoadProject(model);
         ScheduleDiagnostics();
@@ -804,6 +1000,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         var choice = Dialogs.SelectProject(consoles, CurrentFolder);
         if (choice == null) return;
         Settings.ProjectChoices[CurrentFolder] = choice.Path;
+        _projectLoadVersion++;
+        _projectScanCts?.Cancel();
         RunProject = choice;
         await LoadModelAsync(choice.Path);
         ScheduleSettingsSave();
@@ -840,6 +1038,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             var updated = relative == "." ? newPath : Path.Combine(newPath, relative);
             doc.FilePath = Path.GetFullPath(updated);
             doc.DiskStamp = FileStamp.Of(doc.FilePath);
+            _recoveryVersions.Remove(doc.RecoveryId);
             if (wasCSharp && doc.IsCSharp) _ls?.MoveDocument(oldKey, doc.LanguageKey, doc.FilePath);
             else if (wasCSharp) _ls?.CloseDocument(oldKey);
             else AttachLanguage(doc);
@@ -857,6 +1056,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _ = LoadProjectsAsync();
         UpdateHints();
         ScheduleDiagnostics();
+        ScheduleRecovery();
     }
 
     public void OnPathDeleted(string path)
@@ -895,18 +1095,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void Enqueue(WatcherChangeTypes type, string path, string? oldPath)
     {
+        if (_disposed) return;
+        if (type != WatcherChangeTypes.All && CurrentFolder is { } folder &&
+            ProjectLocator.IsInsideSkippedDirectory(path, folder) &&
+            !Path.GetFileName(path).Equals("project.assets.json", StringComparison.OrdinalIgnoreCase) &&
+            (oldPath == null || ProjectLocator.IsInsideSkippedDirectory(oldPath, folder))) return;
         _fsEvents.Enqueue((type, path, oldPath));
         Application.Current?.Dispatcher.BeginInvoke(() =>
         {
-            _fsTimer.Stop();
-            _fsTimer.Start();
+            if (!_disposed && CurrentFolder != null && !_fsTimer.IsEnabled) _fsTimer.Start();
         });
     }
 
     private void ProcessFileSystemEvents()
     {
         var folder = CurrentFolder;
-        if (folder == null)
+        if (_disposed || folder == null)
         {
             _fsEvents.Clear();
             return;
@@ -916,6 +1120,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         bool reloadProjects = false, reevaluate = false, fullRefresh = false;
         while (_fsEvents.TryDequeue(out var e))
         {
+            if (!FileOperations.IsSameOrInside(e.Path, folder)) continue;
             if (e.Type == WatcherChangeTypes.All)
             {
                 fullRefresh = true;
@@ -932,11 +1137,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
                 if (e.Type != WatcherChangeTypes.Changed || Directory.Exists(path) == false)
                     dirs.Add(Path.GetDirectoryName(path) ?? folder);
-                if (name.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) || name is "Directory.Build.props" or "global.json")
+                if (name.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith(".props", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith(".targets", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("global.json", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("nuget.config", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("packages.lock.json", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (e.Type != WatcherChangeTypes.Changed) reloadProjects = true;
-                    else reevaluate = true;
+                    reloadProjects = true;
                 }
+                if (name.Equals(".editorconfig", StringComparison.OrdinalIgnoreCase)) reevaluate = true;
 
                 if (e.Type != WatcherChangeTypes.Changed && name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
                     reevaluate = true;
@@ -950,23 +1160,26 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         else Explorer.RefreshPaths(dirs);
 
         CheckAllExternalChanges();
-        if (reloadProjects) _ = LoadProjectsAsync();
+        if (reloadProjects || fullRefresh) _ = LoadProjectsAsync(useCache: false);
         else if (reevaluate && _model?.ProjectPath is { } analyzed) _ = ReevaluateAsync(analyzed);
+        else if (reevaluate) _ = LoadProjectsAsync(useCache: false);
         ScheduleDiagnostics();
     }
 
     private async Task ReevaluateAsync(string projectPath)
     {
+        if (_disposed) return;
         _evaluationCts?.Cancel();
         var cts = _evaluationCts = new CancellationTokenSource();
         try
         {
-            var model = await Task.Run(() => ProjectEvaluator.EvaluateAsync(projectPath, allowRestore: false, cts.Token));
+            var model = await Task.Run(() => ProjectEvaluator.EvaluateAsync(projectPath, allowRestore: true, cts.Token));
             if (!cts.IsCancellationRequested) ApplyModel(model);
         }
         catch (OperationCanceledException)
         {
         }
+        catch (Exception ex) { AppPaths.Log(ex, "Reavaliando projeto"); }
     }
 
     /// <summary>Compara cada aba com o arquivo no disco (chamado em eventos da pasta e ao ativar a janela).</summary>
@@ -1040,6 +1253,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void ScheduleDiagnostics()
     {
+        if (_disposed) return;
         _diagnosticsTimer.Stop();
         _diagnosticsTimer.Start();
     }
@@ -1047,7 +1261,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private async Task RunDiagnosticsAsync()
     {
         var ls = _ls;
-        if (ls == null) return;
+        if (_disposed || ls == null) return;
         _diagnosticsCts?.Cancel();
         var cts = _diagnosticsCts = new CancellationTokenSource();
         try
@@ -1127,13 +1341,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private async Task RunAsync()
     {
-        if (IsBusy) return;
+        if (_disposed || IsBusy) return;
         _stopRequested = false;
+        var runCts = _runCts = new CancellationTokenSource();
+        var ct = runCts.Token;
         RunState = RunState.Preparing;
         StatusText = "Preparando…";
         try
         {
-            var project = await ResolveRunTargetAsync();
+            var project = await ResolveRunTargetAsync(ct);
+            ct.ThrowIfCancellationRequested();
             if (project == null || _stopRequested)
             {
                 StatusText = "";
@@ -1141,10 +1358,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             }
 
             // SDK (considerando global.json e o framework do projeto).
-            var file = ProjectFile.Read(project.Path);
+            var file = await ProjectFile.ReadEvaluatedAsync(project.Path, ct);
             while (true)
             {
-                var sdk = await SdkLocator.CheckAsync(file.Directory, SdkLocator.RequiredMajorFor(file.EffectiveTargetFramework));
+                var sdk = await SdkLocator.CheckAsync(file.Directory, SdkLocator.RequiredMajorFor(file.EffectiveTargetFramework), ct);
+                ct.ThrowIfCancellationRequested();
                 SdkMissing = sdk.IsMissingSdk && SdkLocator.RequiredMajorFor(file.EffectiveTargetFramework) == SdkLocator.DefaultMajor;
                 if (sdk.CanBuild) break;
                 if (sdk.IsMissingSdk)
@@ -1170,9 +1388,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
             RunState = RunState.Building;
             StatusText = "Compilando…";
-            _runCts = new CancellationTokenSource();
             var result = await Task.Run(() => BuildService.BuildAsync(project.Path,
-                msg => Application.Current?.Dispatcher.BeginInvoke(() => StatusText = msg), _runCts.Token));
+                msg => Application.Current?.Dispatcher.BeginInvoke(() =>
+                {
+                    if (!_disposed && !ct.IsCancellationRequested) StatusText = msg;
+                }), ct));
 
             if (result.Outcome == BuildOutcome.Cancelled || _stopRequested)
             {
@@ -1194,13 +1414,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
             var model = _model is { IsEvaluated: true } m && string.Equals(m.ProjectPath, project.Path, StringComparison.OrdinalIgnoreCase)
                 ? m
-                : await Task.Run(() => ProjectEvaluator.EvaluateAsync(project.Path, allowRestore: false, _runCts.Token));
-            var launch = await BuildService.GetLaunchAsync(model, _runCts.Token);
-            if (_stopRequested) return;
+                : await Task.Run(() => ProjectEvaluator.EvaluateAsync(project.Path, allowRestore: false, ct));
+            var launch = await BuildService.GetLaunchAsync(model, ct);
+            ct.ThrowIfCancellationRequested();
 
             PanelTab = "terminal";
             IsPanelOpen = true;
             await Task.Yield();
+            ct.ThrowIfCancellationRequested();
             var terminal = Terminal ?? throw new InvalidOperationException("Terminal indisponível.");
             var (cols, rows) = terminal.Size;
             var session = PseudoConsoleSession.Start(launch, cols, rows);
@@ -1229,18 +1450,22 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             }
             StatusText = "";
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            if (!_disposed) StatusText = "Execução interrompida.";
+        }
         catch (Exception ex)
         {
             AppPaths.Log(ex, "Executando");
             StatusText = "";
-            Dialogs.ShowError("Não foi possível executar", ex.Message);
+            if (!_disposed) Dialogs.ShowError("Não foi possível executar", ex.Message);
         }
         finally
         {
             var s = _session;
             _session = null;
             s?.Dispose();
-            _runCts?.Dispose();
+            runCts.Dispose();
             _runCts = null;
             RunState = RunState.Idle;
         }
@@ -1252,12 +1477,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             doc.Diagnostics = doc.IsCSharp ? Problems.ForFile(doc.LanguageKey).ToList() : [];
     }
 
-    private async Task<ProjectFile?> ResolveRunTargetAsync()
+    private async Task<ProjectFile?> ResolveRunTargetAsync(CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         if (CurrentFolder != null)
         {
             if (RunProject != null && File.Exists(RunProject.Path)) return RunProject;
-            await LoadProjectsAsync();
+            await LoadProjectsAsync(ct: ct);
+            ct.ThrowIfCancellationRequested();
             var consoles = ProjectLocator.ConsoleProjects(Projects);
             if (consoles.Count == 1) return RunProject = consoles[0];
             if (consoles.Count > 1)
@@ -1266,7 +1493,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 if (choice == null) return null;
                 Settings.ProjectChoices[CurrentFolder] = choice.Path;
                 RunProject = choice;
-                await LoadModelAsync(choice.Path);
+                await LoadModelAsync(choice.Path, ct: ct);
+                ct.ThrowIfCancellationRequested();
                 return choice;
             }
             if (Projects.Count > 0)
@@ -1291,9 +1519,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             {
                 var created = ProjectCreator.CreateProjectInFolder(CurrentFolder);
                 Settings.ProjectChoices[CurrentFolder] = created;
-                await LoadProjectsAsync();
+                await LoadProjectsAsync(ct: ct);
+                ct.ThrowIfCancellationRequested();
                 return RunProject;
             }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 Dialogs.ShowError("Não foi possível criar o projeto", FileErrors.Describe(ex, CurrentFolder));
@@ -1322,7 +1552,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 // O conteúdo do rascunho foi transferido para o Program.cs.
                 RemoveDocument(doc);
             }
-            if (!await OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: true, partOfRun: true))
+            if (!await OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: true, partOfRun: true, ct: ct))
             {
                 NotifyInfo($"Projeto criado em \"{created.Directory}\".");
                 return null;
@@ -1330,6 +1560,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             OpenFile(created.ProgramPath);
             return RunProject;
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
             Dialogs.ShowError("Não foi possível criar o projeto", FileErrors.Describe(ex, request.Name));
@@ -1368,6 +1599,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ShowNotice(string message, bool error)
     {
+        if (_disposed) return;
         NoticeIsError = error;
         Notice = message;
         _noticeTimer.Stop();
@@ -1388,6 +1620,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ScheduleRecovery()
     {
+        if (_disposed) return;
         _recoveryTimer.Stop();
         _recoveryTimer.Start();
     }
@@ -1411,6 +1644,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void ScheduleSettingsSave()
     {
+        if (_disposed) return;
         _settingsTimer.Stop();
         _settingsTimer.Start();
     }
@@ -1444,14 +1678,58 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         foreach (var d in Documents) _recovery.Delete(d.RecoveryId);
         _recovery.Flush(TimeSpan.FromSeconds(3));
         Dispose();
+
+        // Versão nova já baixada: troca os arquivos assim que este processo terminar.
+        if (_stagedUpdate is { } staged)
+        {
+            try
+            {
+                UpdateService.LaunchApplier(staged.AppDir, staged.Version, _relaunchAfterUpdate);
+            }
+            catch (Exception ex)
+            {
+                AppPaths.Log(ex, "Iniciando a atualização");
+            }
+        }
     }
 
     public void Dispose()
     {
+        if (_disposed) return;
+        _disposed = true;
+        _projectLoadVersion++;
+        _stopRequested = true;
+        _runCts?.Cancel();
+        _updatesCts.Cancel();
+        _diagnosticsTimer.Stop();
+        _recoveryTimer.Stop();
+        _noticeTimer.Stop();
+        _fsTimer.Stop();
+        _settingsTimer.Stop();
         _watcher?.Dispose();
+        _fsEvents.Clear();
         _diagnosticsCts?.Cancel();
         _evaluationCts?.Cancel();
+        _projectScanCts?.Cancel();
         _session?.Dispose();
-        _ls?.Dispose();
+        foreach (var doc in Documents)
+        {
+            doc.TextChanged -= OnDocumentTextChanged;
+            doc.PropertyChanged -= OnDocumentPropertyChanged;
+        }
+        if (_ls != null)
+        {
+            _ls.ProjectChanged -= OnLanguageProjectChanged;
+            _ls.Dispose();
+        }
+        else _ = DisposeLanguageWhenReadyAsync();
+    }
+
+    private void OnLanguageProjectChanged() => Application.Current?.Dispatcher.BeginInvoke(ScheduleDiagnostics);
+
+    private async Task DisposeLanguageWhenReadyAsync()
+    {
+        try { (await _languageTask.ConfigureAwait(false)).Dispose(); }
+        catch (Exception ex) { AppPaths.Log(ex, "Encerrando serviços de linguagem"); }
     }
 }

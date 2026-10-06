@@ -15,10 +15,8 @@ if (Get-Process CSharpLab -ErrorAction SilentlyContinue) {
 }
 
 Write-Host "Instalando em $target ..."
-if (Test-Path $target) { Remove-Item -Recurse -Force $target }
-New-Item -ItemType Directory -Force $target | Out-Null
-Copy-Item -Recurse -Force (Join-Path $source "*") $target
-Copy-Item -Force (Join-Path $PSScriptRoot "desinstalar.ps1") $target
+. (Join-Path $PSScriptRoot "Install-AppFiles.ps1")
+Install-AppFiles -Source $source -Target $target -Uninstaller (Join-Path $PSScriptRoot "desinstalar.ps1")
 
 $shell = New-Object -ComObject WScript.Shell
 function New-Shortcut([string]$path) {

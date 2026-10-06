@@ -8,6 +8,7 @@ namespace CSharpLab;
 
 public partial class App : Application
 {
+    private InstanceLease? _instanceLease;
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -26,6 +27,13 @@ public partial class App : Application
 
         try
         {
+            _instanceLease = InstanceLease.TryAcquire(AppPaths.Root);
+            if (_instanceLease == null)
+            {
+                MessageBox.Show("O CSharp Lab já está aberto.", "CSharp Lab", MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown();
+                return;
+            }
             var settings = SettingsStore.Load();
             var vm = new MainViewModel(settings);
             var window = new MainWindow(vm);
@@ -38,6 +46,12 @@ public partial class App : Application
             MessageBox.Show("Não foi possível abrir o CSharp Lab.\n\n" + ex.Message, "CSharp Lab", MessageBoxButton.OK, MessageBoxImage.Error);
             Shutdown(1);
         }
+    }
+
+    protected override void OnExit(ExitEventArgs e)
+    {
+        _instanceLease?.Dispose();
+        base.OnExit(e);
     }
 
     private void OnDispatcherException(object sender, DispatcherUnhandledExceptionEventArgs e)

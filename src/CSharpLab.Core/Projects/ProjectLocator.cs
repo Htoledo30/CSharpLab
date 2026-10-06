@@ -81,6 +81,7 @@ public static class ProjectLocator
     public static List<string> DefaultCompileFiles(string projectDirectory)
     {
         var files = new List<string>();
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         Walk(projectDirectory, isRoot: true);
         return files;
 
@@ -88,6 +89,8 @@ public static class ProjectLocator
         {
             try
             {
+                if (!visited.Add(Path.GetFullPath(dir))) return;
+                if (!isRoot && File.GetAttributes(dir).HasFlag(FileAttributes.ReparsePoint)) return;
                 if (!isRoot && Directory.EnumerateFiles(dir, "*.csproj").Any()) return;
                 foreach (var f in Directory.EnumerateFiles(dir, "*.cs"))
                 {

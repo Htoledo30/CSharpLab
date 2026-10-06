@@ -1,8 +1,31 @@
 # Roteiro de aceite — resultados
 
 Ambiente: Windows 11 Pro (build 26300), AMD Ryzen 7 5700X, SSD, SDK .NET 10.0.301, escala 100%.
-Testes automatizados: **55 de 55 aprovados** (`dotnet test CSharpLab.slnx`: 48 do Core e 7 de ViewModels). A interface foi conduzida por um script
-(teclado/mouse simulados + capturas de tela) sobre o executável real.
+Validação automatizada da revisão e atualização automática em 06/10/2026: **97 de 97 aprovados**
+(`dotnet test CSharpLab.slnx -c Release`: 70 do Core e 27 de ViewModels/editor).
+Os testes do instalador (`tests/Installer.Tests.ps1`) também passaram:
+falha de preparação, rollback após falha na troca e instalação bem-sucedida, numa pasta temporária.
+
+A conferência posterior das alterações encontrou e corrigiu regressões no encerramento (callbacks que
+reiniciavam timers e resultados de descoberta aplicados depois de Dispose), no cancelamento de MSBuild
+durante a preparação e no rename de arquivos para pastas ignoradas. Também corrigiu o recuo com
+`indent_size` diferente de `tab_width` e a prioridade do aviso de falha de atualização. Os novos testes
+cobrem esses cenários, incluindo Parar/fechar enquanto o processo real de MSBuild está bloqueado numa
+leitura e quatro combinações de recuo com tabs. O encerramento cancela a preparação, descarta resultados
+atrasados e desliga os handlers e timers; a classificação do editor descarta resultados de contexto antigo.
+
+Os resultados de interface abaixo pertencem à validação anterior, conduzida por um script
+(teclado/mouse simulados + capturas de tela) sobre o executável real. A revisão atual validou controles
+WPF por testes automatizados; não repetiu o roteiro visual completo nem instalou o aplicativo no perfil do usuário.
+
+Atualizações: feed local, SHA-256, cancelamento, escolha da versão preparada mais nova, detecção de arquivos
+alterados, espera do processo antigo, trava de instância e rollback verificados. O auxiliar PowerShell foi
+executado em pastas temporárias com arquivos de teste; preservou desinstalador e arquivos pessoais.
+O fluxo WPF verificou busca ao abrir, aviso, preferência persistida e cancelamento de reinício com arquivo sujo.
+Uma publicação temporária real foi gerada e conferida: versão, metadado do repositório, arquivos do instalador
+e checksum. A consulta e o download de uma Release real não foram validados: o projeto ainda não informa
+qual repositório deve fornecer as atualizações. O reinício do aplicativo real e o roteiro visual completo
+continuam sem validação nesta revisão.
 
 Legenda: ✅ verificado · ⚠️ implementado, mas não verificado neste ambiente (motivo indicado).
 

@@ -34,7 +34,9 @@ public sealed class CompletionResult
     public bool IsSuggestionMode { get; }
 }
 
-public sealed record CompletionChangeResult(int ReplaceStart, string NewText, int? CaretOffsetInNewText);
+public sealed record CompletionChangeResult(int ReplaceStart, int ReplaceLength, string NewText, int? CaretOffsetInNewText);
+
+public sealed record EditorOptions(bool UseTabs, int IndentationSize, int TabSize);
 
 /// <summary>
 /// Serviços de linguagem do Roslyn sobre um workspace em memória que espelha o projeto real:
@@ -255,8 +257,10 @@ public sealed class LanguageService : IDisposable
 
     private bool BelongsToMain(string key) =>
         _mainModel != null && key.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) &&
-        Files.FileOperations.IsSameOrInside(key, _mainModel.Directory) &&
-        !ProjectLocator.IsInsideSkippedDirectory(key, _mainModel.Directory);
+        (_mainModel.IsEvaluated
+            ? _mainModel.CompileFiles.Contains(key, StringComparer.OrdinalIgnoreCase)
+            : Files.FileOperations.IsSameOrInside(key, _mainModel.Directory) &&
+              !ProjectLocator.IsInsideSkippedDirectory(key, _mainModel.Directory));
 
     private Solution AddLoose(Solution solution, string key, string? path, SourceText text)
     {
@@ -433,7 +437,7 @@ public sealed class LanguageService : IDisposable
         var tc = change.TextChange;
         int? caret = change.NewPosition is { } np ? np - tc.Span.Start : null;
         if (caret is < 0 || caret > (tc.NewText?.Length ?? 0)) caret = null;
-        return new CompletionChangeResult(tc.Span.Start, tc.NewText ?? "", caret);
+        return new CompletionChangeResult(tc.Span.Start, tc.Span.Length, tc.NewText ?? "", caret);
     }
 
     public static async Task<string?> GetDescriptionAsync(CompletionResult result, CompletionItem item, CancellationToken ct)
@@ -450,6 +454,18 @@ public sealed class LanguageService : IDisposable
     {
         var document = GetDocument(key);
         return document == null ? null : await SignatureHelp.GetAsync(document, position, ct).ConfigureAwait(false);
+    }
+
+    public async Task<EditorOptions> GetEditorOptionsAsync(string key, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        if (document == null) return new EditorOptions(false, 4, 4);
+#pragma warning disable CS0618
+        var options = await document.GetOptionsAsync(ct).ConfigureAwait(false);
+        return new EditorOptions(options.GetOption(FormattingOptions.UseTabs, LanguageNames.CSharp),
+            Math.Clamp(options.GetOption(FormattingOptions.IndentationSize, LanguageNames.CSharp), 1, 16),
+            Math.Clamp(options.GetOption(FormattingOptions.TabSize, LanguageNames.CSharp), 1, 16));
+#pragma warning restore CS0618
     }
 
     /// <summary>Alterações do formatador do Roslyn (respeita .editorconfig e o final de linha do arquivo).</summary>

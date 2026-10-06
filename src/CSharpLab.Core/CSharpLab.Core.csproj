@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="CSharpLab.Tests" />
+    <EmbeddedResource Include="Updates\ApplyUpdate.ps1" />
   </ItemGroup>
 
 </Project>

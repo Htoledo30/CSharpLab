@@ -22,6 +22,17 @@ interativo para programas e jogos de texto.
 **Desinstalar:** Configurações → Aplicativos instalados → CSharp Lab, ou rode `Desinstalar.cmd`.
 Seus projetos nunca são apagados.
 
+## Atualizações
+
+Nas cópias publicadas com um repositório de atualizações configurado, o editor procura uma versão
+nova ao abrir e baixa o pacote em segundo plano. Quando estiver pronto, aparece um aviso com
+**Reiniciar agora** ou **Ao fechar**. Reiniciar pergunta antes sobre alterações não salvas.
+Ao fechar normalmente, uma atualização já preparada é instalada automaticamente.
+
+Em **Arquivo → Procurar atualizações ao abrir**, você pode ligar ou desligar a busca automática.
+**Arquivo → Verificar atualizações** faz uma busca manual. Sem internet, o editor continua funcionando.
+Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão manualmente uma vez.
+
 ## Primeiros passos
 
 | Quero… | Como |
@@ -67,5 +78,6 @@ Digite o atalho e aperte **Tab**. Depois, **Tab** passa para o próximo campo e 
 - Seu código: arquivos `.cs` e `.csproj` normais, nas pastas que você escolher. Abrem em qualquer outra ferramenta e compilam com `dotnet build`.
 - Preferências, recentes e recuperação de rascunhos: `%LocalAppData%\CSharpLab`.
 - Se o computador desligar com alterações não salvas, o texto é recuperado na próxima abertura.
+- Uma instância por pasta de preferências mantém a recuperação protegida; a cópia só é apagada ao salvar ou descartar.
 
 Detalhes técnicos e como compilar o próprio editor: [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md).

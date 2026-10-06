@@ -286,6 +286,7 @@ public sealed class CompletionPopup : TextAreaStackedInputHandler
     {
         int start = _start;
         int end = _editor.CaretOffset;
+        while (end < _editor.Document.TextLength && CompletionController.IsIdentifierChar(_editor.Document.GetCharAt(end))) end++;
         Close();
         _editor.CompletionController.Commit(entry, start, end - start);
     }

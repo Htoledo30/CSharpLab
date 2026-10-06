@@ -127,7 +127,7 @@ public sealed class SignatureHelpPopup
         _counter.Visibility = _result.Signatures.Count > 1 ? Visibility.Visible : Visibility.Collapsed;
         _text.Inlines.Clear();
 
-        int active = _result.ActiveParameter;
+        int active = _result.ActiveParameters?[Math.Clamp(_index, 0, _result.Signatures.Count - 1)] ?? _result.ActiveParameter;
         if (sig.HasParamsArray && active >= sig.Parameters.Count) active = sig.Parameters.Count - 1;
         int pos = 0;
         for (int i = 0; i < sig.Parameters.Count; i++)

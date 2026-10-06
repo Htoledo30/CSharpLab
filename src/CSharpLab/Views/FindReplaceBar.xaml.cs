@@ -64,6 +64,7 @@ public partial class FindReplaceBar : UserControl
 
     public void Close()
     {
+        _refresh.Stop();
         Visibility = Visibility.Collapsed;
         if (_editor != null)
         {
@@ -184,6 +185,7 @@ public partial class FindReplaceBar : UserControl
     private void ReplaceCurrent()
     {
         if (_editor == null) return;
+        Recompute(keepPosition: true);
         var search = _editor.Search;
         if (search.Matches.Count == 0) return;
         var (start, length) = search.Matches[Math.Max(0, search.Current)];

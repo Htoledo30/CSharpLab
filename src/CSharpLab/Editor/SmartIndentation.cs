@@ -11,6 +11,25 @@ namespace CSharpLab.Editor;
 /// </summary>
 public sealed partial class SmartIndentation(int indentSize) : IIndentationStrategy
 {
+    public int IndentSize { get; set; } = indentSize;
+    public int TabSize { get; set; } = indentSize;
+    public bool UseTabs { get; set; }
+
+    public string IncreaseIndent(string indent) => UseTabs
+        ? CreateIndent(Columns(indent) + IndentSize)
+        : indent + new string(' ', IndentSize);
+
+    private int Columns(string indent)
+    {
+        int column = 0;
+        foreach (var c in indent)
+            column = c == '\t' ? column + TabSize - column % TabSize : column + 1;
+        return column;
+    }
+
+    private string CreateIndent(int columns) => UseTabs
+        ? new string('\t', columns / TabSize) + new string(' ', columns % TabSize)
+        : new string(' ', columns);
     [GeneratedRegex(@"^\s*(if|else if|for|foreach|while|using|lock|fixed)\b.*\)\s*$|^\s*(else|do)\s*$")]
     private static partial Regex ControlHeader();
 
@@ -24,12 +43,12 @@ public sealed partial class SmartIndentation(int indentSize) : IIndentationStrat
 
         string indent = baseIndent;
         if (trimmed.EndsWith('{') || trimmed.EndsWith('(') || trimmed.EndsWith('[') || ControlHeader().IsMatch(trimmed))
-            indent = baseIndent + new string(' ', indentSize);
+            indent = IncreaseIndent(baseIndent);
 
         var current = document.GetText(line);
         var existing = LeadingWhitespace(current);
-        if (current.TrimStart().StartsWith('}') && indent.Length >= indentSize)
-            indent = indent[..^indentSize];
+        if (current.TrimStart().StartsWith('}') && indent.Length > 0)
+            indent = CreateIndent(Math.Max(0, Columns(indent) - IndentSize));
         if (existing != indent)
             document.Replace(line.Offset, existing.Length, indent);
     }
@@ -48,7 +67,7 @@ public sealed partial class SmartIndentation(int indentSize) : IIndentationStrat
         if (previous == null) return;
         var prevText = document.GetText(previous);
         var indent = LeadingWhitespace(prevText);
-        if (prevText.TrimEnd().EndsWith('{')) indent += new string(' ', indentSize);
+        if (prevText.TrimEnd().EndsWith('{')) indent = IncreaseIndent(indent);
         if (before != indent)
             document.Replace(line.Offset, before.Length, indent);
     }

@@ -19,7 +19,7 @@ namespace CSharpLab.Editor;
 public sealed class CodeEditor : TextEditor
 {
     private readonly MainViewModel _vm;
-    private readonly CSharpColorizer? _colorizer;
+    private CSharpColorizer? _colorizer;
     private readonly DiagnosticRenderer _diagnostics;
     private readonly BracketHighlighter _brackets = new();
     private readonly SmartIndentation _indentation = new(4);
@@ -28,6 +28,8 @@ public sealed class CodeEditor : TextEditor
     private readonly DispatcherTimer _semanticTimer;
     private readonly List<TextAnchor> _autoClosers = [];
     private CancellationTokenSource? _semanticCts;
+    private CancellationTokenSource? _contextCts;
+    public bool IsDetached { get; private set; }
     private ToolTip? _hoverTip;
 
     public CodeEditor(DocumentViewModel doc, MainViewModel vm)
@@ -147,12 +149,15 @@ public sealed class CodeEditor : TextEditor
 
     public void Detach()
     {
+        IsDetached = true;
         Doc.TextChanged -= OnDocTextChanged;
         Doc.PropertyChanged -= OnDocPropertyChanged;
         _vm.LanguageReady -= OnLanguageReady;
         if (LanguageServices != null) LanguageServices.ProjectChanged -= OnProjectChanged;
         _semanticTimer.Stop();
         _semanticCts?.Cancel();
+        _contextCts?.Cancel();
+        _colorizer?.Dispose();
         _completion.Close();
         _signature.Close();
         CloseHover();
@@ -160,15 +165,63 @@ public sealed class CodeEditor : TextEditor
 
     private void OnLanguageReady()
     {
-        if (!Doc.IsCSharp) return;
-        if (LanguageServices?.GetDocument(Doc.LanguageKey)?.Project.ParseOptions is Microsoft.CodeAnalysis.CSharp.CSharpParseOptions options)
-            Syntax.SetOptions(options);
         LanguageServices!.ProjectChanged -= OnProjectChanged;
         LanguageServices.ProjectChanged += OnProjectChanged;
-        ScheduleSemantic();
+        RefreshLanguageContext();
     }
 
-    private void OnProjectChanged() => Dispatcher.BeginInvoke(ScheduleSemantic);
+    private void OnProjectChanged() => Dispatcher.BeginInvoke(RefreshLanguageContext);
+
+    private async void RefreshLanguageContext()
+    {
+        if (IsDetached) return;
+        _contextCts?.Cancel();
+        _semanticCts?.Cancel();
+        _semanticTimer.Stop();
+        var cts = _contextCts = new CancellationTokenSource();
+        _completion.Close();
+        _signature.Close();
+        _colorizer?.SetSemantic([], Document.TextLength);
+        if (!Doc.IsCSharp)
+        {
+            _semanticCts?.Cancel();
+            _semanticTimer.Stop();
+            if (_colorizer != null)
+            {
+                TextArea.TextView.LineTransformers.Remove(_colorizer);
+                _colorizer.Dispose();
+                _colorizer = null;
+            }
+            TextArea.IndentationStrategy = new ICSharpCode.AvalonEdit.Indentation.DefaultIndentationStrategy();
+            TextArea.TextView.Redraw();
+            return;
+        }
+        if (_colorizer == null)
+        {
+            _colorizer = new CSharpColorizer(Syntax, Document);
+            TextArea.TextView.LineTransformers.Add(_colorizer);
+        }
+        TextArea.IndentationStrategy = _indentation;
+        var ls = LanguageServices;
+        if (ls == null) return;
+        string key = Doc.LanguageKey;
+        if (ls.GetDocument(key)?.Project.ParseOptions is Microsoft.CodeAnalysis.CSharp.CSharpParseOptions options)
+            Syntax.SetOptions(options);
+        try
+        {
+            var settings = await Task.Run(() => ls.GetEditorOptionsAsync(key, cts.Token), cts.Token);
+            if (cts.IsCancellationRequested || IsDetached || key != Doc.LanguageKey) return;
+            Options.ConvertTabsToSpaces = !settings.UseTabs;
+            Options.IndentationSize = settings.UseTabs ? settings.TabSize : settings.IndentationSize;
+            _indentation.IndentSize = settings.IndentationSize;
+            _indentation.TabSize = settings.TabSize;
+            _indentation.UseTabs = settings.UseTabs;
+            ScheduleSemantic();
+            TextArea.TextView.Redraw();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex) { Core.Settings.AppPaths.Log(ex, "Atualizando opções do editor"); }
+    }
 
     private void OnDocPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -179,7 +232,7 @@ public sealed class CodeEditor : TextEditor
         }
         else if (e.PropertyName == nameof(DocumentViewModel.FilePath))
         {
-            ScheduleSemantic();
+            Dispatcher.BeginInvoke(RefreshLanguageContext);
         }
     }
 
@@ -187,7 +240,7 @@ public sealed class CodeEditor : TextEditor
 
     private void ScheduleSemantic()
     {
-        if (_colorizer == null) return;
+        if (IsDetached || _colorizer == null) return;
         _semanticTimer.Stop();
         _semanticTimer.Start();
     }
@@ -195,7 +248,8 @@ public sealed class CodeEditor : TextEditor
     private async void RefreshSemantic()
     {
         var ls = LanguageServices;
-        if (ls == null || _colorizer == null) return;
+        if (IsDetached || ls == null || _colorizer == null) return;
+        var colorizer = _colorizer;
         _semanticCts?.Cancel();
         var cts = _semanticCts = new CancellationTokenSource();
         int version = Doc.Version;
@@ -217,8 +271,8 @@ public sealed class CodeEditor : TextEditor
         {
             var key = Doc.LanguageKey;
             var ranges = await Task.Run(() => ls.ClassifySemanticAsync(key, span, cts.Token), cts.Token);
-            if (cts.IsCancellationRequested || version != Doc.Version) return;
-            _colorizer.SetSemantic(ranges, Doc.Document.TextLength);
+            if (IsDetached || cts.IsCancellationRequested || version != Doc.Version || key != Doc.LanguageKey || colorizer != _colorizer) return;
+            colorizer.SetSemantic(ranges, Doc.Document.TextLength);
             TextArea.TextView.Redraw();
         }
         catch (OperationCanceledException)
@@ -348,17 +402,20 @@ public sealed class CodeEditor : TextEditor
         var line = Document.GetLineByOffset(braceOffset);
         var before = Document.GetText(line.Offset, braceOffset - line.Offset);
         if (before.Trim().Length != 0) return;
-        int? indent;
+        string indent;
         try
         {
-            indent = SyntaxContext.OpeningLineIndent(Syntax.Root, Doc.SourceText, braceOffset);
+            var pair = SyntaxContext.FindBracePair(Syntax.Root, braceOffset);
+            if (pair == null) return;
+            var opening = Document.GetText(Document.GetLineByOffset(pair.Value.Open));
+            indent = new string(opening.TakeWhile(c => c is ' ' or '\t').ToArray());
         }
         catch
         {
             return;
         }
-        if (indent == null || indent.Value == before.Length && !before.Contains('\t')) return;
-        Document.Replace(line.Offset, before.Length, new string(' ', indent.Value));
+        if (indent == before) return;
+        Document.Replace(line.Offset, before.Length, indent);
     }
 
     private void OnPreviewKeyDown(object? sender, KeyEventArgs e)
@@ -423,7 +480,7 @@ public sealed class CodeEditor : TextEditor
 
     private bool TryEnterBetweenBraces()
     {
-        if (!TextArea.Selection.IsEmpty) return false;
+        if (!TextArea.Selection.IsEmpty || InCommentOrString(CaretOffset)) return false;
         int caret = CaretOffset;
         int left = caret - 1;
         while (left >= 0 && Document.GetCharAt(left) is ' ' or '\t') left--;
@@ -434,7 +491,7 @@ public sealed class CodeEditor : TextEditor
         var line = Document.GetLineByOffset(left);
         var indent = TextUtilities.GetLeadingWhitespace(Document, line).Length is var n ? Document.GetText(line.Offset, n) : "";
         var newline = TextUtilities.GetNewLineFromDocument(Document, line.LineNumber);
-        var inner = indent + new string(' ', Options.IndentationSize);
+        var inner = _indentation.IncreaseIndent(indent);
         using (Document.RunUpdate())
         {
             Document.Replace(left + 1, right - (left + 1), newline + inner + newline + indent);

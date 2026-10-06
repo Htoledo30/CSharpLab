@@ -33,7 +33,8 @@ public sealed class ProjectFile
             var doc = XDocument.Load(path);
             var root = doc.Root!;
             string? Prop(string name) => root.Descendants()
-                .Where(e => e.Name.LocalName == name && e.Parent?.Name.LocalName == "PropertyGroup" && e.Attribute("Condition") == null)
+                .Where(e => e.Name.LocalName == name && e.Parent?.Name.LocalName == "PropertyGroup" &&
+                            !e.AncestorsAndSelf().Any(a => a.Attribute("Condition") != null))
                 .Select(e => e.Value.Trim())
                 .LastOrDefault(v => v.Length > 0);
 
@@ -56,6 +57,39 @@ public sealed class ProjectFile
         catch (Exception ex)
         {
             return new ProjectFile { Path = System.IO.Path.GetFullPath(path), Error = ex.Message };
+        }
+    }
+
+    /// <summary>Lê também propriedades importadas e condições pela avaliação do SDK, sem executar targets.</summary>
+    public static async Task<ProjectFile> ReadEvaluatedAsync(string path, CancellationToken ct)
+    {
+        var quick = Read(path);
+        if (quick.Error != null || Dotnet.FindExecutable() == null) return quick;
+        try
+        {
+            var result = await Dotnet.RunAsync(
+                ["msbuild", quick.Path, "-nologo", "-v:q", "-tl:off",
+                 "-getProperty:TargetFramework,TargetFrameworks,OutputType,AssemblyName,ImplicitUsings,Nullable,LangVersion"],
+                quick.Directory, ct).ConfigureAwait(false);
+            var start = result.StandardOutput.IndexOf('{');
+            if (result.ExitCode != 0 || start < 0) return quick;
+            using var json = System.Text.Json.JsonDocument.Parse(result.StandardOutput[start..]);
+            var properties = json.RootElement.GetProperty("Properties");
+            string? Prop(string name) => properties.TryGetProperty(name, out var value) &&
+                value.GetString() is { Length: > 0 } text ? text : null;
+            return new ProjectFile
+            {
+                Path = quick.Path, Sdk = quick.Sdk,
+                TargetFramework = Prop("TargetFramework"), TargetFrameworks = Prop("TargetFrameworks"),
+                OutputType = Prop("OutputType"), AssemblyName = Prop("AssemblyName"),
+                ImplicitUsings = Prop("ImplicitUsings"), Nullable = Prop("Nullable"), LangVersion = Prop("LangVersion"),
+            };
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Settings.AppPaths.Log(ex, "Lendo propriedades do projeto");
+            return quick;
         }
     }
 }

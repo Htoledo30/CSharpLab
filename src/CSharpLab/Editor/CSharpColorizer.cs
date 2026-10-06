@@ -14,23 +14,29 @@ public sealed class SemanticSegment : TextSegment
 /// Pinta cada linha visível: primeiro pela árvore sintática (imediato, a cada tecla),
 /// depois aplica por cima a classificação semântica do Roslyn (tipos, métodos, variáveis).
 /// </summary>
-public sealed class CSharpColorizer : DocumentColorizingTransformer
+public sealed class CSharpColorizer : DocumentColorizingTransformer, IDisposable
 {
     private readonly SyntaxCache _syntax;
+    private readonly TextDocument _document;
     private readonly List<ClassifiedRange> _scratch = new(64);
 
     public CSharpColorizer(SyntaxCache syntax, TextDocument document)
     {
         _syntax = syntax;
+        _document = document;
         Semantic = new TextSegmentCollection<SemanticSegment>(document);
-        document.Changed += (_, e) =>
-        {
-            // Classificação semântica do trecho editado fica obsoleta até a próxima análise.
-            var start = Math.Max(0, e.Offset - 1);
-            foreach (var s in Semantic.FindOverlappingSegments(start, e.InsertionLength + 2).ToList())
-                Semantic.Remove(s);
-        };
+        document.Changed += OnChanged;
     }
+
+    private void OnChanged(object? sender, DocumentChangeEventArgs e)
+    {
+        // Classificação semântica do trecho editado fica obsoleta até a próxima análise.
+        var start = Math.Max(0, e.Offset - 1);
+        foreach (var s in Semantic.FindOverlappingSegments(start, e.InsertionLength + 2).ToList())
+            Semantic.Remove(s);
+    }
+
+    public void Dispose() => _document.Changed -= OnChanged;
 
     public TextSegmentCollection<SemanticSegment> Semantic { get; }
 

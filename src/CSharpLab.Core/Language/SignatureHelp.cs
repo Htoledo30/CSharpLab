@@ -12,7 +12,8 @@ public sealed record SignatureHelpResult(
     IReadOnlyList<SignatureDisplay> Signatures,
     int ActiveSignature,
     int ActiveParameter,
-    int ArgumentListStart);
+    int ArgumentListStart,
+    IReadOnlyList<int>? ActiveParameters = null);
 
 /// <summary>Assinatura do método sendo chamado e destaque do parâmetro atual.</summary>
 public static class SignatureHelp
@@ -84,12 +85,19 @@ public static class SignatureHelp
 
         var chosen = model.GetSymbolInfo(call, ct) is var info && info.Symbol is IMethodSymbol s ? s : null;
         int active = chosen != null ? methods.FindIndex(m => SymbolEqualityComparer.Default.Equals(m, chosen)) : -1;
+        var namedArguments = args.Arguments.Where(a => a.NameColon != null)
+            .Select(a => a.NameColon!.Name.Identifier.ValueText).ToList();
         if (active < 0)
-            active = methods.FindIndex(m => m.Parameters.Length > argIndex || m.Parameters.LastOrDefault()?.IsParams == true);
+            active = methods.FindIndex(m => (m.Parameters.Length > argIndex || m.Parameters.LastOrDefault()?.IsParams == true) &&
+                namedArguments.All(name => m.Parameters.Any(p => p.Name == name)));
         if (active < 0) active = 0;
 
         var displays = methods.Select(Display).ToList();
-        return new SignatureHelpResult(displays, active, argIndex, args.OpenParenToken.SpanStart);
+        var argument = args.Arguments.ElementAtOrDefault(argIndex);
+        var activeParameters = methods.Select(m => argument?.NameColon is { } named
+            ? m.Parameters.IndexOf(m.Parameters.FirstOrDefault(p => p.Name == named.Name.Identifier.ValueText)!)
+            : argIndex).ToList();
+        return new SignatureHelpResult(displays, active, activeParameters[active], args.OpenParenToken.SpanStart, activeParameters);
     }
 
     private static SignatureDisplay Display(IMethodSymbol method)

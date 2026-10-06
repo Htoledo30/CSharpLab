@@ -34,6 +34,7 @@
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="38" />
+                <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
                 <RowDefinition Height="24" />
             </Grid.RowDefinitions>
@@ -85,6 +86,11 @@
                         <Separator />
                         <MenuItem Header="Fechar aba" InputGestureText="Ctrl+W" Command="{Binding CloseTabCommand}" />
                         <MenuItem Header="Fechar pasta" Command="{Binding CloseFolderCommand}" />
+                        <Separator />
+                        <MenuItem Header="Verificar atualizações" Command="{Binding CheckUpdatesNowCommand}"
+                                  InputGestureText="{Binding VersionText}" />
+                        <MenuItem Header="Procurar atualizações ao abrir" IsCheckable="True"
+                                  IsChecked="{Binding CheckForUpdatesOnStart}" />
                         <Separator />
                         <MenuItem Header="Sair" InputGestureText="Alt+F4" Click="OnExit" />
                     </MenuItem>
@@ -187,7 +193,31 @@
             </Grid>
 
             <!-- ============================================== Conteúdo -->
-            <Grid x:Name="ContentGrid" Grid.Row="1">
+            <Border x:Name="UpdateBanner" Grid.Row="1" Background="{StaticResource BgElevated}"
+                    BorderBrush="{StaticResource BorderStrong}" BorderThickness="0,0,0,1" Padding="12,6"
+                    Visibility="{Binding UpdateMessage, Converter={StaticResource NullToVis}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Style="{StaticResource Icon}" Text="&#xE896;" FontSize="13"
+                               Foreground="{StaticResource Accent}" Margin="0,0,10,0" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="1" Text="{Binding UpdateMessage}" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="10,0,0,0"
+                                Visibility="{Binding UpdateReady, Converter={StaticResource BoolToVis}}">
+                        <Button Style="{StaticResource TextButton}" Height="28" Padding="10,0"
+                                Foreground="{StaticResource Accent}" Content="Reiniciar agora" Command="{Binding RestartToUpdateCommand}"
+                                ToolTip="Salva ou descarta suas alterações, atualiza o CSharp Lab e abre de novo" />
+                        <Button Style="{StaticResource TextButton}" Height="28" Padding="10,0" Content="Ao fechar"
+                                Command="{Binding UpdateLaterCommand}" ToolTip="Atualiza quando você fechar o CSharp Lab" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Grid x:Name="ContentGrid" Grid.Row="2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition x:Name="ExplorerColumn" Width="230" MinWidth="0" />
                     <ColumnDefinition x:Name="ExplorerSplitterColumn" Width="4" />
@@ -439,7 +469,7 @@
             </Grid>
 
             <!-- ============================================== Barra de status -->
-            <Border Grid.Row="2" Background="{StaticResource BgBase}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+            <Border Grid.Row="3" Background="{StaticResource BgBase}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
                 <DockPanel Margin="10,0" TextBlock.FontSize="12" TextBlock.Foreground="{StaticResource TextSecondary}">
                     <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
                         <TextBlock Text="{Binding ProjectLabel}" ToolTip="Projeto ativo" />

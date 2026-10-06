@@ -220,6 +220,8 @@ public sealed class CompletionController
         var endAnchor = document.CreateAnchor(start + length);
         endAnchor.MovementType = AnchorMovementType.BeforeInsertion;
         int originalStart = entry.Result.Span.Start;
+        int version = _editor.Doc.Version;
+        string key = _editor.Doc.LanguageKey;
 
         CompletionChangeResult? change;
         try
@@ -229,14 +231,15 @@ public sealed class CompletionController
         catch (Exception ex)
         {
             Core.Settings.AppPaths.Log(ex, "Aplicando sugestão");
-            change = new CompletionChangeResult(originalStart, entry.Item.DisplayText, null);
+            return;
         }
-        if (change == null || startAnchor.IsDeleted || endAnchor.IsDeleted) return;
+        if (change == null || startAnchor.IsDeleted || endAnchor.IsDeleted ||
+            version != _editor.Doc.Version || key != _editor.Doc.LanguageKey || _editor.IsDetached) return;
 
         int delta = startAnchor.Offset - originalStart;
-        int replaceStart = Math.Clamp(change.ReplaceStart + delta, 0, startAnchor.Offset);
-        int replaceEnd = endAnchor.Offset;
-        if (replaceEnd < replaceStart) return;
+        int replaceStart = change.ReplaceStart + delta;
+        int replaceEnd = endAnchor.Offset + change.ReplaceStart + change.ReplaceLength - entry.Result.Span.End;
+        if (replaceStart < 0 || replaceEnd < replaceStart || replaceEnd > document.TextLength) return;
         document.Replace(replaceStart, replaceEnd - replaceStart, change.NewText);
         textArea.Caret.Offset = Math.Min(document.TextLength, replaceStart + (change.CaretOffsetInNewText ?? change.NewText.Length));
     }
