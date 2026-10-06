@@ -14,6 +14,12 @@ cobrem esses cenários, incluindo Parar/fechar enquanto o processo real de MSBui
 leitura e quatro combinações de recuo com tabs. O encerramento cancela a preparação, descarta resultados
 atrasados e desliga os handlers e timers; a classificação do editor descarta resultados de contexto antigo.
 
+Revisão "melhorar tudo" (06/10/2026): **125 de 125 aprovados** (94 do Core e 31 de ViewModels/editor),
+cobrindo as ajudas do editor (dica do mouse, F12, F2, Ctrl+., comandos de linha), 31 erros comuns traduzidos,
+dicas DICA01/DICA02, reaproveitamento da compilação e salvar sem recarregar o projeto. Conferido também na
+tela: dica do mouse em português, "Adicionar using System.Text;", F12 entre arquivos, renomear, menu do
+botão direito e um jogo em tempo real (cobrinha) no terminal expandido.
+
 Os resultados de interface abaixo pertencem à validação anterior, conduzida por um script
 (teclado/mouse simulados + capturas de tela) sobre o executável real. A revisão atual validou controles
 WPF por testes automatizados; não repetiu o roteiro visual completo nem instalou o aplicativo no perfil do usuário.
@@ -67,6 +73,9 @@ erros e avisos distinguidos por ícone e rótulo (não só cor). ⚠️ Escalas 
 | Diagnósticos após uma edição | 164 ms na primeira, mediana 3 ms depois (+ ~420 ms de espera após a digitação) |
 | Formatação do documento | ~275 ms (primeira vez) |
 | `dotnet build` incremental | ~0,75–0,8 s com o servidor de compilação aquecido |
+| F5 de novo sem mudar nada | ~30 ms (reaproveita a última compilação; antes ~1,3 s) |
+| Editar, salvar e F5 | ~0,8 s |
+| Primeiro F5 após abrir | ~1,06 s |
 | Memória da janela após abrir | ~260 MB |
 
 Primeira execução de um projeto novo inclui o restore (alguns segundos); reexecuções compilam em menos de 1 s.

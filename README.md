@@ -45,6 +45,9 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | Digitar no programa | Clique no **Terminal** e digite. `ReadLine`, `ReadKey`, setas e cores funcionam. |
 | Parar | `Shift+F5` ou o botão **Parar** (funciona até em loop infinito). |
 | Ver erros | Aba **Problemas**: "Program.cs · Linha 12 — Faltou ";"." Clique para ir até a linha. |
+| Entender o código | Pare o mouse sobre um nome: aparece o tipo e a explicação. |
+| Consertar um erro | Com o cursor no sublinhado, `Ctrl+.` mostra correções (ex.: adicionar o `using` que falta). |
+| Fazer jogos no console | `Ctrl+Shift+J` expande o terminal para quase a tela toda. |
 | Organizar o código | `Ctrl+Shift+F` formata o arquivo (desfaz com `Ctrl+Z`). |
 
 Executar um rascunho pede uma única vez o nome e a pasta de um projeto novo; o código vira o `Program.cs` dele.
@@ -62,10 +65,23 @@ Executar um rascunho pede uma única vez o nome e a pasta de um projeto novo; o 
 | Buscar / Substituir | `Ctrl+F` / `Ctrl+H` |
 | Desfazer / Refazer | `Ctrl+Z` / `Ctrl+Y` |
 | Mostrar explorador / painel inferior | `Ctrl+B` / `Ctrl+J` |
+| Expandir o terminal | `Ctrl+Shift+J` |
+| Correções rápidas | `Ctrl+.` |
+| Ir para definição | `F12` ou `Ctrl` + clique |
+| Renomear em todo o projeto | `F2` |
+| Comentar / descomentar linhas | `Ctrl+/` |
+| Duplicar / apagar linha | `Ctrl+D` / `Ctrl+Shift+K` |
+| Mover linha | `Alt+↑` / `Alt+↓` |
 | Tamanho da fonte | `Ctrl` + roda do mouse |
 
 Sugestões: setas para escolher, **Tab** ou **Enter** para aceitar, **Esc** para fechar.
 Espaço e pontuação nunca aceitam uma sugestão sozinhos.
+
+Tudo isso também está no menu **Editar** e no botão direito do mouse, para não precisar decorar.
+
+**Dicas** (sublinhado azul) apontam armadilhas que o compilador aceita calado: imprimir uma lista
+direto (`Console.WriteLine(lista)` mostra o nome do tipo) e divisão entre inteiros que perde as casas
+decimais (`double media = soma / qtd;`). Não impedem a execução.
 
 ## Snippets
 
