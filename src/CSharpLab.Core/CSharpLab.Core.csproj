@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>CSharpLab.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Mesma versão do compilador incluído no SDK .NET 10.0.301 (Roslyn 5.6.0). -->
+    <PackageReference Include="Basic.Reference.Assemblies.Net100" Version="1.8.12" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Features" Version="5.6.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CSharpLab.Tests" />
+  </ItemGroup>
+
+</Project>

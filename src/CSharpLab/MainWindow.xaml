@@ -1,0 +1,483 @@
+<Window x:Class="CSharpLab.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:CSharpLab.Views"
+        xmlns:vm="clr-namespace:CSharpLab.ViewModels"
+        Title="{Binding WindowTitle}"
+        Width="1280" Height="800" MinWidth="760" MinHeight="480"
+        Background="{StaticResource BgBase}"
+        Foreground="{StaticResource TextPrimary}"
+        FontFamily="{StaticResource UiFont}" FontSize="{StaticResource UiFontSize}"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        Icon="Assets/app.ico">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="38" ResizeBorderThickness="6" GlassFrameThickness="0,0,0,1"
+                      CornerRadius="0" UseAeroCaptionButtons="False" />
+    </WindowChrome.WindowChrome>
+
+    <Window.InputBindings>
+        <KeyBinding Key="N" Modifiers="Ctrl" Command="{Binding NewFileCommand}" />
+        <KeyBinding Key="O" Modifiers="Ctrl" Command="{Binding OpenFileDialogCommand}" />
+        <KeyBinding Key="S" Modifiers="Ctrl" Command="{Binding SaveActiveCommand}" />
+        <KeyBinding Key="S" Modifiers="Ctrl+Shift" Command="{Binding SaveAllCommand}" />
+        <KeyBinding Key="W" Modifiers="Ctrl" Command="{Binding CloseTabCommand}" />
+        <KeyBinding Key="F4" Modifiers="Ctrl" Command="{Binding CloseTabCommand}" />
+        <KeyBinding Key="F5" Command="{Binding RunCommand}" />
+        <KeyBinding Key="F5" Modifiers="Shift" Command="{Binding StopCommand}" />
+        <KeyBinding Key="B" Modifiers="Ctrl" Command="{Binding ToggleExplorerCommand}" />
+        <KeyBinding Key="J" Modifiers="Ctrl" Command="{Binding TogglePanelCommand}" />
+    </Window.InputBindings>
+
+    <Border x:Name="RootBorder">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="38" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="24" />
+            </Grid.RowDefinitions>
+
+            <!-- ============================================== Barra superior -->
+            <Grid Grid.Row="0" Background="{StaticResource BgBase}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Image Source="Assets/app.png" Width="18" Height="18" Margin="12,0,6,0" VerticalAlignment="Center"
+                       RenderOptions.BitmapScalingMode="HighQuality" />
+
+                <Menu Grid.Column="1" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True" Grid.IsSharedSizeScope="True">
+                    <MenuItem Header="_Arquivo">
+                        <MenuItem Header="Novo arquivo" InputGestureText="Ctrl+N" Command="{Binding NewFileCommand}" />
+                        <MenuItem Header="Novo projeto…" Command="{Binding NewProjectCommand}" />
+                        <Separator />
+                        <MenuItem Header="Abrir arquivo…" InputGestureText="Ctrl+O" Command="{Binding OpenFileDialogCommand}" />
+                        <MenuItem Header="Abrir pasta…" Command="{Binding OpenFolderDialogCommand}" />
+                        <MenuItem Header="Abrir projeto…" Command="{Binding OpenProjectDialogCommand}" />
+                        <MenuItem x:Name="RecentMenu" Header="Abrir recente" ItemsSource="{Binding RecentItems}">
+                            <MenuItem.ItemContainerStyle>
+                                <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
+                                    <Setter Property="Command" Value="{Binding DataContext.OpenRecentCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                    <Setter Property="CommandParameter" Value="{Binding}" />
+                                    <Setter Property="ToolTip" Value="{Binding Path}" />
+                                    <Setter Property="Header">
+                                        <Setter.Value>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Name}" />
+                                                <TextBlock Text="{Binding Path}" Foreground="{StaticResource TextMuted}" Margin="12,0,0,0"
+                                                           MaxWidth="320" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </MenuItem.ItemContainerStyle>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem Header="Salvar" InputGestureText="Ctrl+S" Command="{Binding SaveActiveCommand}" />
+                        <MenuItem Header="Salvar como…" Command="{Binding SaveActiveAsCommand}" />
+                        <MenuItem Header="Salvar tudo" InputGestureText="Ctrl+Shift+S" Command="{Binding SaveAllCommand}" />
+                        <Separator />
+                        <MenuItem Header="Fechar aba" InputGestureText="Ctrl+W" Command="{Binding CloseTabCommand}" />
+                        <MenuItem Header="Fechar pasta" Command="{Binding CloseFolderCommand}" />
+                        <Separator />
+                        <MenuItem Header="Sair" InputGestureText="Alt+F4" Click="OnExit" />
+                    </MenuItem>
+                    <MenuItem Header="_Editar">
+                        <MenuItem Header="Desfazer" InputGestureText="Ctrl+Z" Click="OnUndo" />
+                        <MenuItem Header="Refazer" InputGestureText="Ctrl+Y" Click="OnRedo" />
+                        <Separator />
+                        <MenuItem Header="Recortar" InputGestureText="Ctrl+X" Click="OnCut" />
+                        <MenuItem Header="Copiar" InputGestureText="Ctrl+C" Click="OnCopy" />
+                        <MenuItem Header="Colar" InputGestureText="Ctrl+V" Click="OnPaste" />
+                        <Separator />
+                        <MenuItem Header="Buscar" InputGestureText="Ctrl+F" Click="OnFind" />
+                        <MenuItem Header="Substituir" InputGestureText="Ctrl+H" Click="OnReplace" />
+                        <Separator />
+                        <MenuItem Header="Formatar documento" InputGestureText="Ctrl+Shift+F" Click="OnFormat" />
+                        <MenuItem Header="Mostrar sugestões" InputGestureText="Ctrl+Space" Click="OnShowCompletion" />
+                    </MenuItem>
+                    <MenuItem Header="_Projeto">
+                        <MenuItem Header="Executar" InputGestureText="F5" Command="{Binding RunCommand}"
+                                  ToolTip="Salva os arquivos do projeto, compila e executa" />
+                        <MenuItem Header="Parar" InputGestureText="Shift+F5" Command="{Binding StopCommand}" />
+                        <Separator />
+                        <MenuItem Header="Escolher projeto para executar…" Command="{Binding ChooseRunProjectCommand}"
+                                  Visibility="{Binding HasMultipleProjects, Converter={StaticResource BoolToVis}}" />
+                        <MenuItem Header="Mostrar explorador" InputGestureText="Ctrl+B" Command="{Binding ToggleExplorerCommand}" />
+                        <MenuItem Header="Mostrar terminal e problemas" InputGestureText="Ctrl+J" Command="{Binding TogglePanelCommand}" />
+                    </MenuItem>
+                </Menu>
+
+                <TextBlock Grid.Column="2" Text="{Binding WindowTitle}" Foreground="{StaticResource TextMuted}" FontSize="12"
+                           HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           IsHitTestVisible="False" Margin="12,0" />
+
+                <!-- Executar / Parar -->
+                <Button x:Name="RunButton" Grid.Column="3" Command="{Binding RunOrStopCommand}" ToolTip="{Binding RunButtonToolTip}"
+                        AutomationProperties.Name="{Binding RunButtonText}" WindowChrome.IsHitTestVisibleInChrome="True"
+                        Height="26" Margin="0,0,10,0" Padding="10,0,12,0" Cursor="Hand" Focusable="False">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background" Value="{StaticResource AccentSoft}" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}"
+                                                BorderBrush="#3A4170" BorderThickness="1">
+                                            <ContentPresenter VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#363D6B" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                    <Setter Property="Background" Value="#3A2A2E" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="RunGlyph" FontSize="11" Margin="0,0,7,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                    <Setter Property="Text" Value="{StaticResource IconPlay}" />
+                                    <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                            <Setter Property="Text" Value="{StaticResource IconStop}" />
+                                            <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding RunButtonText}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
+
+                <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="0,0,6,0" VerticalAlignment="Center">
+                    <Button Style="{StaticResource IconButton}" Content="{StaticResource IconSidebar}" ToolTip="Mostrar/ocultar explorador (Ctrl+B)"
+                            AutomationProperties.Name="Mostrar ou ocultar explorador" Command="{Binding ToggleExplorerCommand}"
+                            WindowChrome.IsHitTestVisibleInChrome="True" Focusable="False" />
+                    <Button Style="{StaticResource IconButton}" Content="{StaticResource IconPanel}" ToolTip="Mostrar/ocultar terminal e problemas (Ctrl+J)"
+                            AutomationProperties.Name="Mostrar ou ocultar painel inferior" Command="{Binding TogglePanelCommand}"
+                            WindowChrome.IsHitTestVisibleInChrome="True" Focusable="False" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="5" Orientation="Horizontal">
+                    <Button Style="{StaticResource WindowButton}" Content="&#xE921;" Click="OnMinimize" ToolTip="Minimizar"
+                            AutomationProperties.Name="Minimizar" />
+                    <Button x:Name="MaxButton" Style="{StaticResource WindowButton}" Content="&#xE922;" Click="OnMaximize"
+                            ToolTip="Maximizar" AutomationProperties.Name="Maximizar" />
+                    <Button Style="{StaticResource CloseWindowButton}" Content="&#xE8BB;" Click="OnClose" ToolTip="Fechar"
+                            AutomationProperties.Name="Fechar" />
+                </StackPanel>
+            </Grid>
+
+            <!-- ============================================== Conteúdo -->
+            <Grid x:Name="ContentGrid" Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="ExplorerColumn" Width="230" MinWidth="0" />
+                    <ColumnDefinition x:Name="ExplorerSplitterColumn" Width="4" />
+                    <ColumnDefinition Width="*" MinWidth="320" />
+                </Grid.ColumnDefinitions>
+
+                <Border x:Name="ExplorerPane" Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <views:ExplorerView />
+                </Border>
+                <GridSplitter x:Name="ExplorerSplitter" Grid.Column="1" Style="{StaticResource Splitter}" HorizontalAlignment="Stretch"
+                              ResizeBehavior="PreviousAndNext" DragCompleted="OnExplorerResized" Background="{StaticResource BgSidebar}" />
+                <Border Grid.Column="1" Width="1" HorizontalAlignment="Left" Background="{StaticResource BorderBrush}" IsHitTestVisible="False" />
+
+                <Grid x:Name="MainArea" Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" MinHeight="120" />
+                        <RowDefinition x:Name="PanelSplitterRow" Height="0" />
+                        <RowDefinition x:Name="PanelRow" Height="31" MinHeight="31" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Abas + editor -->
+                    <Grid Background="{StaticResource BgEditor}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="36" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Border Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,1">
+                            <ListBox x:Name="Tabs" ItemsSource="{Binding Documents}" SelectedItem="{Binding ActiveDocument}"
+                                     ScrollViewer.HorizontalScrollBarVisibility="Hidden" ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                                     ScrollViewer.CanContentScroll="False" PreviewMouseWheel="OnTabsWheel"
+                                     AutomationProperties.Name="Arquivos abertos" Margin="0,0,0,-1">
+                                <ListBox.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" />
+                                    </ItemsPanelTemplate>
+                                </ListBox.ItemsPanel>
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+                                        <Setter Property="ToolTip" Value="{Binding ToolTip}" />
+                                        <Setter Property="AutomationProperties.Name" Value="{Binding Title}" />
+                                        <EventSetter Event="PreviewMouseDown" Handler="OnTabMouseDown" />
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border x:Name="Bd" Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderBrush}"
+                                                            BorderThickness="0,0,1,0" Height="35">
+                                                        <Grid>
+                                                            <Border x:Name="Accent" Height="1" VerticalAlignment="Top" Background="{StaticResource Accent}" Visibility="Collapsed" />
+                                                            <ContentPresenter VerticalAlignment="Center" />
+                                                        </Grid>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background" Value="#1D1E22" />
+                                                        </Trigger>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgEditor}" />
+                                                            <Setter TargetName="Accent" Property="Visibility" Value="Visible" />
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate DataType="{x:Type vm:DocumentViewModel}">
+                                        <StackPanel x:Name="Root" Orientation="Horizontal" Margin="14,0,6,0">
+                                            <TextBlock x:Name="TitleText" Text="{Binding Title}" Foreground="{StaticResource TextSecondary}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding Hint}" Foreground="{StaticResource TextMuted}" FontSize="11.5" Margin="6,1,0,0"
+                                                       VerticalAlignment="Center" Visibility="{Binding Hint, Converter={StaticResource NullToVis}}" />
+                                            <Grid Width="22" Height="22" Margin="6,0,0,0">
+                                                <TextBlock x:Name="DirtyDot" Text="●" FontSize="10" Foreground="{StaticResource TextSecondary}"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                                <Button x:Name="CloseButton" Style="{StaticResource IconButton}" Width="20" Height="20" FontSize="9"
+                                                        Content="{StaticResource IconClose}" ToolTip="Fechar (Ctrl+W)" AutomationProperties.Name="Fechar aba"
+                                                        Command="{Binding DataContext.CloseTabCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                        CommandParameter="{Binding}" Visibility="Hidden" Focusable="False" />
+                                            </Grid>
+                                        </StackPanel>
+                                        <DataTemplate.Triggers>
+                                            <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                <Setter TargetName="TitleText" Property="Foreground" Value="{StaticResource TextPrimary}" />
+                                                <Setter TargetName="CloseButton" Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                            <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                                                <Setter TargetName="CloseButton" Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsDirty}" Value="True" />
+                                                    <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter TargetName="DirtyDot" Property="Visibility" Value="Visible" />
+                                                <Setter TargetName="CloseButton" Property="Visibility" Value="Hidden" />
+                                            </MultiDataTrigger>
+                                        </DataTemplate.Triggers>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Border>
+
+                        <views:EditorHost x:Name="Editors" Grid.Row="1" />
+
+                        <!-- Nenhum arquivo aberto -->
+                        <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="True">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding Documents.Count}" Value="0">
+                                            <Setter Property="Visibility" Value="Visible" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
+                            <TextBlock Text="Nenhum arquivo aberto" Foreground="{StaticResource TextSecondary}" FontSize="14" HorizontalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                                <Button Style="{StaticResource LinkButton}" Content="Novo arquivo" Command="{Binding NewFileCommand}" />
+                                <TextBlock Text="·" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
+                                <Button Style="{StaticResource LinkButton}" Content="Abrir arquivo" Command="{Binding OpenFileDialogCommand}" />
+                                <TextBlock Text="·" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
+                                <Button Style="{StaticResource LinkButton}" Content="Novo projeto" Command="{Binding NewProjectCommand}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Aviso discreto -->
+                        <Border Grid.Row="1" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,20,16" MaxWidth="460"
+                                Background="{StaticResource BgElevated}" BorderBrush="{StaticResource BorderStrong}" BorderThickness="1"
+                                CornerRadius="7" Padding="12,9,6,9" Visibility="{Binding Notice, Converter={StaticResource NullToVis}}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.4" Color="Black" />
+                            </Border.Effect>
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Width="22" Height="22" FontSize="9"
+                                        Content="{StaticResource IconClose}" Command="{Binding DismissNoticeCommand}" Margin="8,0,0,0"
+                                        AutomationProperties.Name="Fechar aviso" />
+                                <TextBlock DockPanel.Dock="Left" Margin="0,0,10,0" FontSize="13">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                            <Setter Property="Text" Value="&#xE946;" />
+                                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding NoticeIsError}" Value="True">
+                                                    <Setter Property="Text" Value="{StaticResource IconError}" />
+                                                    <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                                <TextBlock Text="{Binding Notice}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+
+                    <GridSplitter x:Name="PanelSplitter" Grid.Row="1" Style="{StaticResource Splitter}" HorizontalAlignment="Stretch"
+                                  VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows"
+                                  DragCompleted="OnPanelResized" Visibility="Collapsed" />
+
+                    <Grid Grid.Row="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="31" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <!-- Cabeçalho do painel inferior (sempre visível) -->
+                    <Border Grid.Row="0" Background="{StaticResource BgSidebar}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+                        <DockPanel Margin="8,0,6,0">
+                            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                                <RadioButton x:Name="TerminalTab" Style="{StaticResource PanelTab}" Content="TERMINAL"
+                                             Command="{Binding ShowPanelTabCommand}" CommandParameter="terminal" />
+                                <RadioButton x:Name="ProblemsTab" Style="{StaticResource PanelTab}"
+                                             Command="{Binding ShowPanelTabCommand}" CommandParameter="problems">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="PROBLEMAS" />
+                                        <Border Margin="7,0,0,0" CornerRadius="8" Padding="6,0" Background="{StaticResource BgActive}"
+                                                Visibility="{Binding Problems.Summary, Converter={StaticResource NullToVis}}">
+                                            <TextBlock Text="{Binding Problems.Summary}" FontSize="11" />
+                                        </Border>
+                                    </StackPanel>
+                                </RadioButton>
+                            </StackPanel>
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button x:Name="ScrollEndButton" Style="{StaticResource TextButton}" Height="22" Padding="8,0" Margin="0,0,6,0"
+                                        Visibility="Collapsed" Click="OnScrollTerminalToEnd" ToolTip="Voltar ao fim da saída">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Style="{StaticResource Icon}" Text="{StaticResource IconArrowDown}" FontSize="10" Margin="0,0,6,0" />
+                                        <TextBlock Text="Ir para o fim" FontSize="12" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Width="24" Height="24" FontSize="9" Command="{Binding TogglePanelCommand}"
+                                        AutomationProperties.Name="Mostrar ou ocultar painel" ToolTip="Mostrar/ocultar painel (Ctrl+J)">
+                                    <Button.Style>
+                                        <Style TargetType="Button" BasedOn="{StaticResource IconButton}">
+                                            <Setter Property="Content" Value="{StaticResource IconChevronUp}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsPanelOpen}" Value="True">
+                                                    <Setter Property="Content" Value="{StaticResource IconChevronDown}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Button.Style>
+                                </Button>
+                            </StackPanel>
+                            <TextBlock Text="{Binding RunInfo}" Foreground="{StaticResource TextMuted}" FontSize="12" VerticalAlignment="Center"
+                                       Margin="12,0" TextTrimming="CharacterEllipsis" />
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Corpo do painel -->
+                    <Grid x:Name="PanelBody" Grid.Row="1" Background="#1A1B1E" Visibility="Collapsed">
+                        <views:TerminalView x:Name="Terminal" Margin="10,6,4,2" />
+                        <Grid x:Name="ProblemsPane" Visibility="Collapsed" Background="{StaticResource BgSidebar}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="0,4,0,4">
+                                <StackPanel>
+                                    <TextBlock Text="Nenhum problema encontrado." Foreground="{StaticResource TextMuted}" Margin="16,8"
+                                               Visibility="{Binding Problems.IsEmpty, Converter={StaticResource BoolToVis}}" />
+                                    <ItemsControl ItemsSource="{Binding Problems.Errors}" ItemTemplate="{StaticResource ProblemTemplate}" />
+                                    <Button Style="{StaticResource TextButton}" HorizontalAlignment="Left" Margin="6,2,0,2" Height="24"
+                                            Command="{Binding ToggleWarningsCommand}"
+                                            Visibility="{Binding Problems.HasWarnings, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock FontSize="9" Margin="0,0,8,0">
+                                                <TextBlock.Style>
+                                                    <Style TargetType="TextBlock" BasedOn="{StaticResource Icon}">
+                                                        <Setter Property="Text" Value="{StaticResource IconChevronRight}" />
+                                                        <Style.Triggers>
+                                                            <DataTrigger Binding="{Binding Problems.WarningsExpanded}" Value="True">
+                                                                <Setter Property="Text" Value="{StaticResource IconChevronDown}" />
+                                                            </DataTrigger>
+                                                        </Style.Triggers>
+                                                    </Style>
+                                                </TextBlock.Style>
+                                            </TextBlock>
+                                            <TextBlock Text="Avisos" />
+                                            <TextBlock Text="{Binding Problems.WarningCount, StringFormat=' ({0})'}" Foreground="{StaticResource TextMuted}" />
+                                        </StackPanel>
+                                    </Button>
+                                    <ItemsControl ItemsSource="{Binding Problems.Warnings}" ItemTemplate="{StaticResource ProblemTemplate}"
+                                                  Visibility="{Binding Problems.WarningsExpanded, Converter={StaticResource BoolToVis}}" />
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Grid>
+                    </Grid>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <!-- ============================================== Barra de status -->
+            <Border Grid.Row="2" Background="{StaticResource BgBase}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0">
+                <DockPanel Margin="10,0" TextBlock.FontSize="12" TextBlock.Foreground="{StaticResource TextSecondary}">
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ProjectLabel}" ToolTip="Projeto ativo" />
+                        <TextBlock Text="{Binding StatusText}" Margin="16,0,0,0" Foreground="{StaticResource TextPrimary}" />
+                        <TextBlock Text="{Binding LanguageStatus}" Margin="16,0,0,0" Foreground="{StaticResource TextMuted}" />
+                        <Button Style="{StaticResource TextButton}" Height="20" Padding="6,0" Margin="12,0,0,0" Command="{Binding ShowSdkHelpCommand}"
+                                Visibility="{Binding SdkMissing, Converter={StaticResource BoolToVis}}" ToolTip="O SDK .NET 10 é necessário para executar">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource Icon}" Text="{StaticResource IconWarning}" FontSize="11" Foreground="{StaticResource WarningBrush}" Margin="0,0,6,0" />
+                                <TextBlock Text="SDK .NET 10 não encontrado" FontSize="12" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right"
+                                DataContext="{Binding ActiveDocument}" Visibility="{Binding Converter={StaticResource NullToVis}}">
+                        <TextBlock Text="{Binding DataContext.CaretText, RelativeSource={RelativeSource AncestorType=Window}}" />
+                        <TextBlock Text="{Binding EncodingName}" Margin="18,0,0,0" />
+                        <TextBlock Text="{Binding LineEnding}" Margin="18,0,0,0" ToolTip="Final de linha do arquivo" />
+                        <TextBlock Margin="18,0,0,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Text" Value="Salvo" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsDirty}" Value="True">
+                                            <Setter Property="Text" Value="Não salvo" />
+                                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+                                        </DataTrigger>
+                                        <DataTrigger Binding="{Binding IsUntitled}" Value="True">
+                                            <Setter Property="Text" Value="Rascunho" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                    <Border />
+                </DockPanel>
+            </Border>
+        </Grid>
+    </Border>
+</Window>

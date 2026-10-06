@@ -1,0 +1,71 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!-- Superfícies, da mais escura para a mais clara -->
+    <Color x:Key="BgBaseColor">#16171A</Color>
+    <Color x:Key="BgSidebarColor">#1A1B1E</Color>
+    <Color x:Key="BgEditorColor">#1E1F22</Color>
+    <Color x:Key="BgElevatedColor">#25262A</Color>
+    <Color x:Key="BgHoverColor">#2B2C31</Color>
+    <Color x:Key="BgActiveColor">#34353B</Color>
+    <Color x:Key="BorderColor">#2A2B30</Color>
+    <Color x:Key="BorderStrongColor">#3B3C42</Color>
+
+    <Color x:Key="TextPrimaryColor">#D7D7DC</Color>
+    <Color x:Key="TextSecondaryColor">#A0A0A8</Color>
+    <Color x:Key="TextMutedColor">#6E6E77</Color>
+
+    <Color x:Key="AccentColor">#7C8CF8</Color>
+    <Color x:Key="AccentHoverColor">#909EFA</Color>
+    <Color x:Key="AccentSoftColor">#2C3157</Color>
+    <Color x:Key="ErrorColor">#F0727C</Color>
+    <Color x:Key="WarningColor">#E2B66A</Color>
+    <Color x:Key="SuccessColor">#7EC699</Color>
+
+    <SolidColorBrush x:Key="BgBase" Color="{StaticResource BgBaseColor}" />
+    <SolidColorBrush x:Key="BgSidebar" Color="{StaticResource BgSidebarColor}" />
+    <SolidColorBrush x:Key="BgEditor" Color="{StaticResource BgEditorColor}" />
+    <SolidColorBrush x:Key="BgElevated" Color="{StaticResource BgElevatedColor}" />
+    <SolidColorBrush x:Key="BgHover" Color="{StaticResource BgHoverColor}" />
+    <SolidColorBrush x:Key="BgActive" Color="{StaticResource BgActiveColor}" />
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+    <SolidColorBrush x:Key="BorderStrong" Color="{StaticResource BorderStrongColor}" />
+    <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource TextPrimaryColor}" />
+    <SolidColorBrush x:Key="TextSecondary" Color="{StaticResource TextSecondaryColor}" />
+    <SolidColorBrush x:Key="TextMuted" Color="{StaticResource TextMutedColor}" />
+    <SolidColorBrush x:Key="Accent" Color="{StaticResource AccentColor}" />
+    <SolidColorBrush x:Key="AccentHover" Color="{StaticResource AccentHoverColor}" />
+    <SolidColorBrush x:Key="AccentSoft" Color="{StaticResource AccentSoftColor}" />
+    <SolidColorBrush x:Key="AccentText" Color="#101225" />
+    <SolidColorBrush x:Key="ErrorBrush" Color="{StaticResource ErrorColor}" />
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="SelectionBrush" Color="#33405F" />
+    <SolidColorBrush x:Key="ListSelection" Color="#2D3250" />
+    <SolidColorBrush x:Key="CloseHover" Color="#C42B1C" />
+
+    <FontFamily x:Key="UiFont">Segoe UI Variable Text, Segoe UI</FontFamily>
+    <FontFamily x:Key="CodeFont">Cascadia Mono, Cascadia Code, Consolas</FontFamily>
+    <FontFamily x:Key="IconFont">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
+    <sys:Double x:Key="UiFontSize">13</sys:Double>
+    <sys:Double x:Key="SmallFontSize">12</sys:Double>
+
+    <!-- Ícones (Segoe Fluent Icons; os mesmos códigos existem no Segoe MDL2 Assets do Windows 10) -->
+    <sys:String x:Key="IconPlay">&#xE768;</sys:String>
+    <sys:String x:Key="IconStop">&#xE71A;</sys:String>
+    <sys:String x:Key="IconNewFile">&#xE8A5;</sys:String>
+    <sys:String x:Key="IconNewFolder">&#xE8F4;</sys:String>
+    <sys:String x:Key="IconRefresh">&#xE72C;</sys:String>
+    <sys:String x:Key="IconCollapse">&#xE8BB;</sys:String>
+    <sys:String x:Key="IconClose">&#xE8BB;</sys:String>
+    <sys:String x:Key="IconChevronRight">&#xE76C;</sys:String>
+    <sys:String x:Key="IconChevronDown">&#xE70D;</sys:String>
+    <sys:String x:Key="IconChevronUp">&#xE70E;</sys:String>
+    <sys:String x:Key="IconError">&#xEA39;</sys:String>
+    <sys:String x:Key="IconWarning">&#xE7BA;</sys:String>
+    <sys:String x:Key="IconSidebar">&#xE90C;</sys:String>
+    <sys:String x:Key="IconPanel">&#xE90E;</sys:String>
+    <sys:String x:Key="IconArrowDown">&#xE74B;</sys:String>
+    <sys:String x:Key="IconFolder">&#xE8B7;</sys:String>
+</ResourceDictionary>

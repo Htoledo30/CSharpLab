@@ -1,0 +1,44 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="Colors.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <Style x:Key="CompletionItemStyle" TargetType="ListBoxItem">
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Bd" Background="Transparent" CornerRadius="4" Padding="6,1,8,1" Height="24">
+                        <ContentPresenter />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgHover}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{StaticResource ListSelection}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <DataTemplate x:Key="CompletionItemTemplate">
+        <DockPanel Height="22" ToolTipService.IsEnabled="False">
+            <Border DockPanel.Dock="Left" Width="20" Height="16" CornerRadius="3" Margin="0,0,8,0" Background="#26FFFFFF">
+                <TextBlock Text="{Binding Glyph}" Foreground="{Binding GlyphBrush}" FontFamily="{StaticResource CodeFont}"
+                           FontSize="10.5" FontWeight="SemiBold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+            <TextBlock DockPanel.Dock="Right" Text="{Binding KindName}" Foreground="{StaticResource TextMuted}" FontSize="11"
+                       Margin="16,0,0,0" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding DisplayText}" FontFamily="{StaticResource CodeFont}" FontSize="13" VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+    </DataTemplate>
+</ResourceDictionary>

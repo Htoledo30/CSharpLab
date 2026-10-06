@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/CSharpLab.Core/CSharpLab.Core.csproj" />
+    <Project Path="src/CSharpLab/CSharpLab.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/CSharpLab.Tests/CSharpLab.Tests.csproj" />
+  </Folder>
+</Solution>
