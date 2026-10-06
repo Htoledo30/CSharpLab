@@ -1341,6 +1341,43 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>Aba do documento (pela chave do Roslyn), abrindo o arquivo se necessário.</summary>
+    public DocumentViewModel? FindOrOpen(string key, string? path) =>
+        FindByKey(key) ?? (path != null && File.Exists(path) ? OpenFile(path, activate: false) : null);
+
+    public void NavigateTo(DocumentViewModel doc, int line, int column, int? offset)
+    {
+        ActiveDocument = doc;
+        GoToRequested?.Invoke(doc, line, column, offset);
+    }
+
+    /// <summary>
+    /// Aplica um renomear em todas as abas afetadas (abrindo as que faltam). Cada arquivo vira
+    /// uma única operação de desfazer; nada é salvo sozinho.
+    /// </summary>
+    public bool ApplyRename(IReadOnlyList<RenameEdit> edits, IReadOnlyDictionary<string, int> versionsBefore)
+    {
+        // Algum arquivo mudou enquanto o Roslyn calculava: as posições já não valem.
+        foreach (var (key, version) in versionsBefore)
+        {
+            if (FindByKey(key) is { } open && open.Version != version) return false;
+        }
+        foreach (var edit in edits)
+        {
+            var doc = FindOrOpen(edit.DocumentKey, edit.FilePath);
+            if (doc == null) continue;
+            using (doc.Document.RunUpdate())
+            {
+                foreach (var change in edit.Changes.OrderByDescending(c => c.Span.Start))
+                    doc.Document.Replace(change.Span.Start, change.Span.Length, change.NewText ?? "");
+            }
+        }
+        return true;
+    }
+
+    public IReadOnlyDictionary<string, int> DocumentVersions() =>
+        Documents.ToDictionary(d => d.LanguageKey, d => d.Version, StringComparer.OrdinalIgnoreCase);
+
     [RelayCommand]
     private void NavigateToProblem(ProblemItem? item)
     {

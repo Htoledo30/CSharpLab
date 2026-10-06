@@ -16,7 +16,7 @@ using Microsoft.CodeAnalysis.Text;
 namespace CSharpLab.Editor;
 
 /// <summary>Editor de um documento, com os recursos de C# ligados ao Roslyn.</summary>
-public sealed class CodeEditor : TextEditor
+public sealed partial class CodeEditor : TextEditor
 {
     private readonly MainViewModel _vm;
     private CSharpColorizer? _colorizer;
@@ -98,7 +98,11 @@ public sealed class CodeEditor : TextEditor
         area.PreviewKeyDown += OnPreviewKeyDown;
         area.Caret.PositionChanged += OnCaretMoved;
         area.TextView.MouseHover += OnMouseHover;
-        area.TextView.MouseHoverStopped += (_, _) => CloseHover();
+        area.TextView.MouseHoverStopped += (_, _) =>
+        {
+            _hoverCts?.Cancel();
+            CloseHover();
+        };
         area.TextView.ScrollOffsetChanged += (_, _) =>
         {
             CloseHover();
@@ -120,6 +124,7 @@ public sealed class CodeEditor : TextEditor
         if (vm.Language != null) OnLanguageReady();
 
         _diagnostics.SetDiagnostics(doc.Diagnostics);
+        InitializeAssist();
     }
 
     private const int SemanticWholeDocumentLimit = 200_000;
@@ -544,40 +549,7 @@ public sealed class CodeEditor : TextEditor
         _completion.Request(null);
     }
 
-    // ================================================================ dicas de erro
-
-    private void OnMouseHover(object? sender, MouseEventArgs e)
-    {
-        var pos = TextArea.TextView.GetPositionFloor(e.GetPosition(TextArea.TextView) + TextArea.TextView.ScrollOffset);
-        if (pos == null) return;
-        int offset = Document.GetOffset(pos.Value.Location);
-        var markers = _diagnostics.At(offset).Take(3).ToList();
-        if (markers.Count == 0) return;
-
-        var panel = new StackPanel();
-        foreach (var m in markers)
-        {
-            var d = m.Diagnostic;
-            panel.Children.Add(new TextBlock
-            {
-                Text = $"Linha {d.Line} — {d.Message}",
-                Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, panel.Children.Count > 0 ? 6 : 0, 0, 0),
-            });
-            panel.Children.Add(new TextBlock
-            {
-                Text = $"{d.Id} · {d.OriginalMessage}",
-                Foreground = (Brush)Application.Current.FindResource("TextMuted"),
-                FontSize = 11,
-                TextWrapping = TextWrapping.Wrap,
-                Margin = new Thickness(0, 2, 0, 0),
-            });
-        }
-        CloseHover();
-        _hoverTip = new ToolTip { Content = panel, PlacementTarget = this, Placement = System.Windows.Controls.Primitives.PlacementMode.Mouse, IsOpen = true };
-        e.Handled = true;
-    }
+    // ================================================================ dicas
 
     private void CloseHover()
     {

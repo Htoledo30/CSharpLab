@@ -144,6 +144,12 @@ public sealed class DialogService : IDialogService
         return dialog.ShowDialog() == true ? dialog.Request : null;
     }
 
+    public string? AskText(string title, string message, string initial, Func<string, string?>? validate = null)
+    {
+        var dialog = new TextPromptDialog(title, message, initial, validate);
+        return dialog.ShowDialog() == true ? dialog.Value : null;
+    }
+
     public ProjectFile? SelectProject(IReadOnlyList<ProjectFile> projects, string folder)
     {
         var dialog = new DialogWindow("Qual projeto executar?");
@@ -270,5 +276,43 @@ public sealed class NewProjectDialog : DialogWindow
         }
         Request = new NewProjectRequest(name, location);
         return true;
+    }
+}
+
+/// <summary>Pede um texto curto, com validação na hora (ex.: o novo nome ao renomear).</summary>
+public sealed class TextPromptDialog : DialogWindow
+{
+    private readonly TextBox _box;
+    private readonly TextBlock _error;
+    private readonly Func<string, string?>? _validate;
+
+    public TextPromptDialog(string title, string message, string initial, Func<string, string?>? validate) : base(title)
+    {
+        _validate = validate;
+        var panel = new StackPanel();
+        panel.Children.Add(Paragraph(message, muted: true));
+        _box = new TextBox { Text = initial, Margin = new Thickness(0, 10, 0, 0), FontFamily = (FontFamily)FindResource("CodeFont") };
+        System.Windows.Automation.AutomationProperties.SetName(_box, message);
+        _error = new TextBlock { Foreground = (Brush)FindResource("ErrorBrush"), FontSize = 12, Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap, Visibility = Visibility.Collapsed };
+        panel.Children.Add(_box);
+        panel.Children.Add(_error);
+        Body = panel;
+        _box.TextChanged += (_, _) => _error.Visibility = Visibility.Collapsed;
+        AddButton("OK", true, "PrimaryButton", isDefault: true);
+        AddButton("Cancelar", false, isCancel: true);
+        InitialFocus = _box;
+        Loaded += (_, _) => _box.SelectAll();
+    }
+
+    public string Value => _box.Text.Trim();
+
+    protected override bool OnButton(object? result)
+    {
+        if (result is not true) return true;
+        var error = Value.Length == 0 ? "Digite um nome." : _validate?.Invoke(Value);
+        if (error == null) return true;
+        _error.Text = error;
+        _error.Visibility = Visibility.Visible;
+        return false;
     }
 }

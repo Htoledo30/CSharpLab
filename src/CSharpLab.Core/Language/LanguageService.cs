@@ -485,6 +485,77 @@ public sealed class LanguageService : IDisposable
         return document == null ? null : await SignatureHelp.GetAsync(document, position, ct).ConfigureAwait(false);
     }
 
+    // ---------------------------------------------------------------- ajudas sobre o código
+
+    private string? KeyOf(DocumentId id)
+    {
+        lock (_gate)
+        {
+            if (_generated.Contains(id)) return null;
+            foreach (var (key, docId) in _documents)
+            {
+                if (docId == id) return key;
+            }
+            return null;
+        }
+    }
+
+    public async Task<string?> GetQuickInfoAsync(string key, int position, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        return document == null ? null : await CodeAssist.GetQuickInfoAsync(document, position, ct).ConfigureAwait(false);
+    }
+
+    public async Task<DefinitionResult?> FindDefinitionAsync(string key, int position, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        if (document == null) return null;
+        var result = await CodeAssist.FindDefinitionAsync(document, position, ct).ConfigureAwait(false);
+        if (result?.DocumentId is { } id)
+        {
+            var target = KeyOf(id);
+            // Declaração num arquivo gerado (ex.: usings implícitos): não há para onde ir.
+            if (target == null) return result with { DocumentId = null, ExternalName = "um arquivo gerado pelo projeto" };
+            return result with { DocumentKey = target };
+        }
+        return result;
+    }
+
+    public async Task<RenameTarget?> GetRenameTargetAsync(string key, int position, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        return document == null ? null : await CodeAssist.GetRenameTargetAsync(document, position, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>Renomeia o símbolo em todos os arquivos do projeto; as alterações vêm por aba/arquivo.</summary>
+    public async Task<(IReadOnlyList<RenameEdit> Edits, int Occurrences, string? Error)> RenameAsync(string key, int position, string newName, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        if (document == null) return ([], 0, "Os serviços de C# ainda não estão prontos para este arquivo.");
+        var (result, error) = await CodeAssist.RenameAsync(document, position, newName, ct).ConfigureAwait(false);
+        if (result == null) return ([], 0, error);
+        var edits = new List<RenameEdit>();
+        foreach (var (id, changes) in result.Changes)
+        {
+            var target = KeyOf(id);
+            if (target == null) continue;
+            edits.Add(new RenameEdit(target, document.Project.Solution.GetDocument(id)?.FilePath, changes));
+        }
+        return (edits, edits.Sum(e => e.Changes.Count), null);
+    }
+
+    public async Task<IReadOnlyList<string>> FindUsingCandidatesAsync(string key, string typeName, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        return document == null ? [] : await CodeAssist.FindUsingCandidatesAsync(document, typeName, ct).ConfigureAwait(false);
+    }
+
+    public async Task<TextChange?> AddUsingAsync(string key, string ns, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        return document == null ? null : await CodeAssist.AddUsingAsync(document, ns, ct).ConfigureAwait(false);
+    }
+
     public async Task<EditorOptions> GetEditorOptionsAsync(string key, CancellationToken ct)
     {
         var document = GetDocument(key);

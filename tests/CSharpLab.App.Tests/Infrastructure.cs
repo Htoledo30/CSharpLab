@@ -96,6 +96,8 @@ public sealed class FakeDialogs : IDialogService
     public string? PickSaveFile(string suggestedName, string? initialDirectory) => null;
     public NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation) => null;
     public ProjectFile? SelectProject(IReadOnlyList<ProjectFile> projects, string folder) => projects.FirstOrDefault();
+    public string? TextAnswer { get; set; }
+    public string? AskText(string title, string message, string initial, Func<string, string?>? validate = null) => TextAnswer;
 }
 
 public sealed class FakeTerminal : ITerminalHost
