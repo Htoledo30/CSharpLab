@@ -55,12 +55,11 @@ public static class ProjectEvaluator
             var cached = JsonSerializer.Deserialize<CachedModel>(File.ReadAllText(cacheFile), CacheJson);
             if (cached == null || cached.Key != CacheKey(projectPath)) return null;
             if (cached.Model.References.Any(r => !File.Exists(r))) return null;
-            return cached.Model with
-            {
-                CompileFiles = ProjectLocator.DefaultCompileFiles(cached.Model.Directory)
-                    .Union(cached.Model.CompileFiles.Where(File.Exists), StringComparer.OrdinalIgnoreCase)
-                    .ToList(),
-            };
+            // Arquivos .cs criados ou apagados desde a avaliação: a lista do MSBuild pode ter mudado
+            // (globs, <Compile Remove>), então o cache não serve; o projeto é avaliado de novo.
+            var onDisk = ProjectLocator.DefaultCompileFiles(cached.Model.Directory);
+            if (!onDisk.ToHashSet(StringComparer.OrdinalIgnoreCase).SetEquals(cached.DiskFiles)) return null;
+            return cached.Model;
         }
         catch
         {
@@ -68,11 +67,41 @@ public static class ProjectEvaluator
         }
     }
 
+    /// <summary>
+    /// Restore é necessário se não há project.assets.json ou se algum arquivo que define
+    /// dependências (o .csproj, Directory.Build.*, Directory.Packages.props, NuGet.config,
+    /// global.json…) mudou depois dele.
+    /// </summary>
     public static bool NeedsRestore(string projectPath)
     {
         var assets = Path.Combine(Path.GetDirectoryName(projectPath)!, "obj", "project.assets.json");
         if (!File.Exists(assets)) return true;
-        return File.GetLastWriteTimeUtc(projectPath) > File.GetLastWriteTimeUtc(assets);
+        var assetsTime = File.GetLastWriteTimeUtc(assets);
+        return RestoreInputs(projectPath).Any(f => File.GetLastWriteTimeUtc(f) > assetsTime);
+    }
+
+    private static readonly string[] AncestorInputs =
+    [
+        "Directory.Build.props", "Directory.Build.targets", "Directory.Packages.props",
+        "NuGet.config", "nuget.config", "NuGet.Config", "global.json",
+    ];
+
+    /// <summary>O .csproj e os arquivos acima dele que influenciam restore e avaliação.</summary>
+    public static IReadOnlyList<string> RestoreInputs(string projectPath)
+    {
+        var list = new List<string> { projectPath };
+        var dir = Path.GetDirectoryName(projectPath)!;
+        var lockFile = Path.Combine(dir, "packages.lock.json");
+        if (File.Exists(lockFile)) list.Add(lockFile);
+        for (var d = dir; !string.IsNullOrEmpty(d); d = Path.GetDirectoryName(d))
+        {
+            foreach (var name in AncestorInputs)
+            {
+                var f = Path.Combine(d, name);
+                if (File.Exists(f) && !list.Contains(f, StringComparer.OrdinalIgnoreCase)) list.Add(f);
+            }
+        }
+        return list;
     }
 
     public static async Task<ProcessResult> RestoreAsync(string projectPath, CancellationToken ct) =>
@@ -202,7 +231,7 @@ public static class ProjectEvaluator
         };
     }
 
-    private sealed record CachedModel(string Key, ProjectModel Model);
+    private sealed record CachedModel(string Key, ProjectModel Model, IReadOnlyList<string> DiskFiles);
 
     private static string CacheFile(string projectPath)
     {
@@ -215,16 +244,8 @@ public static class ProjectEvaluator
         var dir = Path.GetDirectoryName(projectPath)!;
         var assets = Path.Combine(dir, "obj", "project.assets.json");
         long Ticks(string f) => File.Exists(f) ? File.GetLastWriteTimeUtc(f).Ticks : 0;
-        var parts = new List<string> { projectPath, Ticks(projectPath).ToString(), Ticks(assets).ToString(), Dotnet.Root ?? "" };
-        // Arquivos Directory.Build.* acima do projeto também alteram a avaliação.
-        for (var d = dir; d != null; d = Path.GetDirectoryName(d))
-        {
-            foreach (var name in new[] { "Directory.Build.props", "Directory.Build.targets", "global.json" })
-            {
-                var f = Path.Combine(d, name);
-                if (File.Exists(f)) parts.Add(f + Ticks(f));
-            }
-        }
+        var parts = new List<string> { Ticks(assets).ToString(), Dotnet.Root ?? "" };
+        parts.AddRange(RestoreInputs(projectPath).Select(f => f + Ticks(f)));
         return string.Join('|', parts);
     }
 
@@ -232,7 +253,8 @@ public static class ProjectEvaluator
     {
         try
         {
-            AppPaths.WriteAllTextAtomic(CacheFile(projectPath), JsonSerializer.Serialize(new CachedModel(CacheKey(projectPath), model), CacheJson));
+            AppPaths.WriteAllTextAtomic(CacheFile(projectPath), JsonSerializer.Serialize(
+                new CachedModel(CacheKey(projectPath), model, ProjectLocator.DefaultCompileFiles(model.Directory)), CacheJson));
         }
         catch (Exception ex)
         {

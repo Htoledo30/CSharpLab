@@ -20,7 +20,7 @@ jobs:
           dotnet-version: "10.0.x"
 
       - name: Testes
-        run: dotnet test tests/CSharpLab.Tests -c Release
+        run: dotnet test CSharpLab.slnx -c Release
 
       - name: Pacote
         shell: pwsh

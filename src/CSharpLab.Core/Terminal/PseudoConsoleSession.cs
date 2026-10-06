@@ -30,8 +30,51 @@ public sealed class PseudoConsoleSession : IDisposable
     private long _lastOutputTicks;
     private bool _disposed;
 
-    /// <summary>Saída já decodificada (UTF-8). Disparado numa thread de fundo.</summary>
-    public event Action<string>? Output;
+    private const int MaxPendingOutput = 4 * 1024 * 1024;
+    private readonly object _outputGate = new();
+    private readonly StringBuilder _pendingOutput = new();
+    private Action<string>? _output;
+
+    /// <summary>
+    /// Saída já decodificada (UTF-8). Disparado numa thread de fundo. O que o programa escrever
+    /// antes do primeiro assinante fica guardado e é entregue a ele na assinatura.
+    /// </summary>
+    public event Action<string>? Output
+    {
+        add
+        {
+            if (value == null) return;
+            lock (_outputGate)
+            {
+                _output += value;
+                if (_pendingOutput.Length > 0)
+                {
+                    var pending = _pendingOutput.ToString();
+                    _pendingOutput.Clear();
+                    value(pending);
+                }
+            }
+        }
+        remove
+        {
+            lock (_outputGate) _output -= value;
+        }
+    }
+
+    private void RaiseOutput(string text)
+    {
+        lock (_outputGate)
+        {
+            if (_output != null)
+            {
+                _output(text);
+            }
+            else if (_pendingOutput.Length < MaxPendingOutput)
+            {
+                _pendingOutput.Append(text);
+            }
+        }
+    }
 
     public int ProcessId { get; private set; }
 
@@ -190,7 +233,7 @@ public sealed class PseudoConsoleSession : IDisposable
                 Interlocked.Exchange(ref _lastOutputTicks, Environment.TickCount64);
                 int c = decoder.GetChars(bytes, 0, n, chars, 0, flush: false);
                 if (c > 0)
-                    Output?.Invoke(new string(chars, 0, c));
+                    RaiseOutput(new string(chars, 0, c));
             }
         }
         catch (IOException) { }

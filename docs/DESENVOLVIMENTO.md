@@ -4,7 +4,7 @@
 
 ```powershell
 dotnet build CSharpLab.slnx                 # compila tudo
-dotnet test tests/CSharpLab.Tests           # testes (precisa do SDK .NET 10)
+dotnet test CSharpLab.slnx                  # testes do Core e dos ViewModels (precisa do SDK .NET 10)
 dotnet run --project src/CSharpLab          # abre o editor em modo Debug
 powershell -ExecutionPolicy Bypass -File build\publish.ps1   # gera artifacts\CSharpLab-win-x64.zip
 ```
@@ -29,6 +29,7 @@ Publicar uma versão no GitHub: crie uma tag `v1.2.3` e envie (`git push --tags`
 | `src/CSharpLab/Editor` | AvalonEdit + recursos de C# (cores, sublinhados, sugestões, assinatura, snippets, indentação) |
 | `src/CSharpLab/Views` | Explorador, terminal, busca, diálogos, host de editores |
 | `tests/CSharpLab.Tests` | Tradução de erros, arquivos, projetos, build real, cancelamento e terminal |
+| `tests/CSharpLab.App.Tests` | ViewModels numa thread STA com Dispatcher real: execução/parada, exclusão, salvamento, pasta |
 
 ## Decisões técnicas
 
@@ -67,7 +68,14 @@ Publicar uma versão no GitHub: crie uma tag `v1.2.3` e envie (`git push --tags`
 - **Salvamento**: grava num temporário na mesma pasta e substitui o original (`File.Replace`); codificação
   (UTF-8 com/sem BOM, UTF-16, Windows-1252) e finais de linha são preservados.
 - **Recuperação**: cópias de documentos alterados em `%LocalAppData%\CSharpLab\Recovery` (1,5 s após a
-  última edição, gravação atômica), apagadas ao salvar ou descartar.
+  última edição, gravação atômica), apagadas ao salvar ou descartar. Gravações e exclusões passam por uma
+  fila única e ordenada, então uma gravação atrasada nunca recria um rascunho já descartado.
+- **Salvar** confere o arquivo no disco antes de gravar (data, tamanho e conteúdo) e pergunta antes de
+  substituir uma versão alterada por outro programa. Codificações antigas (Windows-1252) nunca trocam
+  caracteres em silêncio: se faltar algum, o editor oferece salvar em UTF-8.
+- **Restore** é refeito quando o `.csproj`, `Directory.Build.*`, `Directory.Packages.props`, `NuGet.config`,
+  `global.json` ou `packages.lock.json` mudam depois do `project.assets.json`. O cache da avaliação deixa de
+  valer quando arquivos `.cs` são criados ou apagados, para respeitar `<Compile Remove>` e globs.
 - **Sugestões**: lista própria (não a janela padrão do AvalonEdit) para ordenar por qualidade de
   correspondência: igual > começa com > iniciais CamelCase > contém. Os snippets do Roslyn são omitidos; os
   do editor aparecem identificados como "snippet".

@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Threading;
+using CSharpLab.Core.Files;
 using CSharpLab.Editor;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Rendering;
@@ -88,14 +89,8 @@ public partial class FindReplaceBar : UserControl
         var query = FindBox.Text;
         if (query.Length > 0)
         {
-            var text = _editor.Document.Text;
-            var comparison = MatchCase.IsChecked == true ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase;
-            int index = 0;
-            while (search.Matches.Count < MaxMatches && (index = text.IndexOf(query, index, comparison)) >= 0)
-            {
-                search.Matches.Add((index, query.Length));
-                index += Math.Max(1, query.Length);
-            }
+            // O destaque mostra até MaxMatches; "Substituir tudo" busca de novo sem limite.
+            search.Matches.AddRange(TextOccurrences.FindAll(_editor.Document.Text, query, MatchCase.IsChecked == true, MaxMatches));
             int caret = keepPosition && !_editor.TextArea.Selection.IsEmpty ? _editor.SelectionStart : _editor.CaretOffset;
             search.Current = search.Matches.FindIndex(m => m.Start >= caret);
             if (search.Current < 0 && search.Matches.Count > 0) search.Current = 0;
@@ -207,7 +202,7 @@ public partial class FindReplaceBar : UserControl
     private void OnReplaceAll(object sender, RoutedEventArgs e)
     {
         if (_editor == null) return;
-        var matches = _editor.Search.Matches.ToList();
+        var matches = TextOccurrences.FindAll(_editor.Document.Text, FindBox.Text, MatchCase.IsChecked == true);
         if (matches.Count == 0) return;
         var replacement = ReplaceBox.Text;
         using (_editor.Document.RunUpdate())

@@ -45,7 +45,27 @@ public sealed class RecoveryStore
 
     private string FileFor(string id) => Path.Combine(_dir, id + ".json");
 
-    public void Save(RecoveryEntry entry)
+    // Gravações e exclusões passam por uma fila única, fora da interface e na ordem em que foram
+    // pedidas: uma gravação atrasada nunca recria uma recuperação já apagada, nem uma versão
+    // antiga sobrescreve uma mais nova.
+    private readonly object _queueGate = new();
+    private Task _tail = Task.CompletedTask;
+
+    private void Enqueue(Action action)
+    {
+        lock (_queueGate)
+            _tail = _tail.ContinueWith(_ => action(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+    }
+
+    /// <summary>Espera as operações pendentes (usado ao fechar o aplicativo e nos testes).</summary>
+    public bool Flush(TimeSpan timeout)
+    {
+        Task tail;
+        lock (_queueGate) tail = _tail;
+        return tail.Wait(timeout);
+    }
+
+    public void Save(RecoveryEntry entry) => Enqueue(() =>
     {
         try
         {
@@ -55,9 +75,9 @@ public sealed class RecoveryStore
         {
             AppPaths.Log(ex, "Gravando recuperação");
         }
-    }
+    });
 
-    public void Delete(string id)
+    public void Delete(string id) => Enqueue(() =>
     {
         try
         {
@@ -68,7 +88,7 @@ public sealed class RecoveryStore
         {
             AppPaths.Log(ex, "Removendo recuperação");
         }
-    }
+    });
 
     public IReadOnlyList<RecoveryEntry> LoadAll()
     {

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -68,7 +69,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         EditorFontSize = settings.FontSize;
         IsExplorerVisible = settings.ExplorerVisible;
         ExplorerWidth = Math.Clamp(settings.ExplorerWidth, 160, 600);
-        IsPanelOpen = false;
+        IsPanelOpen = settings.PanelOpen;
         PanelHeight = settings.PanelHeight;
         PanelTab = settings.PanelTab == "problems" ? "problems" : "terminal";
 
@@ -519,6 +520,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private bool SaveTo(DocumentViewModel doc, string path)
     {
+        // Salvar no próprio arquivo: confere no disco se ele mudou desde a última leitura/gravação,
+        // mesmo que o monitor da pasta ainda não tenha avisado (ou o arquivo esteja fora da pasta).
+        if (doc.FilePath != null && string.Equals(doc.FilePath, path, StringComparison.OrdinalIgnoreCase) &&
+            ChangedOnDisk(doc, path) &&
+            !Dialogs.Confirm("Arquivo alterado fora do editor",
+                $"\"{doc.Title}\" foi alterado por outro programa depois que você o abriu. Salvar vai substituir essa versão pela do editor.",
+                "Substituir", danger: true))
+        {
+            return false;
+        }
+
         try
         {
             var stamp = TextFileIO.Save(path, doc.Document.Text, doc.Encoding);
@@ -527,10 +539,40 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _recoveryVersions.Remove(doc.RecoveryId);
             return true;
         }
+        catch (UnrepresentableTextException ex) when (doc.Encoding is not (UTF8Encoding or UnicodeEncoding))
+        {
+            // Nada é trocado em silêncio: o usuário decide converter para UTF-8 ou cancelar.
+            if (!Dialogs.Confirm("Salvar em UTF-8?",
+                    $"\"{doc.Title}\" usa {ex.EncodingName}, que não tem alguns caracteres do texto (por exemplo \"{ex.Sample}\"). " +
+                    "Salvar em UTF-8 mantém todos eles.",
+                    "Salvar em UTF-8"))
+            {
+                return false;
+            }
+            doc.Encoding = TextFileIO.Utf8NoBom;
+            return SaveTo(doc, path);
+        }
         catch (Exception ex)
         {
             Dialogs.ShowError("Não foi possível salvar", FileErrors.Describe(ex, path));
             return false;
+        }
+    }
+
+    /// <summary>O arquivo no disco não é mais o que o editor leu ou gravou por último.</summary>
+    private static bool ChangedOnDisk(DocumentViewModel doc, string path)
+    {
+        var stamp = FileStamp.Of(path);
+        if (stamp == null || doc.DiskStamp == null || stamp == doc.DiskStamp) return false;
+        try
+        {
+            // Data diferente mas mesmo conteúdo (ex.: outro programa só "tocou" o arquivo) não conta.
+            var current = TextFileIO.Read(path);
+            return !doc.MatchesDiskVersion(current.Text);
+        }
+        catch
+        {
+            return true;
         }
     }
 
@@ -610,6 +652,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void CloseFolderCore()
     {
+        _evaluationCts?.Cancel();
+        _evaluationCts = null;
         _watcher?.Dispose();
         _watcher = null;
         CurrentFolder = null;
@@ -717,6 +761,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private void ApplyModel(ProjectModel model)
     {
+        // Resultado de uma avaliação que terminou depois de a pasta mudar: descarta.
+        if (CurrentFolder == null || !FileOperations.IsSameOrInside(model.Directory, CurrentFolder)) return;
         _model = model;
         _ls?.LoadProject(model);
         ScheduleDiagnostics();
@@ -765,10 +811,23 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     // ================================================================ arquivos alterados
 
-    public async Task<bool> PrepareDeleteAsync(string path)
+    /// <summary>
+    /// Confirma o envio para a Lixeira. Se houver abas com alterações não salvas dentro do caminho,
+    /// avisa que elas serão perdidas (a Lixeira guarda só a versão do disco).
+    /// </summary>
+    public bool ConfirmDelete(string path, bool isDirectory)
     {
-        await Task.Yield();
-        return true;
+        var name = Path.GetFileName(path.TrimEnd(Path.DirectorySeparatorChar));
+        var what = isDirectory ? $"a pasta \"{name}\" e todo o seu conteúdo" : $"\"{name}\"";
+        var dirty = Documents.Where(d => d.IsDirty && d.FilePath != null && FileOperations.IsSameOrInside(d.FilePath, path)).ToList();
+        if (dirty.Count == 0)
+            return Dialogs.Confirm("Enviar para a Lixeira", $"Enviar {what} para a Lixeira?", "Enviar para a Lixeira", danger: true);
+
+        var files = string.Join(", ", dirty.Take(3).Select(d => $"\"{d.Title}\"")) + (dirty.Count > 3 ? $" e mais {dirty.Count - 3}" : "");
+        return Dialogs.Confirm("Alterações não salvas serão perdidas",
+            $"{files} {(dirty.Count == 1 ? "tem" : "têm")} alterações não salvas. A Lixeira guarda só a versão do disco; " +
+            $"as alterações feitas aqui serão perdidas. Enviar {what} para a Lixeira mesmo assim?",
+            "Enviar e perder alterações", danger: true);
     }
 
     public void OnPathRenamed(string oldPath, string newPath)
@@ -879,6 +938,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                     else reevaluate = true;
                 }
 
+                if (e.Type != WatcherChangeTypes.Changed && name.EndsWith(".cs", StringComparison.OrdinalIgnoreCase))
+                    reevaluate = true;
+
                 if (deleted) _ls?.OnFileDeleted(path);
                 else _ls?.OnFileCreatedOrChanged(path);
             }
@@ -889,15 +951,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         CheckAllExternalChanges();
         if (reloadProjects) _ = LoadProjectsAsync();
-        else if (reevaluate && (RunProject ?? Projects.FirstOrDefault()) is { } p) _ = ReevaluateAsync(p.Path);
+        else if (reevaluate && _model?.ProjectPath is { } analyzed) _ = ReevaluateAsync(analyzed);
         ScheduleDiagnostics();
     }
 
     private async Task ReevaluateAsync(string projectPath)
     {
+        _evaluationCts?.Cancel();
+        var cts = _evaluationCts = new CancellationTokenSource();
         try
         {
-            var cts = _evaluationCts = new CancellationTokenSource();
             var model = await Task.Run(() => ProjectEvaluator.EvaluateAsync(projectPath, allowRestore: false, cts.Token));
             if (!cts.IsCancellationRequested) ApplyModel(model);
         }
@@ -1024,11 +1087,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     // ================================================================ execução
 
+    /// <summary>
+    /// Síncrono de propósito: um comando assíncrono ficaria desabilitado enquanto a execução
+    /// estivesse em andamento, e o mesmo botão precisa servir para Parar.
+    /// </summary>
     [RelayCommand]
-    private async Task RunOrStop()
+    private void RunOrStop()
     {
         if (IsBusy) StopRun();
-        else await RunAsync();
+        else _ = RunAsync();
     }
 
     [RelayCommand]
@@ -1338,7 +1405,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             if (_recoveryVersions.TryGetValue(doc.RecoveryId, out var v) && v == doc.Version) continue;
             var entry = RecoveryStore.Create(doc.RecoveryId, doc.FilePath, doc.IsUntitled ? doc.Title : null, doc.Document.Text, doc.Encoding, i);
             _recoveryVersions[doc.RecoveryId] = doc.Version;
-            _ = Task.Run(() => _recovery.Save(entry));
+            _recovery.Save(entry);
         }
     }
 
@@ -1375,6 +1442,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         SaveSettings();
         // Saída normal: o que restou foi salvo ou descartado explicitamente.
         foreach (var d in Documents) _recovery.Delete(d.RecoveryId);
+        _recovery.Flush(TimeSpan.FromSeconds(3));
         Dispose();
     }
 

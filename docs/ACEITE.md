@@ -1,7 +1,7 @@
 # Roteiro de aceite — resultados
 
 Ambiente: Windows 11 Pro (build 26300), AMD Ryzen 7 5700X, SSD, SDK .NET 10.0.301, escala 100%.
-Testes automatizados: **41 de 41 aprovados** (`dotnet test`). A interface foi conduzida por um script
+Testes automatizados: **55 de 55 aprovados** (`dotnet test CSharpLab.slnx`: 48 do Core e 7 de ViewModels). A interface foi conduzida por um script
 (teclado/mouse simulados + capturas de tela) sobre o executável real.
 
 Legenda: ✅ verificado · ⚠️ implementado, mas não verificado neste ambiente (motivo indicado).
@@ -10,9 +10,9 @@ Legenda: ✅ verificado · ⚠️ implementado, mas não verificado neste ambien
 | --- | --- | --- |
 | 1 | Primeira abertura | ✅ Editor pronto com `Sem título.cs` e o `Console.WriteLine("Olá, mundo!");`, focado; desfazer funciona. ⚠️ Abertura **sem SDK** não testada (a máquina tem o SDK); a verificação e o aviso "Instale o SDK .NET 10 para executar C#" com link e "Verificar novamente" estão implementados, e o app é self-contained. |
 | 2 | Projeto `A_Torre` em caminho com espaços e acentos | ✅ Criado (teste automatizado e pela interface em `Projetos Ação\A_Torre`), aberto, salvo, sessão restaurada ao reabrir, executado. |
-| 3 | Arquivos | ✅ Novo `.cs` pelo explorador (abre e recebe o foco), duas abas, aviso ao fechar com texto não salvo (Cancelar mantém tudo), renomear (testes, inclusive só maiúsculas), envio à Lixeira (verificado com arquivo temporário). Abas com mesmo nome mostram a pasta ao lado (implementado). |
-| 4 | Salvar | ✅ Falha por arquivo somente leitura não altera o original (teste); gravação atômica; mudança externa com edição local abre "Manter a minha / Recarregar do disco"; sem edição local recarrega sozinho. |
-| 5 | Recuperação | ✅ Processo encerrado à força com arquivo alterado: texto recuperado na reabertura, ligado ao caminho original, marcado como não salvo. |
+| 3 | Arquivos | ✅ Novo `.cs` pelo explorador (abre e recebe o foco), duas abas, aviso ao fechar com texto não salvo (Cancelar mantém tudo), renomear (testes, inclusive só maiúsculas), envio à Lixeira (verificado com arquivo temporário); excluir arquivo ou pasta com abas alteradas avisa que as alterações serão perdidas (teste). Abas com mesmo nome mostram a pasta ao lado (implementado). |
+| 4 | Salvar | ✅ Falha por arquivo somente leitura não altera o original (teste); gravação atômica; mudança externa com edição local abre "Manter a minha / Recarregar do disco"; sem edição local recarrega sozinho. Salvar confere o disco antes de gravar, mesmo que o monitor ainda não tenha avisado (teste). Arquivo Windows-1252 com caractere fora da codificação pede para salvar em UTF-8 em vez de trocar o caractere (teste). |
+| 5 | Recuperação | ✅ Processo encerrado à força com arquivo alterado: texto recuperado na reabertura, ligado ao caminho original, marcado como não salvo. Gravações e exclusões da recuperação são feitas em ordem (teste): uma gravação atrasada não recria rascunho descartado. |
 | 6 | Completion | ✅ `Console.Wri` → `Write`, `WriteLine`; variável local e membros de classe de outro arquivo; texto não salvo de outro arquivo reflete nas sugestões (teste). |
 | 7 | Snippets | ✅ `for` + Tab cria a estrutura; Tab percorre `i` (espelhado nas três posições) e `10`; Enter conclui; `cw` + Tab dentro do bloco. Tab sem atalho válido indenta normalmente. |
 | 8 | Formatar | ✅ Bloco mal indentado organizado; strings e comentários intactos; um `Ctrl+Z` restaura tudo. |
@@ -20,7 +20,7 @@ Legenda: ✅ verificado · ⚠️ implementado, mas não verificado neste ambien
 | 10 | Contexto | ✅ Projeto com usings implícitos e dois arquivos sem falsos erros (teste); a compilação real concorda. |
 | 11 | ReadLine | ✅ `Console.Write("Nome: ")` aparece sem quebra de linha; "José Henrique" lido e respondido na hora, com acentos e ⚔. |
 | 12 | ReadKey | ✅ `ReadKey(true)` com seta para cima → `UpArrow`; `ReadKey(false)` ecoa a tecla (teste); cores e `Console.Clear` geram sequências VT, não texto (teste + tela). |
-| 13 | Parar | ✅ Loop infinito encerrado por Shift+F5 e pelo botão; processos filhos encerrados (teste com filho); nenhum processo órfão; Ctrl+C sem seleção interrompe o programa (teste); executar de novo funciona. |
+| 13 | Parar | ✅ Loop infinito encerrado por Shift+F5 e pelo botão (o botão continua habilitado quando a execução começou por ele — teste); processos filhos encerrados (teste com filho); nenhum processo órfão; Ctrl+C sem seleção interrompe o programa (teste); executar de novo funciona. |
 | 14 | Falha de build | ✅ Erro introduzido → arquivos salvos, Problemas aberto, "A compilação falhou", binário antigo não executado. |
 | 15 | Falha de execução | ✅ Exceção preserva stack trace e código de saída (teste); o editor mostra "O programa encerrou com erro (código N)" separado da saída. |
 | 16 | Volume | ✅ 100.000 linhas: compilação + execução em ~5 s, janela respondendo em todas as amostras (0 de 10 travadas), memória estável (~260 → ~305 MB), histórico limitado. |

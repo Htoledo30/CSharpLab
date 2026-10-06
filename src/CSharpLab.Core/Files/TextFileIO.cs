@@ -73,7 +73,7 @@ public static class TextFileIO
         var full = Path.GetFullPath(path);
         var dir = Path.GetDirectoryName(full)!;
         var preamble = encoding.GetPreamble();
-        var body = encoding.GetBytes(text);
+        var body = Encode(text, encoding);
 
         if (File.Exists(full) && File.GetAttributes(full).HasFlag(FileAttributes.ReadOnly))
             throw new UnauthorizedAccessException($"O arquivo \"{Path.GetFileName(full)}\" é somente leitura.");
@@ -100,6 +100,27 @@ public static class TextFileIO
         }
 
         return FileStamp.Of(full) ?? new FileStamp(DateTime.UtcNow, preamble.Length + body.Length);
+    }
+
+    /// <summary>
+    /// Converte sem substituições silenciosas: se a codificação do arquivo (ex.: Windows-1252)
+    /// não tiver algum caractere do texto, lança <see cref="UnrepresentableTextException"/>.
+    /// </summary>
+    public static byte[] Encode(string text, Encoding encoding)
+    {
+        var strict = (Encoding)encoding.Clone();
+        strict.EncoderFallback = EncoderFallback.ExceptionFallback;
+        try
+        {
+            return strict.GetBytes(text);
+        }
+        catch (EncoderFallbackException ex)
+        {
+            var sample = ex.CharUnknownHigh != '\0'
+                ? new string([ex.CharUnknownHigh, ex.CharUnknownLow])
+                : ex.CharUnknown.ToString();
+            throw new UnrepresentableTextException(DescribeEncoding(encoding), sample);
+        }
     }
 
     public static string TempName(string fileName) => $".{fileName}.{Guid.NewGuid().ToString("N")[..8]}.tmp";
@@ -132,4 +153,12 @@ public static class TextFileIO
     {
         try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
+}
+
+/// <summary>O texto tem caracteres que a codificação atual do arquivo não consegue gravar.</summary>
+public sealed class UnrepresentableTextException(string encodingName, string sample)
+    : IOException($"A codificação {encodingName} não consegue gravar \"{sample}\".")
+{
+    public string EncodingName { get; } = encodingName;
+    public string Sample { get; } = sample;
 }

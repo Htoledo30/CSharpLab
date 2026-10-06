@@ -364,14 +364,11 @@ public sealed partial class ExplorerViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task Delete(ExplorerNode? node)
+    private void Delete(ExplorerNode? node)
     {
         node ??= Selected;
         if (node == null || node.IsNew || node == Root) return;
-        var what = node.IsDirectory ? $"a pasta \"{node.Name}\" e todo o seu conteúdo" : $"\"{node.Name}\"";
-        if (!_main.Dialogs.Confirm("Enviar para a Lixeira", $"Enviar {what} para a Lixeira?", "Enviar para a Lixeira", danger: true))
-            return;
-        if (!await _main.PrepareDeleteAsync(node.FullPath)) return;
+        if (!_main.ConfirmDelete(node.FullPath, node.IsDirectory)) return;
         try
         {
             FileOperations.SendToRecycleBin(node.FullPath);

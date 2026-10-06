@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Security.Cryptography;
 using System.IO;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -26,13 +27,25 @@ public sealed partial class DocumentViewModel : ObservableObject
         DiskStamp = stamp;
         UntitledNumber = untitledNumber;
         Title = ComputeTitle();
+        if (filePath != null && stamp != null) _diskHash = Hash(text);
         Document.Changed += OnDocumentChanged;
         Document.UndoStack.PropertyChanged += OnUndoStackChanged;
     }
 
     public string Id { get; } = Guid.NewGuid().ToString("N");
     public TextDocument Document { get; }
-    public Encoding Encoding { get; set; }
+    private Encoding _encoding = TextFileIO.Utf8NoBom;
+
+    public Encoding Encoding
+    {
+        get => _encoding;
+        set
+        {
+            _encoding = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(EncodingName));
+        }
+    }
     public FileStamp? DiskStamp { get; set; }
     public int UntitledNumber { get; }
     public int Version { get; private set; } = 1;
@@ -126,6 +139,13 @@ public sealed partial class DocumentViewModel : ObservableObject
             UpdateDirty();
     }
 
+    private byte[]? _diskHash;
+
+    private static byte[] Hash(string text) => SHA256.HashData(Encoding.UTF8.GetBytes(text));
+
+    /// <summary>Verdadeiro se o texto é igual ao que o editor leu ou gravou por último no disco.</summary>
+    public bool MatchesDiskVersion(string text) => _diskHash != null && Hash(text).AsSpan().SequenceEqual(_diskHash);
+
     private void UpdateDirty() => IsDirty = _forceDirty || !Document.UndoStack.IsOriginalFile;
 
     /// <summary>Marca como alterado mesmo sem histórico de edição (texto recuperado, arquivo excluído).</summary>
@@ -138,6 +158,7 @@ public sealed partial class DocumentViewModel : ObservableObject
     public void MarkSaved(FileStamp stamp)
     {
         DiskStamp = stamp;
+        _diskHash = Hash(Document.Text);
         _forceDirty = false;
         Document.UndoStack.MarkAsOriginalFile();
         UpdateDirty();

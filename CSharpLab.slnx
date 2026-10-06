@@ -4,6 +4,7 @@
     <Project Path="src/CSharpLab/CSharpLab.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/CSharpLab.App.Tests/CSharpLab.App.Tests.csproj" />
     <Project Path="tests/CSharpLab.Tests/CSharpLab.Tests.csproj" />
   </Folder>
 </Solution>
