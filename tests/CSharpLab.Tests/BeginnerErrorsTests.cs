@@ -93,6 +93,11 @@ public sealed class BeginnerHintsTests
     [InlineData("int soma = 7, qtd = 2;\ndouble media = soma / qtd;", BeginnerHints.IntegerDivisionId)]
     [InlineData("int a = 7, b = 2;\nvar r = (double)(a / b);", BeginnerHints.IntegerDivisionId)]
     [InlineData("int a = 7;\nfloat f = a / 2;", BeginnerHints.IntegerDivisionId)]
+    [InlineData("int idade = int.Parse(Console.ReadLine());", BeginnerHints.ParseInputId)]
+    [InlineData("double preco = double.Parse(Console.ReadLine()!);", BeginnerHints.ParseInputId)]
+    [InlineData("string resposta = Console.ReadLine() ?? \"\";\nif (resposta == \"sim\") { }", BeginnerHints.CaseSensitiveInputId)]
+    [InlineData("while (true)\n{\n    Console.WriteLine(\"oi\");\n}", BeginnerHints.EndlessLoopId)]
+    [InlineData("while (true)\n{\n    for (int i = 0; i < 3; i++) { break; }\n}", BeginnerHints.EndlessLoopId)]
     public void Aponta_armadilhas(string code, string expected) => Assert.Contains(expected, Hints(code));
 
     [Theory]
@@ -103,5 +108,13 @@ public sealed class BeginnerHintsTests
     [InlineData("int a = 7, b = 2;\ndouble r = (double)a / b;")]
     [InlineData("double x = 7.0;\ndouble r = x / 2;")]
     [InlineData("List<int> v = new();\nConsole.WriteLine(v.Count);")]
+    [InlineData("int.TryParse(Console.ReadLine(), out int n);")]
+    [InlineData("int n = int.Parse(\"42\");")]
+    [InlineData("string r = Console.ReadLine() ?? \"\";\nif (r.ToLower() == \"sim\") { }")]
+    [InlineData("string r = Console.ReadLine() ?? \"\";\nif (r == \"1\") { }")]
+    [InlineData("string estado = \"menu\";\nif (estado == \"menu\") { }")]
+    [InlineData("while (true)\n{\n    if (Console.ReadKey().Key == ConsoleKey.Escape) break;\n}")]
+    [InlineData("while (true)\n{\n    switch (1) { case 1: return; }\n}")]
+    [InlineData("while (true)\n{\n    Action a = () => { return; };\n    break;\n}")]
     public void Nao_reclama_de_codigo_correto(string code) => Assert.Empty(Hints(code));
 }

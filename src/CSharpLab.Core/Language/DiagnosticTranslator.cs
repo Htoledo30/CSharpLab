@@ -125,6 +125,7 @@ public static partial class DiagnosticTranslator
             "CS0168" when Has(1) => $"A variável \"{Arg(0)}\" foi declarada, mas nunca usada.",
             "CS0219" when Has(1) => $"A variável \"{Arg(0)}\" recebe um valor, mas esse valor nunca é usado.",
             "CS0162" => "Este código nunca será executado.",
+            "CS0642" => "Há um \";\" logo depois do if/for/while: o bloco abaixo roda sempre, sem depender da condição. Tire esse \";\".",
             "CS8600" => "Um valor que pode ser nulo está sendo guardado num tipo que não aceita nulo.",
             "CS8602" => "Este valor pode ser nulo aqui.",
             "CS8604" when Has(1) => $"O argumento \"{Arg(0)}\" pode ser nulo aqui.",
