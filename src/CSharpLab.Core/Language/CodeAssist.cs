@@ -28,6 +28,9 @@ public sealed record RenameEdit(string DocumentKey, string? FilePath, IReadOnlyL
 /// Ajudas sobre o código: o que é um nome (dica do mouse), onde foi declarado, renomear em todos
 /// os arquivos e qual "using" falta para um tipo não encontrado.
 /// </summary>
+/// <summary>Dica do mouse: assinatura (código) e explicação em português, quando houver.</summary>
+public sealed record QuickInfoResult(string? Signature, PortugueseDoc? Doc);
+
 /// <summary>Como completar um nome de método: com "()" e onde deixar o cursor.</summary>
 public enum CallShape
 {
@@ -75,19 +78,36 @@ public static class CodeAssist
         return methods.All(m => m.Parameters.Length == 0) ? CallShape.NoParameters : CallShape.HasParameters;
     }
 
-    public static async Task<string?> GetQuickInfoAsync(Document document, int position, CancellationToken ct)
+    /// <summary>
+    /// O que mostrar ao parar o mouse: a assinatura do Roslyn ("(variável local) int vida") e,
+    /// para palavras-chave e métodos comuns, uma explicação em português com exemplo.
+    /// </summary>
+    public static async Task<QuickInfoResult?> GetQuickInfoAsync(Document document, int position, CancellationToken ct)
     {
-        var service = QuickInfoService.GetService(document);
-        if (service == null) return null;
-        var item = await service.GetQuickInfoAsync(document, position, ct).ConfigureAwait(false);
-        if (item == null) return null;
-        var lines = item.Sections
-            .Where(s => s.Kind is QuickInfoSectionKinds.Description or "NullabilityAnalysis"
-                or QuickInfoSectionKinds.TypeParameters)
-            .Select(s => s.Text.Trim())
-            .Where(t => t.Length > 0)
-            .ToList();
-        return lines.Count == 0 ? null : string.Join(Environment.NewLine, lines);
+        var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
+        var token = root?.FindToken(position) ?? default;
+        bool isKeyword = SyntaxFacts.IsKeywordKind(token.Kind()) ||
+                         (token.IsKind(SyntaxKind.IdentifierToken) && token.ValueText is "var" or "nameof" or "await" or "async" or "record" &&
+                          token.Parent is not VariableDeclaratorSyntax);
+        var keywordDoc = isKeyword ? PortugueseDocs.ForKeyword(token.ValueText) : null;
+
+        string? signature = null;
+        // Para palavras-chave, a assinatura só ajuda no var (mostra o tipo descoberto).
+        if (keywordDoc == null || token.ValueText == "var")
+        {
+            var service = QuickInfoService.GetService(document);
+            var item = service == null ? null : await service.GetQuickInfoAsync(document, position, ct).ConfigureAwait(false);
+            var lines = item?.Sections
+                .Where(s => s.Kind is QuickInfoSectionKinds.Description or "NullabilityAnalysis"
+                    or QuickInfoSectionKinds.TypeParameters)
+                .Select(s => s.Text.Trim())
+                .Where(t => t.Length > 0)
+                .ToList() ?? [];
+            if (lines.Count > 0) signature = string.Join(Environment.NewLine, lines);
+        }
+
+        var doc = keywordDoc ?? PortugueseDocs.ForSymbol(await SymbolAtAsync(document, position, ct).ConfigureAwait(false));
+        return signature == null && doc == null ? null : new QuickInfoResult(signature, doc);
     }
 
     private static async Task<ISymbol?> SymbolAtAsync(Document document, int position, CancellationToken ct)

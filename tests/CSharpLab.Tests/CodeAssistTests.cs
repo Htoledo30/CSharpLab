@@ -50,6 +50,33 @@ public sealed class CodeAssistTests : IDisposable
         Assert.Equal(expected, await _ls.GetCallShapeAsync(key, position, CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData("string nome = Console.ReadLine() ?? \"\";", "ReadLine", "Espera a pessoa digitar")]
+    [InlineData("int n = int.Parse(\"4\");", "Parse", "int.TryParse")]
+    [InlineData("var r = new Random();\nint d = r.Next(1, 7);", "Next", "NÃO inclui o max")]
+    [InlineData("var l = new List<string>();\nl.Add(\"Espada\");", "Add", "fim da lista")]
+    [InlineData("var l = new List<int>();\nvar p = l.Where(x => x > 1);", "Where", "Filtra")]
+    [InlineData("foreach (var c in \"abc\") { }", "foreach", "cada item")]
+    [InlineData("static void Atacar() { }", "static", "Pertence à classe")]
+    [InlineData("int vida = 3;", "int", "Número inteiro")]
+    public async Task Dica_explica_em_portugues(string text, string word, string expected)
+    {
+        var key = Open(text);
+        var info = await _ls.GetQuickInfoAsync(key, text.IndexOf(word, StringComparison.Ordinal) + 1, CancellationToken.None);
+        Assert.NotNull(info?.Doc);
+        Assert.Contains(expected, info!.Doc!.Text);
+    }
+
+    [Fact]
+    public async Task Dica_do_var_mostra_o_tipo_e_a_explicacao()
+    {
+        var text = "var nome = \"Ana\";";
+        var key = Open(text);
+        var info = await _ls.GetQuickInfoAsync(key, 1, CancellationToken.None);
+        Assert.Contains("string", info!.Signature, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("descobrir o tipo", info.Doc!.Text);
+    }
+
     [Fact]
     public async Task Dica_mostra_tipo_da_variavel()
     {
@@ -57,7 +84,7 @@ public sealed class CodeAssistTests : IDisposable
         var key = Open(text);
         var info = await _ls.GetQuickInfoAsync(key, text.LastIndexOf("vida") + 1, CancellationToken.None);
         Assert.NotNull(info);
-        Assert.Contains("int vida", info);
+        Assert.Contains("int vida", info!.Signature);
     }
 
     [Fact]

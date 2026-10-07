@@ -293,7 +293,7 @@ public sealed partial class CodeEditor
         var markers = _diagnostics.At(offset.Value).Take(3).ToList();
 
         // O que é o nome sob o mouse (só sobre palavras, não sobre espaço ou pontuação).
-        string? info = null;
+        QuickInfoResult? info = null;
         var ls = LanguageServices;
         if (Doc.IsCSharp && ls != null && offset.Value < Document.TextLength &&
             CompletionController.IsIdentifierChar(Document.GetCharAt(offset.Value)))
@@ -343,17 +343,45 @@ public sealed partial class CodeEditor
                 });
             }
         }
-        if (info != null)
+        if (info?.Signature != null)
         {
             panel.Children.Add(new TextBlock
             {
-                Text = info,
+                Text = info.Signature,
                 FontFamily = (FontFamily)Application.Current.FindResource("CodeFont"),
                 FontSize = 12.5,
                 Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, markers.Count > 0 ? 8 : 0, 0, 0),
             });
+        }
+        if (info?.Doc is { } doc)
+        {
+            // Explicação em português (texto normal) e um exemplo curto (código).
+            panel.Children.Add(new TextBlock
+            {
+                Text = doc.Text,
+                Foreground = (Brush)Application.Current.FindResource(info.Signature != null ? "TextSecondary" : "TextPrimary"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, panel.Children.Count > 0 ? 6 : 0, 0, 0),
+            });
+            if (doc.Example != null)
+            {
+                panel.Children.Add(new Border
+                {
+                    Background = (Brush)Application.Current.FindResource("BgActive"),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(8, 5, 8, 5),
+                    Margin = new Thickness(0, 6, 0, 0),
+                    Child = new TextBlock
+                    {
+                        Text = doc.Example,
+                        FontFamily = (FontFamily)Application.Current.FindResource("CodeFont"),
+                        FontSize = 12,
+                        Foreground = (Brush)Application.Current.FindResource("TextPrimary"),
+                    },
+                });
+            }
         }
         CloseHover();
         _hoverTip = new ToolTip { Content = panel, PlacementTarget = this, Placement = PlacementMode.Mouse, IsOpen = true };
