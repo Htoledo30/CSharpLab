@@ -33,7 +33,7 @@ public static class BeginnerHints
                 case InvocationExpressionSyntax invocation when ParsesInputDirectly(model, invocation, ct) is { } method:
                     yield return (ParseInputId,
                         $"Se a pessoa digitar algo que não é número, {method} para o programa com erro. " +
-                        $"Para conferir antes: if ({TryParseOf(method)}(Console.ReadLine(), out var numero)) {{ ... }}",
+                        $"Para conferir antes: if ({TryParseOf(method)}(Console.ReadLine(), out var number)) {{ ... }}",
                         invocation.GetLocation());
                     break;
                 case BinaryExpressionSyntax { RawKind: (int)SyntaxKind.DivideExpression } division when TruncatesIntoDecimal(model, division, ct):
@@ -45,7 +45,7 @@ public static class BeginnerHints
                     when ComparesTypedTextWithWord(model, comparison, ct) is { } word:
                     yield return (CaseSensitiveInputId,
                         $"A comparação diferencia maiúsculas: quem digitar \"{Capitalize(word)}\" não vai ser igual a \"{word}\". " +
-                        "Para aceitar os dois, compare com .ToLower() ou use string.Equals(texto, \"...\", StringComparison.OrdinalIgnoreCase).",
+                        "Para aceitar os dois, compare com .ToLower() ou use string.Equals(text, \"...\", StringComparison.OrdinalIgnoreCase).",
                         comparison.GetLocation());
                     break;
                 case WhileStatementSyntax { Condition: LiteralExpressionSyntax { RawKind: (int)SyntaxKind.TrueLiteralExpression } } loop

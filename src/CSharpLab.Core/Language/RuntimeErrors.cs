@@ -76,7 +76,7 @@ public static partial class RuntimeErrors
                 var input = Quoted().Match(message) is { Success: true } q ? q.Groups[1].Value : null;
                 return input != null && parses
                     ? new($"\"{input}\" não é um número válido, então {call} não conseguiu converter.",
-                        "Use int.TryParse para conferir antes: if (int.TryParse(texto, out int numero)) { ... }")
+                        "Use int.TryParse para conferir antes: if (int.TryParse(text, out int number)) { ... }")
                     : new("Um texto não estava no formato esperado (por exemplo, letras onde devia haver um número).",
                         parses ? "Use TryParse para conferir o texto antes de converter." : null);
 
@@ -111,15 +111,15 @@ public static partial class RuntimeErrors
             case "KeyNotFoundException":
                 var key = Quoted().Match(message) is { Success: true } k ? $" \"{k.Groups[1].Value}\"" : "";
                 return new($"A chave{key} não existe no dicionário.",
-                    "Use dicionario.TryGetValue(chave, out var valor) ou ContainsKey(chave) antes de ler.");
+                    "Use dictionary.TryGetValue(key, out var value) ou ContainsKey(key) antes de ler.");
 
             case "InvalidOperationException" when message.Contains("Collection was modified", StringComparison.OrdinalIgnoreCase):
                 return new("A lista foi alterada (Add/Remove) dentro de um foreach que está percorrendo ela.",
-                    "Percorra uma cópia (foreach (var x in lista.ToList())) ou use um for de trás para frente.");
+                    "Percorra uma cópia (foreach (var item in list.ToList())) ou use um for de trás para frente.");
 
             case "InvalidOperationException" when message.Contains("Sequence contains no", StringComparison.OrdinalIgnoreCase):
                 return new("Você pediu um item (First, Single, Max, Average…) de uma lista vazia.",
-                    "Confira se lista.Count > 0 antes, ou use FirstOrDefault.");
+                    "Confira se list.Count > 0 antes, ou use FirstOrDefault.");
 
             case "InvalidOperationException" when message.Contains("Nullable object must have a value", StringComparison.OrdinalIgnoreCase):
                 return new("Você usou .Value de um valor que está null.", "Confira com HasValue antes, ou use ?? para dar um valor padrão.");
