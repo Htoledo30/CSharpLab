@@ -28,8 +28,53 @@ public sealed record RenameEdit(string DocumentKey, string? FilePath, IReadOnlyL
 /// Ajudas sobre o código: o que é um nome (dica do mouse), onde foi declarado, renomear em todos
 /// os arquivos e qual "using" falta para um tipo não encontrado.
 /// </summary>
+/// <summary>Como completar um nome de método: com "()" e onde deixar o cursor.</summary>
+public enum CallShape
+{
+    /// <summary>Não é chamada (não é método, ou o nome é usado como valor: += Atacar, nameof, Action a = Atacar).</summary>
+    None,
+    NoParameters,
+    HasParameters,
+}
+
 public static class CodeAssist
 {
+    /// <summary>O nome que termina em <paramref name="position"/> é uma chamada de método? Com ou sem parâmetros?</summary>
+    public static async Task<CallShape> GetCallShapeAsync(Document document, int position, CancellationToken ct)
+    {
+        var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
+        var model = await document.GetSemanticModelAsync(ct).ConfigureAwait(false);
+        if (root == null || model == null || position <= 0) return CallShape.None;
+        if (root.FindToken(position - 1).Parent is not SimpleNameSyntax name || name.Span.End != position) return CallShape.None;
+
+        ExpressionSyntax expression = name.Parent switch
+        {
+            MemberAccessExpressionSyntax access when access.Name == name => access,
+            MemberBindingExpressionSyntax binding when binding.Name == name => binding,
+            _ => name,
+        };
+        switch (expression.Parent)
+        {
+            case InvocationExpressionSyntax invocation when invocation.Expression == expression:
+            case AssignmentExpressionSyntax assignment when assignment.Right == expression &&
+                assignment.Kind() is SyntaxKind.AddAssignmentExpression or SyntaxKind.SubtractAssignmentExpression:
+                return CallShape.None;
+            case ArgumentSyntax { Parent.Parent: InvocationExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: "nameof" } } }:
+                return CallShape.None;
+        }
+        // O nome vai para um delegate (Action a = Atacar; lista.ForEach(Console.WriteLine)).
+        if (model.GetTypeInfo(expression, ct).ConvertedType is { TypeKind: TypeKind.Delegate }) return CallShape.None;
+
+        var methods = model.GetMemberGroup(expression, ct).OfType<IMethodSymbol>().ToList();
+        if (methods.Count == 0)
+        {
+            var info = model.GetSymbolInfo(expression, ct);
+            methods = (info.Symbol != null ? [info.Symbol] : info.CandidateSymbols.ToList()).OfType<IMethodSymbol>().ToList();
+        }
+        if (methods.Count == 0) return CallShape.None;
+        return methods.All(m => m.Parameters.Length == 0) ? CallShape.NoParameters : CallShape.HasParameters;
+    }
+
     public static async Task<string?> GetQuickInfoAsync(Document document, int position, CancellationToken ct)
     {
         var service = QuickInfoService.GetService(document);

@@ -133,7 +133,9 @@ public sealed class EditorRecoveryTests
                 var item = Assert.Single(result.Items, i => i.DisplayText == "WriteLine");
                 if (extra.Length > 0) doc.Document.Insert(editor.CaretOffset, extra);
                 editor.CompletionController.Commit(new CompletionEntry(item, result), "Console.".Length, word.Length + extra.Length);
-                await Ui.WaitUntil(() => doc.Document.Text == "Console.WriteLine", what: "completion sem sufixo duplicado");
+                // WriteLine tem parâmetros: entra com "()" e o cursor dentro.
+                await Ui.WaitUntil(() => doc.Document.Text == "Console.WriteLine()", what: "completion sem sufixo duplicado");
+                Assert.Equal("Console.WriteLine(".Length, editor.CaretOffset);
             }
 
             // Tab seguido de "(" antes do Roslyn responder: a sugestão entra e o "(" fica depois dela.
@@ -145,6 +147,16 @@ public sealed class EditorRecoveryTests
             editor.TextArea.PerformTextInput("(");
             await Ui.WaitUntil(() => doc.Document.Text.StartsWith("Console.WriteLine("), what: "completion com tecla digitada logo depois");
             Assert.Equal(doc.Document.Text.IndexOf('(') + 1, editor.CaretOffset);
+            Assert.DoesNotContain("((", doc.Document.Text);
+
+            // Método sem parâmetros: "()" e o cursor depois, pronto para o ";".
+            doc.Document.Text = "string nome = Console.Read";
+            editor.CaretOffset = doc.Document.TextLength;
+            var rl = await vm.Language!.GetCompletionsAsync(doc.LanguageKey, editor.CaretOffset, null, CancellationToken.None);
+            var readLine = Assert.Single(rl!.Items, i => i.DisplayText == "ReadLine");
+            editor.CompletionController.Commit(new CompletionEntry(readLine, rl), "string nome = Console.".Length, "Read".Length);
+            await Ui.WaitUntil(() => doc.Document.Text == "string nome = Console.ReadLine()", what: "parênteses do ReadLine");
+            Assert.Equal(doc.Document.TextLength, editor.CaretOffset);
         }
         finally { editor.Detach(); }
     });

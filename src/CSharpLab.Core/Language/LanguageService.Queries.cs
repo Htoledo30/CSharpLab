@@ -78,6 +78,12 @@ public sealed partial class LanguageService
         }
     }
 
+    public async Task<CallShape> GetCallShapeAsync(string key, int position, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        return document == null ? CallShape.None : await CodeAssist.GetCallShapeAsync(document, position, ct).ConfigureAwait(false);
+    }
+
     public async Task<string?> GetQuickInfoAsync(string key, int position, CancellationToken ct)
     {
         var document = GetDocument(key);

@@ -33,6 +33,23 @@ public sealed class CodeAssistTests : IDisposable
         return key;
     }
 
+    [Theory]
+    [InlineData("string nome = Console.ReadLine|", CallShape.NoParameters)]
+    [InlineData("Console.WriteLine|", CallShape.HasParameters)]
+    [InlineData("var h = new Heroi();\nh.Atacar|", CallShape.NoParameters)]
+    [InlineData("var r = new Random();\nint n = r.Next|", CallShape.HasParameters)]
+    [InlineData("var h = new Heroi();\nAction a = h.Atacar|;", CallShape.None)]
+    [InlineData("var h = new Heroi();\nAction? a = null;\na += h.Atacar|;", CallShape.None)]
+    [InlineData("var nome = nameof(Console.ReadLine|);", CallShape.None)]
+    [InlineData("var h = new Heroi();\nint v = h.Vida|;", CallShape.None)]
+    [InlineData("new List<int>().ForEach(Console.WriteLine|);", CallShape.None)]
+    public async Task Metodo_completado_ganha_parenteses_so_quando_e_chamada(string code, CallShape expected)
+    {
+        int position = code.IndexOf('|');
+        var key = Open(code.Remove(position, 1));
+        Assert.Equal(expected, await _ls.GetCallShapeAsync(key, position, CancellationToken.None));
+    }
+
     [Fact]
     public async Task Dica_mostra_tipo_da_variavel()
     {

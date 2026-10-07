@@ -372,6 +372,9 @@ public sealed partial class CodeEditor : TextEditor
         AfterCharTyped(e.Text[0]);
     }
 
+    /// <summary>Mostra os parâmetros do método em que o cursor está.</summary>
+    internal void ShowSignatureHelp() => _signature.Update();
+
     private void AfterCharTyped(char c)
     {
         int caret = CaretOffset;

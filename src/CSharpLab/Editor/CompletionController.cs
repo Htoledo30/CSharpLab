@@ -246,6 +246,41 @@ public sealed class CompletionController
         if (replaceStart < 0 || replaceEnd < replaceStart || replaceEnd > document.TextLength) return;
         bool caretInWord = textArea.Caret.Offset >= startAnchor.Offset && textArea.Caret.Offset <= endAnchor.Offset;
         document.Replace(replaceStart, replaceEnd - replaceStart, change.NewText);
-        if (caretInWord) textArea.Caret.Offset = Math.Min(document.TextLength, replaceStart + (change.CaretOffsetInNewText ?? change.NewText.Length));
+        if (!caretInWord) return;
+        textArea.Caret.Offset = Math.Min(document.TextLength, replaceStart + (change.CaretOffsetInNewText ?? change.NewText.Length));
+        if (IsMethod(entry.Item) && change.NewText.Length > 0 && (char.IsLetterOrDigit(change.NewText[^1]) || change.NewText[^1] == '_'))
+            await AddCallParenthesesAsync(textArea.Caret.Offset);
+    }
+
+    private static bool IsMethod(CompletionItem item) =>
+        item.Tags.Contains(WellKnownTags.Method) || item.Tags.Contains(WellKnownTags.ExtensionMethod);
+
+    /// <summary>
+    /// Depois de completar um método, coloca "()": cursor depois do ")" se não há parâmetros,
+    /// ou dentro, mostrando os parâmetros. Nada muda se o usuário já digitou algo ou se o nome é
+    /// usado sem chamar (ex.: botao.Click += Atacar).
+    /// </summary>
+    private async Task AddCallParenthesesAsync(int nameEnd)
+    {
+        var ls = _editor.LanguageServices;
+        var document = _editor.Document;
+        if (ls == null || (nameEnd < document.TextLength && document.GetCharAt(nameEnd) is '(' or '<')) return;
+        int version = _editor.Doc.Version;
+        string key = _editor.Doc.LanguageKey;
+        CallShape shape;
+        try
+        {
+            shape = await Task.Run(() => ls.GetCallShapeAsync(key, nameEnd, CancellationToken.None));
+        }
+        catch (Exception ex)
+        {
+            Core.Settings.AppPaths.Log(ex, "Parênteses da sugestão");
+            return;
+        }
+        if (shape == CallShape.None || version != _editor.Doc.Version || key != _editor.Doc.LanguageKey ||
+            _editor.IsDetached || _editor.CaretOffset != nameEnd) return;
+        document.Insert(nameEnd, "()");
+        _editor.CaretOffset = shape == CallShape.NoParameters ? nameEnd + 2 : nameEnd + 1;
+        if (shape == CallShape.HasParameters) _editor.ShowSignatureHelp();
     }
 }
