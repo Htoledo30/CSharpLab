@@ -23,6 +23,10 @@ public sealed class ProjectFile
 
     public bool IsSdkStyle => !string.IsNullOrEmpty(Sdk);
     public bool IsConsole => string.Equals(OutputType, "Exe", StringComparison.OrdinalIgnoreCase);
+    /// <summary>Programa de janela (ex.: um jogo com botões). Roda como o console, mas abre uma janela.</summary>
+    public bool IsWindowApp => string.Equals(OutputType, "WinExe", StringComparison.OrdinalIgnoreCase);
+    /// <summary>O botão Executar consegue rodar: console ou janela.</summary>
+    public bool IsRunnable => IsConsole || IsWindowApp;
     public bool IsMultiTarget => string.IsNullOrEmpty(TargetFramework) && !string.IsNullOrEmpty(TargetFrameworks);
     public string? EffectiveTargetFramework => TargetFramework ?? TargetFrameworks?.Split(';', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
 

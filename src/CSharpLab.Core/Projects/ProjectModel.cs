@@ -31,6 +31,11 @@ public sealed record ProjectModel
     public bool IsEvaluated { get; init; }
 
     public bool IsConsole => string.Equals(OutputType, "Exe", StringComparison.OrdinalIgnoreCase);
+    public bool IsWindowApp => string.Equals(OutputType, "WinExe", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Jogo com botões: o projeto usa o motor CSharpLab.Game.</summary>
+    public bool UsesGameEngine => References.Any(r =>
+        string.Equals(Path.GetFileNameWithoutExtension(r), GameKit.LibraryName, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Verdadeiro se os dois modelos produzem a mesma compilação (arquivos, referências, opções).

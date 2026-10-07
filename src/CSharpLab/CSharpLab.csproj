@@ -24,6 +24,8 @@
     <ProjectReference Include="..\CSharpLab.Core\CSharpLab.Core.csproj" />
     <!-- Gancho carregado nos programas do usuário para explicar erros de execução (não é usado pelo editor). -->
     <ProjectReference Include="..\CSharpLab.RuntimeHook\CSharpLab.RuntimeHook.csproj" />
+    <!-- Motor dos jogos com botões: copiado para a pasta lib\ de cada jogo novo (não é usado pelo editor). -->
+    <ProjectReference Include="..\CSharpLab.Game\CSharpLab.Game.csproj" />
     <AssemblyMetadata Include="UpdateRepository" Value="$(UpdateRepository)" Condition="'$(UpdateRepository)' != ''" />
   </ItemGroup>
 
@@ -35,6 +37,11 @@
       <RuntimePackAsset Remove="@(RuntimePackAsset)" Condition="'%(Extension)' == '.pdb'" />
     </ItemGroup>
   </Target>
+
+  <!-- O motor vai para os jogos como IL puro (sem ReadyToRun), igual em qualquer PC. -->
+  <ItemGroup>
+    <PublishReadyToRunExclude Include="CSharpLab.Game.dll" />
+  </ItemGroup>
 
   <ItemGroup>
     <Resource Include="Assets\app.ico" />

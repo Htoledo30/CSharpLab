@@ -15,15 +15,23 @@ public static class BeginnerHints
     public const string ParseInputId = "DICA03";
     public const string EndlessLoopId = "DICA04";
     public const string CaseSensitiveInputId = "DICA05";
+    public const string ConsoleInGameId = "DICA06";
 
     public static IEnumerable<(string Id, string Message, Location Location)> Analyze(SemanticModel model, CancellationToken ct)
     {
         var root = model.SyntaxTree.GetRoot(ct);
+        // Jogo com botões: o projeto usa o motor (e é um programa de janela, sem terminal).
+        bool gameProject = model.Compilation.GetTypeByMetadataName("CSharpLab.GameEngine.Game") != null;
         foreach (var node in root.DescendantNodes())
         {
             ct.ThrowIfCancellationRequested();
             switch (node)
             {
+                case InvocationExpressionSyntax invocation when gameProject && UsesTerminal(model, invocation, ct):
+                    yield return (ConsoleInGameId,
+                        "Num jogo com botões o terminal não aparece. Para mostrar um texto use game.Say(...); para perguntar algo, game.Ask(...).",
+                        invocation.GetLocation());
+                    break;
                 case InvocationExpressionSyntax invocation when PrintsCollection(model, invocation, ct) is { } argument:
                     var name = argument.ToString();
                     yield return (PrintCollectionId,
@@ -58,6 +66,10 @@ public static class BeginnerHints
             }
         }
     }
+
+    private static bool UsesTerminal(SemanticModel model, InvocationExpressionSyntax invocation, CancellationToken ct) =>
+        invocation.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "WriteLine" or "Write" or "ReadLine" or "ReadKey" } &&
+        IsConsoleMethod(model, invocation, ct);
 
     /// <summary>Console.Write/WriteLine com um único argumento que é coleção (não string).</summary>
     private static ExpressionSyntax? PrintsCollection(SemanticModel model, InvocationExpressionSyntax invocation, CancellationToken ct)

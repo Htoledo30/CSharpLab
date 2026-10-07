@@ -38,7 +38,7 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | Quero… | Como |
 | --- | --- |
 | Escrever algo rápido | Ao abrir, já existe um rascunho `Sem título.cs`. É só digitar. |
-| Criar um projeto | **Arquivo → Novo projeto…**: nome e pasta. Abre o `Program.cs`. |
+| Criar um projeto | **Arquivo → Novo projeto…**: tipo (**Programa console** ou **Jogo com botões**), nome e pasta. Abre o `Program.cs`. |
 | Abrir o que já tenho | **Arquivo → Abrir pasta…** e escolha a pasta do projeto. (Escolher um `.csproj` em **Abrir arquivo…** também abre o projeto.) |
 | Salvar | `Ctrl+S` (salvar tudo: `Ctrl+Shift+S`). Abas com `●` têm alterações não salvas. |
 | Executar | `F5` ou o botão **Executar** (ele mostra o nome do projeto que vai rodar). Os arquivos do projeto são salvos e compilados antes. |
@@ -50,9 +50,47 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | Consertar um erro | Com o cursor no sublinhado, `Ctrl+.` mostra correções (ex.: adicionar o `using` que falta). |
 | Fazer jogos no console | `Ctrl+Shift+J` expande o terminal para quase a tela toda. |
 | Organizar o código | `Ctrl+Shift+F` formata o arquivo (desfaz com `Ctrl+Z`). |
-| Estudar com exemplos | **Arquivo → Exemplos para estudar**: adivinhe o número, calculadora, jogo da velha, batalha RPG e cobrinha. Código em inglês, comentários em português. Ficam em `Documentos\CSharp Lab\Exemplos` e suas mudanças nunca são apagadas. |
+| Estudar com exemplos | **Arquivo → Exemplos para estudar**: adivinhe o número, calculadora, jogo da velha, batalha RPG, cobrinha e RPG com botões. Código em inglês, comentários em português. Ficam em `Documentos\CSharp Lab\Exemplos` e suas mudanças nunca são apagadas. |
 
 Executar um rascunho pede uma única vez o nome e a pasta de um projeto novo; o código vira o `Program.cs` dele.
+
+## Jogos com botões
+
+Um **jogo com botões** abre numa janela própria, com título, textos, barras de vida e botões, em vez do terminal.
+Crie em **Arquivo → Novo projeto… → Jogo com botões** (ou abra o exemplo **RPG com botões**). Cada coisa na tela é uma linha de C#:
+
+```csharp
+var game = new Game("A Torre");
+int gold = 0;
+
+game.Scene("Start", () =>
+{
+    game.Title("Vila");
+    game.Say($"Ouro: {gold}", GameColor.Gold);
+    game.Button("Procurar moedas", () => gold += 5);
+    game.Button("Ir para a floresta", () => game.GoTo("Forest"));
+});
+
+game.Scene("Forest", () => game.Say("Árvores por todo lado."));
+
+game.Run("Start");
+```
+
+| Comando | Em português | O que faz |
+| --- | --- | --- |
+| `Scene` | cena | Uma tela do jogo. É desenhada de novo depois de cada clique, com os valores atuais das variáveis. |
+| `Title` | título | Texto grande no alto. |
+| `Say` | dizer | Um texto. Dentro de um botão, aparece destacado depois do clique. |
+| `Button` | botão | O código entre as chaves roda no clique. As teclas 1 a 9 também apertam os botões. |
+| `Bar` | barra | Vida, mana, energia… |
+| `Ask` | perguntar | Campo para o jogador escrever (ex.: o nome). |
+| `Image` | imagem | Uma imagem da pasta `Assets` do projeto. |
+| `GoTo` | ir para | Troca de cena. |
+| `Run` | começar | Abre a janela. Sempre na última linha. |
+
+O autocomplete e o mouse em cima de cada comando mostram a tradução e um exemplo. Os snippets `scene` e `button`
+escrevem a estrutura com as chaves. O jogo leva uma cópia do motor em `lib\` (funciona mesmo se a pasta mudar de lugar)
+e um `AGENTS.md`/`CLAUDE.md` que ensina o motor para IAs como o Claude e o Codex.
 
 ## Atalhos
 
@@ -94,6 +132,8 @@ mostra uma explicação em português com exemplo. Sugestões de método já ent
 Digite o atalho e aperte **Tab**. Depois, **Tab** passa para o próximo campo e **Enter** termina.
 
 `cw` `read` `if` `ifelse` `for` `foreach` `while` `switch` `method` `methodr` `class` `array` `list`
+
+Em jogos com botões: `scene` `button`
 
 ## Onde ficam as coisas
 

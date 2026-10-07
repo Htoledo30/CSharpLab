@@ -9,7 +9,7 @@ public sealed record PortugueseDoc(string Text, string? Example = null);
 /// Explicações em português para as palavras-chave do C# e os métodos mais usados por quem está
 /// começando. A documentação oficial desses métodos vem em inglês; aqui fica o essencial.
 /// </summary>
-public static class PortugueseDocs
+public static partial class PortugueseDocs
 {
     public static PortugueseDoc? ForKeyword(string keyword) => Keywords.GetValueOrDefault(keyword);
 
@@ -19,6 +19,47 @@ public static class PortugueseDocs
         if (symbol is IMethodSymbol { ReducedFrom: { } reduced }) symbol = reduced;
         symbol = symbol.OriginalDefinition;
         return KeyOf(symbol) is { } key ? Members.GetValueOrDefault(key) : null;
+    }
+
+    /// <summary>
+    /// Explicação para a assinatura que o autocomplete mostra ("void Game.Say(string text, ...)",
+    /// "int int.Parse(string s)", "class System.Console"), que traz o nome sem o namespace.
+    /// </summary>
+    public static PortugueseDoc? ForSignature(string signature)
+    {
+        var head = signature;
+        int cut = head.IndexOfAny(['(', '{', '[']);
+        if (cut >= 0) head = head[..cut];
+        head = Generics().Replace(head, "").Trim();
+        var name = head.Split(' ', StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+        if (name == null) return null;
+        return Members.GetValueOrDefault(name) ?? ShortMembers.GetValueOrDefault(name);
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"<[^<>]*>")]
+    private static partial System.Text.RegularExpressions.Regex Generics();
+
+    /// <summary>"Console.WriteLine", "int.Parse", "List.Add": tipo e membro, como aparecem nas assinaturas.</summary>
+    // Calculado no primeiro uso: depende de Members, que é inicializado mais abaixo no arquivo.
+    private static Dictionary<string, PortugueseDoc>? _shortMembers;
+    private static Dictionary<string, PortugueseDoc> ShortMembers => _shortMembers ??= BuildShort();
+
+    private static Dictionary<string, PortugueseDoc> BuildShort()
+    {
+        var aliases = new Dictionary<string, string>
+        {
+            ["Int32"] = "int", ["Int64"] = "long", ["Double"] = "double", ["Single"] = "float", ["Decimal"] = "decimal",
+            ["Object"] = "object", ["String"] = "string", ["Boolean"] = "bool", ["Char"] = "char",
+        };
+        var result = new Dictionary<string, PortugueseDoc>();
+        foreach (var (key, doc) in Members)
+        {
+            var parts = key.Split('.');
+            if (parts.Length < 2) continue;
+            var type = aliases.GetValueOrDefault(parts[^2], parts[^2]);
+            result.TryAdd(type + "." + parts[^1], doc);
+        }
+        return result;
     }
 
     /// <summary>"System.Console.ReadLine", "System.Collections.Generic.List.Add", "System.Random"…</summary>
@@ -233,6 +274,30 @@ public static class PortugueseDocs
             m[$"{type}.MinValue"] = D($"O menor valor que um {name} consegue guardar.");
         }
         m["System.Object.ToString"] = D("Transforma o valor em texto.");
+        AddGameDocs(m);
         return m;
+    }
+
+    /// <summary>O motor dos jogos com botões: cada nome em inglês simples, com a tradução na frente.</summary>
+    private static void AddGameDocs(Dictionary<string, PortugueseDoc> m)
+    {
+        const string game = "CSharpLab.GameEngine.Game";
+        m[game] = D("Game = jogo. A janela do jogo, com cenas, textos, barras e botões.", "var game = new Game(\"A Torre\");");
+        m[game + ".Scene"] = D("Scene = cena. Cria uma tela do jogo. Ela é desenhada de novo depois de cada clique, sempre com os valores atuais das variáveis.",
+            "game.Scene(\"Forest\", () =>\n{\n    game.Say(\"Árvores por todo lado.\");\n    game.Button(\"Voltar\", () => game.GoTo(\"Start\"));\n});");
+        m[game + ".GoTo"] = D("GoTo = ir para. Troca para outra cena.", "game.GoTo(\"Forest\");");
+        m[game + ".Title"] = D("Title = título. Texto grande no alto da cena.", "game.Title(\"Capítulo 1\");");
+        m[game + ".Say"] = D("Say = dizer. Mostra um texto na tela. Dentro de um botão, aparece destacado depois do clique.",
+            "game.Say($\"Ouro: {gold}\", GameColor.Gold);");
+        m[game + ".Button"] = D("Button = botão. O código entre as chaves roda quando o jogador clica. As teclas 1 a 9 também apertam os botões.",
+            "game.Button(\"Atacar\", () =>\n{\n    enemyHealth -= 10;\n    game.Say(\"Você acertou!\");\n});");
+        m[game + ".Bar"] = D("Bar = barra. Mostra uma barra de vida, mana ou energia, à direita da tela.", "game.Bar(\"Vida\", health, 100, GameColor.Green);");
+        m[game + ".Ask"] = D("Ask = perguntar. Mostra uma pergunta com um campo para o jogador escrever; a resposta chega entre as chaves.",
+            "game.Ask(\"Qual é o seu nome?\", answer =>\n{\n    playerName = answer;\n    game.GoTo(\"Start\");\n});");
+        m[game + ".Image"] = D("Image = imagem. Mostra uma imagem (png ou jpg) da pasta Assets do projeto.", "game.Image(\"goblin.png\");");
+        m[game + ".Run"] = D("Run = começar. Abre a janela do jogo na primeira cena. Fica sempre na última linha.", "game.Run(\"Start\");");
+        m[game + ".CurrentScene"] = D("CurrentScene = cena atual. O nome da cena que está na tela.");
+        m["CSharpLab.GameEngine.GameColor"] = D("GameColor = cor do jogo: White, Gray, Red, Green, Blue, Gold, Purple, Orange.", "game.Say(\"Cuidado!\", GameColor.Red);");
+        m["CSharpLab.GameEngine.GameException"] = D("Erro do motor do jogo. A mensagem explica em português o que fazer.");
     }
 }

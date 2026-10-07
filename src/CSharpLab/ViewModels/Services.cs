@@ -16,7 +16,8 @@ public enum ExternalChangeChoice
     KeepMine,
 }
 
-public sealed record NewProjectRequest(string Name, string Location);
+/// <param name="IsGame">Jogo com botões (janela) em vez de programa console.</param>
+public sealed record NewProjectRequest(string Name, string Location, bool IsGame = false);
 
 /// <summary>Diálogos nativos e da aplicação. Implementado pela camada de interface.</summary>
 public interface IDialogService
@@ -30,7 +31,8 @@ public interface IDialogService
     string? PickFolder(string title, string? initialDirectory);
     string? PickFile(string title, string filter, string? initialDirectory);
     string? PickSaveFile(string suggestedName, string? initialDirectory);
-    NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation);
+    /// <param name="offerGame">Deixa escolher entre programa console e jogo com botões.</param>
+    NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation, bool offerGame = false);
     ProjectFile? SelectProject(IReadOnlyList<ProjectFile> projects, string folder);
     /// <summary>Pede um texto curto (ex.: novo nome). Null se cancelar.</summary>
     string? AskText(string title, string message, string initial, Func<string, string?>? validate = null);

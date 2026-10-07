@@ -4,7 +4,8 @@ namespace CSharpLab.Core.Language;
 /// Snippet essencial. O modelo usa "${n:texto}" para campos editáveis (o mesmo n repete o campo),
 /// "$0" para a posição final do cursor e "\n" + 4 espaços por nível de indentação.
 /// </summary>
-public sealed record SnippetDefinition(string Shortcut, string Description, string Template, CodeContext Contexts);
+/// <param name="GameOnly">Só aparece em jogos com botões (usa o motor CSharpLab.Game).</param>
+public sealed record SnippetDefinition(string Shortcut, string Description, string Template, CodeContext Contexts, bool GameOnly = false);
 
 public static class Snippets
 {
@@ -27,12 +28,15 @@ public static class Snippets
         new("class", "class MyClass { }", "class ${1:MyClass}\n{\n    $0\n}", CodeContext.Member | CodeContext.Type),
         new("array", "int[] values = { 1, 2, 3 };", "int[] ${1:values} = { ${2:1, 2, 3} };$0", StmtOrMember),
         new("list", "List<int> values = new();", "List<${1:int}> ${2:values} = new();$0", StmtOrMember),
+        new("scene", "game.Scene(\"Name\", () => { });", "game.Scene(\"${1:Name}\", () =>\n{\n    $0\n});", Stmt, GameOnly: true),
+        new("button", "game.Button(\"Texto\", () => { });", "game.Button(\"${1:Texto}\", () =>\n{\n    $0\n});", Stmt, GameOnly: true),
     ];
 
     public static SnippetDefinition? Find(string shortcut) =>
         All.FirstOrDefault(s => s.Shortcut == shortcut);
 
-    public static bool Fits(SnippetDefinition snippet, CodeContext context) => (snippet.Contexts & context) != 0;
+    public static bool Fits(SnippetDefinition snippet, CodeContext context, bool gameProject = false) =>
+        (snippet.Contexts & context) != 0 && (!snippet.GameOnly || gameProject);
 
     /// <summary>Parte do modelo: texto literal, campo editável ou posição final.</summary>
     public abstract record Part;

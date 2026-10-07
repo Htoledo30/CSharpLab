@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/CSharpLab.Core/CSharpLab.Core.csproj" />
     <Project Path="src/CSharpLab/CSharpLab.csproj" />
+    <Project Path="src/CSharpLab.Game/CSharpLab.Game.csproj" />
     <Project Path="src/CSharpLab.RuntimeHook/CSharpLab.RuntimeHook.csproj" />
   </Folder>
   <Folder Name="/tests/">

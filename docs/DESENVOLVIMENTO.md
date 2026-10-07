@@ -48,11 +48,12 @@ oferecer versões novas, mas uma cópia anterior ao recurso precisa ser instalad
 | Pasta | Responsabilidade |
 | --- | --- |
 | `src/CSharpLab.Core/Files` | Leitura com detecção de codificação, gravação atômica, Lixeira, validação de nomes |
-| `src/CSharpLab.Core/Projects` | SDK (`dotnet --list-sdks`, `global.json`), localizar/criar projetos console, avaliação MSBuild, o que cada evento do disco exige (`FolderChanges`) |
+| `src/CSharpLab.Core/Projects` | SDK (`dotnet --list-sdks`, `global.json`), localizar/criar projetos console e jogos (`GameKit`), avaliação MSBuild, o que cada evento do disco exige (`FolderChanges`) |
 | `src/CSharpLab.Core/Language` | Roslyn: workspace (`LanguageService.cs`), consultas (`LanguageService.Queries.cs`: completion, assinatura, dica, definição, renomear, formatação, cores, diagnósticos), erros traduzidos, dicas para iniciantes, snippets |
 | `src/CSharpLab.Core/Build` | `dotnet restore/build` com diagnósticos SARIF, comando de execução e o que o F5 reaproveita na sessão (`RunCache`) |
 | `src/CSharpLab.Core/Terminal` | Sessão ConPTY + Job Object (processo do usuário fora do editor) |
 | `src/CSharpLab.Core/Settings` | Preferências JSON, recentes, recuperação de rascunhos |
+| `src/CSharpLab.Game` | Motor dos jogos com botões (namespace `CSharpLab.GameEngine`, WPF). `Game` monta cada cena numa `Screen` (testável com uma `IGameView` falsa) e a `GameWindow` desenha num palco de 960×540 que escala com a janela. Copiado para `lib\` de cada jogo pelo `GameKit` (Core), que também cria o `.csproj` (WinExe), o `AGENTS.md`/`CLAUDE.md` e atualiza o motor de jogos antigos ao executar. |
 | `src/CSharpLab.RuntimeHook` | Gancho (`DOTNET_STARTUP_HOOKS`, .NET 8+) carregado no programa do usuário: registra tipo, mensagem e linhas de um erro não tratado para o editor explicar em português (`RuntimeErrors`). Não altera o comportamento do programa. |
 | `src/CSharpLab/ViewModels` | MVVM. `MainViewModel` é dividido por assunto: `.cs` (estado, início, painéis, avisos, encerramento), `.Documents` (abas, salvar, recuperação), `.Folders` (pasta e projetos), `.FileSystem` (mudanças no disco), `.Analysis` (erros ao vivo, navegação), `.Run` (SDK → salvar → compilar → terminal), `.Updates`. Mais explorador e problemas. |
 | `src/CSharpLab/Editor` | AvalonEdit + recursos de C# (cores, sublinhados, sugestões, assinatura, snippets, indentação) |

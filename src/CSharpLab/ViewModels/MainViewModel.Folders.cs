@@ -48,9 +48,9 @@ public sealed partial class MainViewModel
             Dialogs.ShowError("Não foi possível abrir o projeto", "O arquivo .csproj não pôde ser lido.", file.Error);
             return;
         }
-        if (!file.IsConsole)
+        if (!file.IsRunnable)
         {
-            Dialogs.ShowError("Projeto não suportado", "Este projeto não é um aplicativo console. Esta versão executa apenas projetos console C#.");
+            Dialogs.ShowError("Projeto não suportado", "Este projeto não é um programa console nem um jogo com botões. O CSharp Lab executa esses dois tipos.");
             return;
         }
         await OpenFolderAsync(file.Directory, file.Path, promptForUnsaved: true);
@@ -178,11 +178,11 @@ public sealed partial class MainViewModel
         // de o SDK confirmar as propriedades de cada .csproj (isso leva ~1 s por projeto).
         if (useCache && _model == null)
         {
-            var quickConsoles = ProjectLocator.ConsoleProjects(candidates);
+            var quickRunnable = ProjectLocator.RunnableProjects(candidates);
             var guess = (Settings.ProjectChoices.TryGetValue(folder, out var remembered)
                             ? candidates.FirstOrDefault(p => string.Equals(p.Path, remembered, StringComparison.OrdinalIgnoreCase))
                             : null)
-                        ?? (quickConsoles.Count == 1 ? quickConsoles[0] : null)
+                        ?? (quickRunnable.Count == 1 ? quickRunnable[0] : null)
                         ?? (candidates.Count == 1 ? candidates[0] : null);
             if (guess != null)
             {
@@ -206,15 +206,15 @@ public sealed partial class MainViewModel
         catch (OperationCanceledException) { return; }
         if (_disposed || scan.IsCancellationRequested || CurrentFolder != folder || version != _projectLoadVersion) return;
         Projects = projects;
-        var consoles = ProjectLocator.ConsoleProjects(projects);
+        var runnable = ProjectLocator.RunnableProjects(projects);
 
         ProjectFile? chosen = null;
         if (Settings.ProjectChoices.TryGetValue(folder, out var saved))
-            chosen = consoles.FirstOrDefault(p => string.Equals(p.Path, saved, StringComparison.OrdinalIgnoreCase));
-        chosen ??= consoles.Count == 1 ? consoles[0] : null;
+            chosen = runnable.FirstOrDefault(p => string.Equals(p.Path, saved, StringComparison.OrdinalIgnoreCase));
+        chosen ??= runnable.Count == 1 ? runnable[0] : null;
         RunProject = chosen;
 
-        var analysis = chosen ?? consoles.FirstOrDefault() ?? projects.FirstOrDefault(p => p.IsSdkStyle && p.Error == null);
+        var analysis = chosen ?? runnable.FirstOrDefault() ?? projects.FirstOrDefault(p => p.IsSdkStyle && p.Error == null);
         if (analysis != null)
         {
             await LoadModelAsync(analysis.Path, useCache, scan.Token);
@@ -296,12 +296,14 @@ public sealed partial class MainViewModel
     {
         var request = Dialogs.AskNewProject("Novo projeto",
             "Um projeto é uma pasta com seus arquivos .cs e um arquivo .csproj. É ele que o botão Executar compila e roda.",
-            "MeuProjeto", DefaultProjectLocation());
+            "MeuProjeto", DefaultProjectLocation(), offerGame: true);
         if (request == null) return;
         if (!ConfirmCloseAll(Documents)) return;
         try
         {
-            var created = ProjectCreator.CreateConsoleProject(request.Location, request.Name);
+            var created = request.IsGame
+                ? ProjectCreator.CreateGameProject(request.Location, request.Name)
+                : ProjectCreator.CreateConsoleProject(request.Location, request.Name);
             Settings.LastProjectLocation = request.Location;
             await OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: false);
             OpenFile(created.ProgramPath);
@@ -324,9 +326,9 @@ public sealed partial class MainViewModel
     private async Task ChooseRunProject()
     {
         if (CurrentFolder == null) return;
-        var consoles = ProjectLocator.ConsoleProjects(Projects);
-        if (consoles.Count < 2) return;
-        var choice = Dialogs.SelectProject(consoles, CurrentFolder);
+        var runnable = ProjectLocator.RunnableProjects(Projects);
+        if (runnable.Count < 2) return;
+        var choice = Dialogs.SelectProject(runnable, CurrentFolder);
         if (choice == null) return;
         Settings.ProjectChoices[CurrentFolder] = choice.Path;
         _projectLoadVersion++;

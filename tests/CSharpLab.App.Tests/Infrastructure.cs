@@ -100,7 +100,7 @@ public sealed class FakeDialogs : IDialogService
     public string? FileAnswer { get; set; }
     public string? PickFile(string title, string filter, string? initialDirectory) => FileAnswer;
     public string? PickSaveFile(string suggestedName, string? initialDirectory) => null;
-    public NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation) => null;
+    public NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation, bool offerGame = false) => null;
     public ProjectFile? SelectProject(IReadOnlyList<ProjectFile> projects, string folder) => projects.FirstOrDefault();
     public List<string> OpenedUrls { get; } = [];
     public void OpenUrl(string url) => OpenedUrls.Add(url);

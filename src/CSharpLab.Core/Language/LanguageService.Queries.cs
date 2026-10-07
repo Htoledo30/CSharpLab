@@ -54,7 +54,9 @@ public sealed partial class LanguageService
         if (string.IsNullOrWhiteSpace(text)) return null;
         // Só a primeira linha (assinatura); documentação extensa não entra.
         var firstLine = text.Split('\n')[0].Trim();
-        return firstLine.Length > 0 ? firstLine : null;
+        if (firstLine.Length == 0) return null;
+        // Para os métodos comuns e o motor dos jogos, a explicação curta em português embaixo.
+        return PortugueseDocs.ForSignature(firstLine) is { } doc ? firstLine + "\n" + doc.Text : firstLine;
     }
 
     public async Task<SignatureHelpResult?> GetSignatureHelpAsync(string key, int position, CancellationToken ct)

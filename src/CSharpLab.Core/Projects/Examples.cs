@@ -3,10 +3,11 @@ using System.Reflection;
 namespace CSharpLab.Core.Projects;
 
 /// <summary>Projeto de exemplo para estudar: código em inglês, comentários em português.</summary>
-public sealed record ExampleProject(string Id, string Title, string Description);
+/// <param name="IsGame">Jogo com botões (janela) em vez de console.</param>
+public sealed record ExampleProject(string Id, string Title, string Description, bool IsGame = false);
 
 /// <summary>
-/// Exemplos prontos (adivinhe o número, calculadora, jogo da velha, cobrinha, batalha RPG),
+/// Exemplos prontos (adivinhe o número, calculadora, jogo da velha, cobrinha, batalha RPG, RPG com botões),
 /// guardados dentro do programa e copiados para uma pasta do usuário ao abrir.
 /// </summary>
 public static class Examples
@@ -18,6 +19,7 @@ public static class Examples
         new("TicTacToe", "Jogo da velha", "Array de duas dimensões e for dentro de for"),
         new("RpgBattle", "Batalha RPG", "Classes e objetos, em dois arquivos"),
         new("Snake", "Cobrinha", "Jogo em tempo real: teclas, cores e posição na tela"),
+        new("RpgButtons", "RPG com botões", "Jogo de janela: cenas, botões, barras de vida e pergunta de nome", IsGame: true),
     ];
 
     /// <summary>Pasta onde os exemplos são criados (Documentos\CSharp Lab\Exemplos).</summary>
@@ -52,7 +54,9 @@ public static class Examples
 
         Directory.CreateDirectory(parentFolder);
         var files = FilesOf(example);
-        var created = ProjectCreator.CreateConsoleProject(parentFolder, example.Id, files["Program.cs"]);
+        var created = example.IsGame
+            ? ProjectCreator.CreateGameProject(parentFolder, example.Id, files["Program.cs"])
+            : ProjectCreator.CreateConsoleProject(parentFolder, example.Id, files["Program.cs"]);
         foreach (var (name, text) in files)
         {
             if (!name.Equals("Program.cs", StringComparison.OrdinalIgnoreCase))

@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- Os testes do motor dos jogos desenham a janela (fora da tela). -->
+    <UseWPF>true</UseWPF>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,10 +15,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\CSharpLab.Core\CSharpLab.Core.csproj" />
+    <ProjectReference Include="..\..\src\CSharpLab.Game\CSharpLab.Game.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Using Include="Xunit" />
+    <!-- UseWPF tira o System.IO dos usings automáticos. -->
+    <Using Include="System.IO" />
   </ItemGroup>
 
 </Project>

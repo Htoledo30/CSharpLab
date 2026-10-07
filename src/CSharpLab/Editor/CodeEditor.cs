@@ -481,7 +481,7 @@ public sealed partial class CodeEditor : TextEditor
         {
             return false;
         }
-        if (!Snippets.Fits(snippet, context)) return false;
+        if (!Snippets.Fits(snippet, context, LanguageServices?.MainModel?.UsesGameEngine == true)) return false;
         SnippetExpander.Expand(TextArea, snippet, start, caret - start);
         return true;
     }

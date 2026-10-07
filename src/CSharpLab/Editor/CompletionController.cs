@@ -186,9 +186,10 @@ public sealed class CompletionController
         if (typedChar != '.')
         {
             var context = SyntaxContext.GetContext(_editor.Syntax.Root, start);
+            bool game = _editor.LanguageServices?.MainModel?.UsesGameEngine == true;
             foreach (var s in Snippets.All)
             {
-                if (Snippets.Fits(s, context)) entries.Add(new CompletionEntry(s));
+                if (Snippets.Fits(s, context, game)) entries.Add(new CompletionEntry(s));
             }
         }
         if (entries.Count == 0) return;

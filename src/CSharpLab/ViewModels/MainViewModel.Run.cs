@@ -157,6 +157,8 @@ public sealed partial class MainViewModel
     /// </summary>
     private async Task<ProcessLaunch?> BuildOrReuseAsync(ProjectFile project, CancellationToken ct)
     {
+        // Jogo com botões: se o CSharp Lab trouxe um motor mais novo, o jogo passa a usá-lo.
+        if (project.IsWindowApp) await Task.Run(() => GameKit.RefreshLibrary(project.Directory), ct);
         var fingerprint = await Task.Run(() => BuildService.InputFingerprint(project.Path), ct);
         if (_runCache.TryReuse(project.Path, fingerprint) is { } reused)
         {
@@ -214,7 +216,10 @@ public sealed partial class MainViewModel
         RunInfo = $"{project.Name} — executando";
         RunState = RunState.Running;
         StatusText = "Executando";
-        terminal.FocusTerminal();
+        if (project.IsWindowApp)
+            terminal.WriteNotice("O jogo abre numa janela própria. Para encerrar, feche a janela ou clique em Parar.");
+        else
+            terminal.FocusTerminal();
 
         var exitCode = await session.Completion;
         if (Settings.TerminalHintRuns < 3)
@@ -229,7 +234,7 @@ public sealed partial class MainViewModel
         }
         else if (exitCode == 0)
         {
-            terminal.WriteNotice("Programa encerrado (código 0).");
+            terminal.WriteNotice(project.IsWindowApp ? "Jogo fechado." : "Programa encerrado (código 0).");
             RunInfo = $"{project.Name} — encerrado";
         }
         else if (!ExplainCrash(project, crashReport, exitCode, terminal))
@@ -312,11 +317,11 @@ public sealed partial class MainViewModel
             if (RunProject != null && File.Exists(RunProject.Path)) return RunProject;
             await LoadProjectsAsync(ct: ct);
             ct.ThrowIfCancellationRequested();
-            var consoles = ProjectLocator.ConsoleProjects(Projects);
-            if (consoles.Count == 1) return RunProject = consoles[0];
-            if (consoles.Count > 1)
+            var runnable = ProjectLocator.RunnableProjects(Projects);
+            if (runnable.Count == 1) return RunProject = runnable[0];
+            if (runnable.Count > 1)
             {
-                var choice = Dialogs.SelectProject(consoles, CurrentFolder);
+                var choice = Dialogs.SelectProject(runnable, CurrentFolder);
                 if (choice == null) return null;
                 Settings.ProjectChoices[CurrentFolder] = choice.Path;
                 RunProject = choice;
@@ -326,7 +331,7 @@ public sealed partial class MainViewModel
             }
             if (Projects.Count > 0)
             {
-                Dialogs.ShowError("Nenhum projeto console", "Esta pasta tem projetos, mas nenhum é um aplicativo console. Esta versão executa apenas projetos console C#.");
+                Dialogs.ShowError("Nenhum projeto para executar", "Esta pasta tem projetos, mas nenhum é um programa console ou um jogo com botões, que são os tipos que o CSharp Lab executa.");
                 return null;
             }
 

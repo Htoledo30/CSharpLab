@@ -69,7 +69,31 @@ public static class ProjectCreator
     /// Cria &lt;parent&gt;\&lt;name&gt;\ com o .csproj e Program.cs. Nunca usa uma pasta que já tenha arquivos.
     /// Se falhar no meio, remove apenas o que foi criado aqui.
     /// </summary>
-    public static CreatedProject CreateConsoleProject(string parentFolder, string name, string? programText = null)
+    public static CreatedProject CreateConsoleProject(string parentFolder, string name, string? programText = null) =>
+        CreateProject(parentFolder, name, CsprojContent, programText ?? DefaultProgram, null);
+
+    /// <summary>
+    /// Cria um jogo com botões: .csproj de janela, Program.cs inicial, o motor em lib\, a pasta Assets
+    /// e o guia do motor para IAs (AGENTS.md e CLAUDE.md).
+    /// </summary>
+    public static CreatedProject CreateGameProject(string parentFolder, string name, string? programText = null) =>
+        CreateProject(parentFolder, name, GameKit.CsprojContent, programText ?? GameKit.StarterProgram, dir =>
+        {
+            var created = GameKit.CopyLibrary(dir);
+            var assets = Path.Combine(dir, GameKit.AssetsFolder);
+            Directory.CreateDirectory(assets);
+            created.Add(assets);
+            foreach (var (file, text) in new[] { ("AGENTS.md", GameKit.AgentsGuide), ("CLAUDE.md", GameKit.ClaudeGuide) })
+            {
+                var path = Path.Combine(dir, file);
+                WriteNew(path, text);
+                created.Add(path);
+            }
+            return created;
+        });
+
+    private static CreatedProject CreateProject(string parentFolder, string name, Func<string, string> csprojContent, string programText,
+        Func<string, List<string>>? extras)
     {
         name = name.Trim();
         var error = ValidateProjectName(name);
@@ -97,18 +121,31 @@ public static class ProjectCreator
         var created = new List<string>();
         try
         {
-            WriteNew(csproj, CsprojContent(name));
+            WriteNew(csproj, csprojContent(name));
             created.Add(csproj);
-            WriteNew(program, programText ?? DefaultProgram);
+            WriteNew(program, programText);
             created.Add(program);
+            if (extras != null) created.AddRange(extras(dir));
             return new CreatedProject(csproj, program);
         }
         catch
         {
-            foreach (var f in created)
+            // De trás para frente: os arquivos antes das pastas que os contêm.
+            for (int i = created.Count - 1; i >= 0; i--)
             {
-                try { File.Delete(f); } catch { }
+                try
+                {
+                    if (Directory.Exists(created[i])) Directory.Delete(created[i], recursive: false);
+                    else File.Delete(created[i]);
+                }
+                catch { }
             }
+            try
+            {
+                var lib = Path.Combine(dir, GameKit.LibraryFolder);
+                if (Directory.Exists(lib) && !Directory.EnumerateFileSystemEntries(lib).Any()) Directory.Delete(lib);
+            }
+            catch { }
             if (createdDir)
             {
                 try { Directory.Delete(dir, recursive: false); } catch { }

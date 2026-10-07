@@ -45,6 +45,32 @@ public sealed class RuntimeErrorTests
         await Ui.WaitUntil(() => vm.RunState == RunState.Idle, 60_000, "fim");
     }, 300);
 
+    /// <summary>
+    /// Jogo com botões pelo F5: compila, roda pelo terminal e um erro do motor aparece em português,
+    /// com a linha. A cena quebra antes de a janela abrir, então nada aparece na tela durante o teste.
+    /// </summary>
+    [Fact]
+    public void Jogo_com_erro_do_motor_aponta_a_linha_em_portugues() => Ui.Run(async () =>
+    {
+        var terminal = new FakeTerminal();
+        using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = terminal };
+        await vm.InitializeAsync();
+        var created = ProjectCreator.CreateGameProject(Ui.NewFolder("jogo"), "Jogo",
+            "var game = new Game(\"Teste\");\ngame.Scene(\"Start\", () =>\n{\n    game.GoTo(\"Florest\");\n});\ngame.Scene(\"Forest\", () => { });\ngame.Run(\"Start\");\n");
+        await vm.OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: false);
+        Assert.True(vm.RunProject?.IsWindowApp);
+
+        vm.RunOrStopCommand.Execute(null);
+        await Ui.WaitUntil(() => vm.RunState == RunState.Running, 120_000, "execução");
+        await Ui.WaitUntil(() => vm.RunState == RunState.Idle, 30_000, "o jogo parar");
+
+        Assert.Contains(terminal.Notices, n => n.Contains("janela própria"));
+        Assert.Contains(terminal.Notices, n => n.Contains("Erro na linha 4 (Program.cs)") &&
+                                               n.Contains("A cena \"Florest\" não existe. Você quis dizer \"Forest\"?"));
+        var problem = Assert.Single(vm.Problems.Errors, p => p.Diagnostic.Id == RuntimeErrors.DiagnosticId);
+        Assert.Equal(4, problem.Diagnostic.Line);
+    }, 300);
+
     [Fact]
     public void Erro_dentro_de_outro_arquivo_aponta_esse_arquivo() => Ui.Run(async () =>
     {

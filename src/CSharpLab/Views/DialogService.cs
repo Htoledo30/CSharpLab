@@ -137,9 +137,9 @@ public sealed class DialogService : IDialogService
         return dialog.ShowDialog(Owner()) == true ? dialog.FileName : null;
     }
 
-    public NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation)
+    public NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation, bool offerGame = false)
     {
-        var dialog = new NewProjectDialog(title, explanation, defaultName, defaultLocation, this);
+        var dialog = new NewProjectDialog(title, explanation, defaultName, defaultLocation, this, offerGame);
         return dialog.ShowDialog() == true ? dialog.Request : null;
     }
 
@@ -159,7 +159,7 @@ public sealed class DialogService : IDialogService
     {
         var dialog = new DialogWindow("Qual projeto executar?");
         var panel = new StackPanel();
-        panel.Children.Add(DialogWindow.Paragraph("Esta pasta tem mais de um projeto console. A escolha fica salva para esta pasta.", muted: true));
+        panel.Children.Add(DialogWindow.Paragraph("Esta pasta tem mais de um projeto. A escolha fica salva para esta pasta.", muted: true));
         var radios = new List<RadioButton>();
         foreach (var p in projects)
         {
@@ -181,23 +181,40 @@ public sealed class DialogService : IDialogService
     private static Window? Owner() => Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
 }
 
-/// <summary>Pede apenas nome e pasta de destino. O tipo é sempre console.</summary>
+/// <summary>Pede nome e pasta de destino e, quando oferecido, o tipo: programa console ou jogo com botões.</summary>
 public sealed class NewProjectDialog : DialogWindow
 {
+    private const string DefaultGameName = "MeuJogo";
     private readonly TextBox _name;
+    private readonly RadioButton? _game;
     private readonly TextBox _location;
     private readonly TextBlock _preview;
     private readonly TextBlock _error;
 
-    public NewProjectDialog(string title, string? explanation, string defaultName, string defaultLocation, DialogService dialogs) : base(title)
+    public NewProjectDialog(string title, string? explanation, string defaultName, string defaultLocation, DialogService dialogs, bool offerGame = false) : base(title)
     {
         Width = 520;
         var panel = new StackPanel();
         if (explanation != null)
             panel.Children.Add(new TextBlock { Text = explanation, TextWrapping = TextWrapping.Wrap, Foreground = (Brush)FindResource("TextSecondary"), Margin = new Thickness(0, 0, 0, 12) });
 
-        panel.Children.Add(Label("Nome"));
         _name = new TextBox { Text = defaultName };
+        if (offerGame)
+        {
+            panel.Children.Add(Label("Tipo"));
+            var console = KindOption("Programa console", "Texto no terminal: Console.WriteLine, ReadLine, jogos de terminal.", isChecked: true);
+            _game = KindOption("Jogo com botões", "Uma janela com títulos, textos, barras de vida e botões: game.Say, game.Button…", isChecked: false);
+            panel.Children.Add(console);
+            panel.Children.Add(_game);
+            // O nome padrão acompanha o tipo, enquanto a pessoa não escolher outro.
+            _game.Checked += (_, _) => { if (_name.Text.Trim() == defaultName) _name.Text = DefaultGameName; };
+            console.Checked += (_, _) => { if (_name.Text.Trim() == DefaultGameName) _name.Text = defaultName; };
+            panel.Children.Add(Label("Nome", top: 12));
+        }
+        else
+        {
+            panel.Children.Add(Label("Nome"));
+        }
         System.Windows.Automation.AutomationProperties.SetName(_name, "Nome do projeto");
         panel.Children.Add(_name);
 
@@ -233,6 +250,22 @@ public sealed class NewProjectDialog : DialogWindow
     }
 
     public NewProjectRequest? Request { get; private set; }
+
+    private static RadioButton KindOption(string title, string detail, bool isChecked)
+    {
+        var content = new StackPanel();
+        content.Children.Add(new TextBlock { Text = title, FontWeight = FontWeights.SemiBold });
+        content.Children.Add(new TextBlock
+        {
+            Text = detail,
+            Foreground = (Brush)Application.Current.FindResource("TextMuted"),
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+        });
+        var radio = new RadioButton { Content = content, IsChecked = isChecked, GroupName = "ProjectKind" };
+        System.Windows.Automation.AutomationProperties.SetName(radio, title);
+        return radio;
+    }
 
     private static TextBlock Label(string text, double top = 0) => new()
     {
@@ -279,7 +312,7 @@ public sealed class NewProjectDialog : DialogWindow
             _error.Visibility = Visibility.Visible;
             return false;
         }
-        Request = new NewProjectRequest(name, location);
+        Request = new NewProjectRequest(name, location, IsGame: _game?.IsChecked == true);
         return true;
     }
 }

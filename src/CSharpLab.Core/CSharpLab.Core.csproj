@@ -20,6 +20,9 @@
     <!-- Projetos de exemplo: guardados dentro do programa, não compilados com ele. -->
     <Compile Remove="Examples\**" />
     <EmbeddedResource Include="Examples\**\*.cs" />
+    <!-- Jogos com botões: programa inicial e guia do motor para IAs. -->
+    <Compile Remove="GameKit\**" />
+    <EmbeddedResource Include="GameKit\**" />
   </ItemGroup>
 
 </Project>

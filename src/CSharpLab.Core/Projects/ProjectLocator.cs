@@ -51,8 +51,9 @@ public static class ProjectLocator
         return result.OrderBy(p => p.Path.Count(c => c == '\\')).ThenBy(p => p.Path, StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    public static IReadOnlyList<ProjectFile> ConsoleProjects(IEnumerable<ProjectFile> projects) =>
-        projects.Where(p => p.Error == null && p.IsConsole).ToList();
+    /// <summary>Projetos que o botão Executar roda: console e jogos (janela).</summary>
+    public static IReadOnlyList<ProjectFile> RunnableProjects(IEnumerable<ProjectFile> projects) =>
+        projects.Where(p => p.Error == null && p.IsRunnable).ToList();
 
     /// <summary>Projeto mais próximo que contém o arquivo, subindo as pastas até <paramref name="stopAt"/>.</summary>
     public static ProjectFile? FindOwningProject(string filePath, string? stopAt = null)

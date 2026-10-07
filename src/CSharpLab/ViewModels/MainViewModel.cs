@@ -157,7 +157,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public string ProjectLabel => RunProject?.Name ?? (CurrentFolder != null ? Path.GetFileName(CurrentFolder.TrimEnd('\\')) : "Sem projeto");
 
-    public bool HasMultipleProjects => ProjectLocator.ConsoleProjects(Projects).Count > 1;
+    public bool HasMultipleProjects => ProjectLocator.RunnableProjects(Projects).Count > 1;
 
     partial void OnCurrentFolderChanged(string? value)
     {

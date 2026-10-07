@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Motor dos "Jogos com botões". Copiado para a pasta lib\ de cada jogo criado no CSharp Lab:
+    o jogo não depende do editor instalado. Os nomes são em inglês simples e a documentação
+    (dica do mouse e autocomplete) é em português.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>CSharpLab.GameEngine</RootNamespace>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+    <!-- Os jogos referenciam a dll diretamente: IL puro, igual em qualquer PC. -->
+    <PublishReadyToRun>false</PublishReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CSharpLab.Tests" />
+  </ItemGroup>
+
+</Project>

@@ -149,6 +149,10 @@ public static partial class RuntimeErrors
                 return new("Este método ainda não foi escrito: ele só tem o throw new NotImplementedException().",
                     "Troque essa linha pelo código do método.");
 
+            case "GameException":
+                // Erro do motor dos jogos: a mensagem já é em português e diz o que fazer.
+                return new(message, null);
+
             default:
                 return new($"O programa parou com um erro ({crash.ShortType}): {message}", null);
         }

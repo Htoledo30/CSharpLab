@@ -103,7 +103,7 @@ public sealed class FilesAndProjectsTests : IDisposable
         ProjectCreator.CreateConsoleProject(_root, "Dois");
         Directory.CreateDirectory(Path.Combine(a.Directory, "bin"));
         File.WriteAllText(Path.Combine(a.Directory, "bin", "Falso.csproj"), "<Project/>");
-        var found = ProjectLocator.ConsoleProjects(ProjectLocator.FindProjects(_root));
+        var found = ProjectLocator.RunnableProjects(ProjectLocator.FindProjects(_root));
         Assert.Equal(2, found.Count);
     }
 
