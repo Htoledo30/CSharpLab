@@ -129,6 +129,46 @@ public sealed class FilesAndProjectsTests : IDisposable
     }
 
     [Fact]
+    public void Disco_ocupado_por_um_instante_e_repetido_erro_de_verdade_nao()
+    {
+        // "Não foi possível remover o arquivo a ser substituído" (antivírus segurando o arquivo): tenta de novo.
+        int calls = 0;
+        DiskRetry.Run(() =>
+        {
+            if (++calls < 3) throw new IOException("ocupado", unchecked((int)0x80070497));
+        });
+        Assert.Equal(3, calls);
+
+        // Arquivo que não existe: não adianta esperar.
+        calls = 0;
+        Assert.Throws<FileNotFoundException>(() => DiskRetry.Run(() =>
+        {
+            calls++;
+            throw new FileNotFoundException("sumiu");
+        }));
+        Assert.Equal(1, calls);
+
+        // Ocupado para sempre: desiste depois de algumas tentativas e mostra o erro.
+        calls = 0;
+        Assert.Throws<IOException>(() => DiskRetry.Run(() =>
+        {
+            calls++;
+            throw new IOException("em uso", unchecked((int)0x80070020));
+        }, attempts: 3));
+        Assert.Equal(3, calls);
+    }
+
+    [Fact]
+    public void Ponto_e_virgula_esquecido_no_fim_da_linha_nao_vira_pedido_de_virgula()
+    {
+        var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(
+            "string name = Console.ReadLine()\nint age = 3;\nMath.Max(1 2);\n");
+        var messages = tree.GetDiagnostics().Where(d => d.Id == "CS1003").Select(DiagnosticTranslator.Translate).ToList();
+        Assert.Contains("Faltou \";\" no fim da linha.", messages);
+        Assert.Contains("Era esperado \",\".", messages);       // Math.Max(1 2): aí falta mesmo a vírgula
+    }
+
+    [Fact]
     public void Texto_do_msbuild_com_caminho_complexo()
     {
         var output = @"C:\Pasta (1)\Meu Jogo\Program.cs(12,5): error CS1002: ; expected [C:\Pasta (1)\Meu Jogo\Jogo.csproj]

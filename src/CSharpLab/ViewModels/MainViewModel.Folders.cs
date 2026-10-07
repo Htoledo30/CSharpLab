@@ -287,6 +287,10 @@ public sealed partial class MainViewModel
             return;
         }
         if (!await OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: true)) return;
+        // Exemplo com telas desenhadas: a primeira tela fica aberta numa aba, ao lado do código.
+        var screens = Path.Combine(created.Directory, GameScreens.Folder);
+        if (Directory.Exists(screens) && Directory.EnumerateFiles(screens, "*.json").Order(StringComparer.OrdinalIgnoreCase).FirstOrDefault() is { } screen)
+            OpenFile(screen, activate: false);
         OpenFile(created.ProgramPath);
         FocusEditorRequested?.Invoke();
     }

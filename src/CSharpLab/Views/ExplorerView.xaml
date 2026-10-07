@@ -7,6 +7,8 @@
         <ContextMenu x:Key="NodeMenu">
             <MenuItem Header="Novo arquivo" Command="{Binding Explorer.NewFileCommand}" />
             <MenuItem Header="Nova pasta" Command="{Binding Explorer.NewFolderCommand}" />
+            <MenuItem Header="Nova tela do jogo…" Command="{Binding NewScreenCommand}"
+                      Visibility="{Binding HasGame, Converter={StaticResource BoolToVis}}" />
             <Separator />
             <MenuItem Header="Renomear" InputGestureText="F2" Command="{Binding Explorer.RenameCommand}" />
             <MenuItem Header="Excluir" InputGestureText="Del" Command="{Binding Explorer.DeleteCommand}" />
@@ -16,7 +18,7 @@
         </ContextMenu>
 
         <HierarchicalDataTemplate DataType="{x:Type vm:ExplorerNode}" ItemsSource="{Binding Children}">
-            <Grid Height="22" ToolTip="{Binding FullPath}" ToolTipService.InitialShowDelay="900">
+            <Grid x:Name="Row" Height="22" ToolTip="{Binding ToolTipText}" ToolTipService.InitialShowDelay="700">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="20" />
                     <ColumnDefinition Width="*" />
@@ -32,6 +34,10 @@
                          PreviewKeyDown="OnEditBoxKeyDown" LostKeyboardFocus="OnEditBoxLostFocus" />
             </Grid>
             <HierarchicalDataTemplate.Triggers>
+                <!-- Coisas que o CSharp Lab cuida sozinho (motor do jogo, guias para IAs) ficam mais apagadas -->
+                <DataTrigger Binding="{Binding IsQuiet}" Value="True">
+                    <Setter TargetName="Row" Property="Opacity" Value="0.55" />
+                </DataTrigger>
                 <DataTrigger Binding="{Binding IsEditing}" Value="True">
                     <Setter TargetName="EditBox" Property="Visibility" Value="Visible" />
                     <Setter TargetName="NameText" Property="Visibility" Value="Collapsed" />
@@ -98,13 +104,36 @@
                       Visibility="{Binding Explorer.HasFolder, Converter={StaticResource BoolToVis}}" />
 
             <!-- Sem pasta aberta -->
-            <StackPanel Margin="16,8,16,0" Visibility="{Binding Explorer.HasFolder, Converter={StaticResource InverseBoolToVis}}">
-                <TextBlock Text="Nenhuma pasta aberta." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
-                <Button Style="{StaticResource LinkButton}" Content="Abrir pasta…" HorizontalAlignment="Left" Margin="-6,10,0,0"
-                        Command="{Binding OpenFolderDialogCommand}" />
-                <Button Style="{StaticResource LinkButton}" Content="Novo projeto…" HorizontalAlignment="Left" Margin="-6,2,0,0"
-                        Command="{Binding NewProjectCommand}" />
-            </StackPanel>
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Visibility="{Binding Explorer.HasFolder, Converter={StaticResource InverseBoolToVis}}">
+                <StackPanel Margin="16,8,16,12">
+                    <TextBlock Text="Nenhuma pasta aberta." Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
+                    <Button Style="{StaticResource LinkButton}" Content="Novo projeto…" HorizontalAlignment="Left" Margin="-6,10,0,0"
+                            ToolTip="Um programa de console ou um jogo com botões" Command="{Binding NewProjectCommand}" />
+                    <Button Style="{StaticResource LinkButton}" Content="Abrir pasta…" HorizontalAlignment="Left" Margin="-6,2,0,0"
+                            Command="{Binding OpenFolderDialogCommand}" />
+                    <Button x:Name="ExamplesButton" Style="{StaticResource LinkButton}" Content="Exemplos para estudar…" HorizontalAlignment="Left"
+                            Margin="-6,2,0,0" ToolTip="Jogos e programas prontos, com explicações em português" Click="OnExamplesClick" />
+
+                    <!-- Recentes: um clique abre de novo -->
+                    <TextBlock Text="RECENTES" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Margin="0,22,0,6"
+                               Visibility="{Binding RecentItems.Count, Converter={StaticResource CountToVis}}" />
+                    <ItemsControl ItemsSource="{Binding RecentItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Style="{StaticResource LinkButton}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                        Margin="-6,0,0,0" ToolTip="{Binding Path}"
+                                        Command="{Binding DataContext.OpenRecentCommand, ElementName=Root}" CommandParameter="{Binding}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock FontFamily="{StaticResource IconFont}" FontSize="11" Text="&#xE8B7;" Foreground="{StaticResource TextMuted}"
+                                                   VerticalAlignment="Center" Margin="0,1,8,0" />
+                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextPrimary}" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
         </Grid>
     </DockPanel>
 </UserControl>

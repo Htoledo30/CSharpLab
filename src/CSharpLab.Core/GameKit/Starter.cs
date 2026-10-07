@@ -1,5 +1,5 @@
 // Jogo com botões: cada cena é uma tela do jogo. Aperte F5 para jogar.
-// Dica: pare o mouse em cima de Say, Button, Bar... para ver a explicação.
+// Dica: pare o mouse em cima de Write, Button, Bar... para ver a explicação.
 
 var game = new Game("Meu jogo");
 
@@ -9,13 +9,13 @@ int gold = 0;
 game.Scene("Start", () =>
 {
     game.Title("Bem-vindo!");
-    game.Say("Você está numa vila tranquila.");
-    game.Say($"Ouro: {gold}", GameColor.Gold);
+    game.Write("Você está numa vila tranquila.");
+    game.Write($"Ouro: {gold}", Color.Gold);
 
     game.Button("Procurar moedas", () =>
     {
         gold += 5;
-        game.Say("Você achou 5 moedas!");
+        game.Write("Você achou 5 moedas!");
     });
 
     game.Button("Ir para a floresta", () => game.GoTo("Forest"));
@@ -24,9 +24,9 @@ game.Scene("Start", () =>
 game.Scene("Forest", () =>
 {
     game.Title("Floresta");
-    game.Say("Árvores altas e um silêncio estranho...");
+    game.Write("Árvores altas e um silêncio estranho...");
     game.Button("Voltar para a vila", () => game.GoTo("Start"));
 });
 
 // Abre a janela na primeira cena. Fica sempre no fim do arquivo.
-game.Run("Start");
+game.Start("Start");

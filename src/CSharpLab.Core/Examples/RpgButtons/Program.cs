@@ -16,7 +16,7 @@ int enemyHealth = 30;
 game.Scene("Name", () =>
 {
     game.Title("A Torre do Goblin");
-    game.Say("Um goblin roubou o tesouro da vila e se escondeu na torre.");
+    game.Write("Um goblin roubou o tesouro da vila e se escondeu na torre.");
     game.Ask("Qual é o seu nome, aventureiro?", answer =>
     {
         playerName = answer;
@@ -28,9 +28,9 @@ game.Scene("Name", () =>
 game.Scene("Village", () =>
 {
     game.Title("Vila");
-    game.Say($"Bem-vindo, {playerName}! A torre fica logo ali.");
-    game.Say($"Ouro: {gold}   Poções: {potions}", GameColor.Gold);
-    game.Bar("Vida", health, maxHealth, GameColor.Green);
+    game.Write($"Bem-vindo, {playerName}! A torre fica logo ali.");
+    game.Write($"Ouro: {gold}   Poções: {potions}", Color.Gold);
+    game.Bar("Vida", health, maxHealth, Color.Green);
 
     game.Button("Comprar poção (5 de ouro)", () =>
     {
@@ -38,11 +38,11 @@ game.Scene("Village", () =>
         {
             gold -= 5;
             potions++;
-            game.Say("Você comprou uma poção.", GameColor.Green);
+            game.Write("Você comprou uma poção.", Color.Green);
         }
         else
         {
-            game.Say("Ouro insuficiente!", GameColor.Red);
+            game.Write("Ouro insuficiente!", Color.Red);
         }
     });
 
@@ -57,15 +57,15 @@ game.Scene("Fight", () =>
     if (health <= 0) game.GoTo("GameOver");
 
     game.Title("Um goblin aparece!");
-    game.Say("Ele segura uma faca enferrujada e ri de você.");
-    game.Bar(playerName, health, maxHealth, GameColor.Green);
-    game.Bar("Goblin", enemyHealth, 30, GameColor.Red);
+    game.Write("Ele segura uma faca enferrujada e ri de você.");
+    game.Bar(playerName, health, maxHealth, Color.Green);
+    game.Bar("Goblin", enemyHealth, 30, Color.Red);
 
     game.Button("Atacar", () =>
     {
         int damage = Random.Shared.Next(5, 11); // de 5 a 10
         enemyHealth -= damage;
-        game.Say($"Você causou {damage} de dano!");
+        game.Write($"Você causou {damage} de dano!");
         GoblinAttacks();
     });
 
@@ -76,7 +76,7 @@ game.Scene("Fight", () =>
         {
             potions--;
             health = Math.Min(maxHealth, health + 30);
-            game.Say("Você se sente bem melhor.", GameColor.Green);
+            game.Write("Você se sente bem melhor.", Color.Green);
             GoblinAttacks();
         });
     }
@@ -87,14 +87,14 @@ game.Scene("Fight", () =>
 game.Scene("Victory", () =>
 {
     game.Title("Vitória!");
-    game.Say($"{playerName} derrotou o goblin e recuperou o tesouro.", GameColor.Gold);
-    game.Say("A vila inteira comemora o seu nome.");
+    game.Write($"{playerName} derrotou o goblin e recuperou o tesouro.", Color.Gold);
+    game.Write("A vila inteira comemora o seu nome.");
 });
 
 game.Scene("GameOver", () =>
 {
     game.Title("Fim de jogo");
-    game.Say("Você caiu... mas a vila ainda precisa de você.", GameColor.Red);
+    game.Write("Você caiu... mas a vila ainda precisa de você.", Color.Red);
     game.Button("Tentar de novo", () =>
     {
         health = maxHealth;
@@ -103,7 +103,7 @@ game.Scene("GameOver", () =>
     });
 });
 
-game.Run("Name");
+game.Start("Name");
 
 // Um método: o mesmo código usado por dois botões (Atacar e Beber poção).
 void GoblinAttacks()
@@ -111,5 +111,5 @@ void GoblinAttacks()
     if (enemyHealth <= 0) return;
     int hit = Random.Shared.Next(4, 10);
     health -= hit;
-    game.Say($"O goblin revida: -{hit} de vida.", GameColor.Red);
+    game.Write($"O goblin revida: -{hit} de vida.", Color.Red);
 }

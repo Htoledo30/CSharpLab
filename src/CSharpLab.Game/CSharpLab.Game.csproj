@@ -16,7 +16,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- O editor visual (aba Tela) desenha com o mesmo código do jogo. -->
+    <InternalsVisibleTo Include="CSharpLab" />
     <InternalsVisibleTo Include="CSharpLab.Tests" />
+    <InternalsVisibleTo Include="CSharpLab.App.Tests" />
   </ItemGroup>
 
 </Project>

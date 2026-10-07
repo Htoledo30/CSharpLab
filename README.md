@@ -66,31 +66,67 @@ int gold = 0;
 game.Scene("Start", () =>
 {
     game.Title("Vila");
-    game.Say($"Ouro: {gold}", GameColor.Gold);
+    game.Write($"Ouro: {gold}", Color.Gold);
     game.Button("Procurar moedas", () => gold += 5);
     game.Button("Ir para a floresta", () => game.GoTo("Forest"));
 });
 
-game.Scene("Forest", () => game.Say("Árvores por todo lado."));
+game.Scene("Forest", () => game.Write("Árvores por todo lado."));
 
-game.Run("Start");
+game.Start("Start");
 ```
 
 | Comando | Em português | O que faz |
 | --- | --- | --- |
 | `Scene` | cena | Uma tela do jogo. É desenhada de novo depois de cada clique, com os valores atuais das variáveis. |
 | `Title` | título | Texto grande no alto. |
-| `Say` | dizer | Um texto. Dentro de um botão, aparece destacado depois do clique. |
+| `Write` | dizer | Um texto. Dentro de um botão, aparece destacado depois do clique. |
 | `Button` | botão | O código entre as chaves roda no clique. As teclas 1 a 9 também apertam os botões. |
 | `Bar` | barra | Vida, mana, energia… |
 | `Ask` | perguntar | Campo para o jogador escrever (ex.: o nome). |
 | `Image` | imagem | Uma imagem da pasta `Assets` do projeto. |
 | `GoTo` | ir para | Troca de cena. |
-| `Run` | começar | Abre a janela. Sempre na última linha. |
+| `Start` | começar | Abre a janela. Sempre na última linha. |
 
 O autocomplete e o mouse em cima de cada comando mostram a tradução e um exemplo. Os snippets `scene` e `button`
 escrevem a estrutura com as chaves. O jogo leva uma cópia do motor em `lib\` (funciona mesmo se a pasta mudar de lugar)
 e um `AGENTS.md`/`CLAUDE.md` que ensina o motor para IAs como o Claude e o Codex.
+
+### Desenhar a tela (aba Tela)
+
+Em vez de montar a tela pelo código, dá para **desenhar**: **Arquivo → Nova tela do jogo…**, dê o nome da cena
+(ex.: `Fight`) e a tela abre na aba **Tela**:
+
+- **Peças** à esquerda: Texto, Botão, Barra, Imagem, Caixa, Campo de escrita e Mensagens. Clique para pôr no meio ou arraste até o lugar.
+- **Palco** no meio: arraste para mover, puxe os quadradinhos para mudar o tamanho (Shift mantém a proporção).
+  As peças grudam nas bordas e nos centros das outras, com linhas-guia (Alt solta livre).
+  Setas movem 1 (Shift: 10), `Ctrl+D` duplica, `Del` apaga, `Ctrl+Z` desfaz, Tab passa para a próxima peça, botão direito tem mais opções.
+- **Propriedades** à direita: nome, texto, letra, cor, imagem, posição e tamanho, e o código para usar a peça.
+
+No código, a cena pega as peças pelo nome com `game.Find` e muda as propriedades com `=` (como na Unity):
+
+```csharp
+game.Scene("Fight", () =>
+{
+    game.Find("PlayerHealth").Value = health;
+    game.Find("Potion").Visible = potions > 0;
+    game.Find("Attack").OnClick(() =>
+    {
+        enemyHealth -= 10;
+        game.Write("Você acertou!");
+    });
+});
+```
+
+Ao digitar `game.Find("`, o editor sugere os nomes das peças daquela tela. Um nome que não existe ganha uma dica antes de rodar,
+e renomear uma peça na Tela também troca o nome no código.
+
+O botão **Cenas**, ao lado do **Executar**, lista as cenas do jogo (qual tem tela, qual é só código, onde o jogo começa)
+e troca entre a tela e o código da cena em que você está. No alto da aba Tela, **Código da cena** leva até o `game.Scene("Fight", …)`.
+Atalhos no código: `Ctrl`+clique ou `F12` no nome da cena abre a tela dela, e no nome de um `game.GoTo("Shop")` vai até o código da cena.
+
+A tela é um arquivo de texto (`Screens/Fight.json`, botão **Texto** no alto da aba), então uma IA também consegue criar e
+mudar telas. Exemplo pronto: **RPG com tela desenhada**.
 
 ## Atalhos
 

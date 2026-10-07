@@ -10,6 +10,7 @@
     <BooleanToVisibilityConverter x:Key="BoolToVis" />
     <ui:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
     <ui:NullToVisibilityConverter x:Key="NullToVis" />
+    <ui:CountToVisibilityConverter x:Key="CountToVis" />
 
     <Style x:Key="FocusVisual">
         <Setter Property="Control.Template">

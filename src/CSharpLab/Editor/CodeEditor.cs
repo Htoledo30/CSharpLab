@@ -391,6 +391,8 @@ public sealed partial class CodeEditor : TextEditor
         }
 
         if (_completion.IsOpen) return;
+        // Dentro de game.Find("…"): os nomes das peças da tela.
+        if ((c == '"' || CompletionController.IsIdentifierStart(c)) && _completion.RequestPieceNames()) return;
         if (c == '.')
         {
             if (!InCommentOrString(caret)) _completion.Request('.');

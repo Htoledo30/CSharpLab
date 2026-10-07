@@ -68,6 +68,49 @@ public sealed partial class ExplorerNode : ObservableObject
         _ => NodeKind.Other,
     };
 
+    /// <summary>
+    /// Explicação das pastas e arquivos especiais de um jogo (o que é, se precisa mexer). Os que o
+    /// CSharp Lab cuida sozinho (<see cref="IsQuiet"/>) aparecem mais apagados.
+    /// </summary>
+    public string? Explanation
+    {
+        get
+        {
+            if (!_explained)
+            {
+                _explanation = Explain();
+                _explained = true;
+            }
+            return _explanation;
+        }
+    }
+
+    private string? _explanation;
+    private bool _explained;
+
+    private string? Explain()
+    {
+        // Só os nomes especiais olham o disco (para saber se a pasta é de um jogo).
+        var name = Name.ToLowerInvariant();
+        if (FullPath.Length == 0 || Parent == null || name is not ("lib" or "screens" or "assets" or "agents.md" or "claude.md")) return null;
+        var folder = Path.GetDirectoryName(FullPath) ?? "";
+        if (!File.Exists(Path.Combine(folder, "lib", Core.Projects.GameKit.LibraryName + ".dll"))) return null;
+        return (IsDirectory, name) switch
+        {
+            (true, "lib") => "O motor dos jogos (CSharpLab.Game). O CSharp Lab atualiza sozinho: não precisa mexer.",
+            (true, "screens") => "As telas desenhadas: cada arquivo é uma cena e abre na aba Tela.",
+            (true, "assets") => "As imagens do jogo (.png, .jpg). Use nas peças Imagem ou em game.Image(\"arquivo.png\").",
+            (false, "agents.md") => "Guia do motor para IAs (Codex e outras). Pode ignorar.",
+            (false, "claude.md") => "Guia do motor para o Claude (aponta para o AGENTS.md). Pode ignorar.",
+            _ => null,
+        };
+    }
+
+    public bool IsQuiet => Explanation != null && Name.ToLowerInvariant() is "lib" or "agents.md" or "claude.md";
+
+    /// <summary>A dica do mouse: a explicação (se houver) e o caminho.</summary>
+    public string ToolTipText => Explanation is { } text ? text + "\n" + FullPath : FullPath;
+
     partial void OnIsExpandedChanged(bool value)
     {
         if (value && !_loaded) LoadChildren();
@@ -79,6 +122,10 @@ public sealed partial class ExplorerNode : ObservableObject
         FullPath = newPath;
         Name = Path.GetFileName(newPath);
         OnPropertyChanged(nameof(Kind));
+        _explained = false;
+        OnPropertyChanged(nameof(Explanation));
+        OnPropertyChanged(nameof(IsQuiet));
+        OnPropertyChanged(nameof(ToolTipText));
         if (_loaded)
         {
             foreach (var c in Children)

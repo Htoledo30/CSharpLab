@@ -80,6 +80,10 @@ public sealed partial class DocumentViewModel : ObservableObject
 
     public bool IsCSharp => FilePath == null || FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
 
+    /// <summary>Tela de um jogo (Screens/*.json): abre no editor visual (aba Tela).</summary>
+    public bool IsScreen => FilePath != null && FilePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(Path.GetFileName(Path.GetDirectoryName(FilePath)), "Screens", StringComparison.OrdinalIgnoreCase);
+
     public string LanguageKey => FilePath != null ? LanguageService.KeyFor(FilePath) : LanguageService.UntitledKey(Id);
 
     public string ToolTip => FilePath ?? "Rascunho ainda não salvo";

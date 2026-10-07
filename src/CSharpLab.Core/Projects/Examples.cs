@@ -20,13 +20,17 @@ public static class Examples
         new("RpgBattle", "Batalha RPG", "Classes e objetos, em dois arquivos"),
         new("Snake", "Cobrinha", "Jogo em tempo real: teclas, cores e posição na tela"),
         new("RpgButtons", "RPG com botões", "Jogo de janela: cenas, botões, barras de vida e pergunta de nome", IsGame: true),
+        new("RpgScreens", "RPG com tela desenhada", "As telas montadas na aba Tela; o código usa game.Find", IsGame: true),
     ];
 
     /// <summary>Pasta onde os exemplos são criados (Documentos\CSharp Lab\Exemplos).</summary>
     public static string DefaultFolder =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "CSharp Lab", "Exemplos");
 
-    /// <summary>Arquivos .cs do exemplo (nome → conteúdo), lidos dos recursos do programa.</summary>
+    /// <summary>
+    /// Arquivos do exemplo (caminho relativo → conteúdo), lidos dos recursos do programa: os .cs e as
+    /// telas desenhadas ("Screens/Fight.json").
+    /// </summary>
     public static IReadOnlyDictionary<string, string> FilesOf(ExampleProject example)
     {
         var assembly = typeof(Examples).Assembly;
@@ -36,7 +40,11 @@ public static class Examples
         {
             using var stream = assembly.GetManifestResourceStream(resource)!;
             using var reader = new StreamReader(stream);
-            files[resource[prefix.Length..]] = reader.ReadToEnd().Replace("\r\n", "\n").Replace("\n", Environment.NewLine);
+            var name = resource[prefix.Length..];
+            // Recursos guardam pastas com ponto: "Screens.Fight.json" volta a ser "Screens/Fight.json".
+            if (name.StartsWith(GameScreens.Folder + ".", StringComparison.Ordinal))
+                name = GameScreens.Folder + "/" + name[(GameScreens.Folder.Length + 1)..];
+            files[name] = reader.ReadToEnd().Replace("\r\n", "\n").Replace("\n", Environment.NewLine);
         }
         return files;
     }
@@ -59,8 +67,10 @@ public static class Examples
             : ProjectCreator.CreateConsoleProject(parentFolder, example.Id, files["Program.cs"]);
         foreach (var (name, text) in files)
         {
-            if (!name.Equals("Program.cs", StringComparison.OrdinalIgnoreCase))
-                File.WriteAllText(Path.Combine(created.Directory, name), text, Files.TextFileIO.Utf8NoBom);
+            if (name.Equals("Program.cs", StringComparison.OrdinalIgnoreCase)) continue;
+            var path = Path.Combine(created.Directory, name.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, text, Files.TextFileIO.Utf8NoBom);
         }
         return created;
     }

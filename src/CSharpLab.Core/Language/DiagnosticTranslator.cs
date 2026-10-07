@@ -29,6 +29,10 @@ public static partial class DiagnosticTranslator
     public static string Translate(Diagnostic diagnostic)
     {
         var args = GetArguments(diagnostic);
+        // "string name = Console.ReadLine()" sem ";" e outra instrução na linha de baixo: o compilador
+        // pede uma vírgula (achando que é uma lista de variáveis), mas o que falta é o ";".
+        if (diagnostic.Id is "CS1003" && args is [","] && MissingAtLineEnd(diagnostic))
+            return "Faltou \";\" no fim da linha.";
         var own = args != null ? TranslateKnown(diagnostic.Id, args) : null;
         if (own != null) return own;
 
@@ -38,6 +42,27 @@ public static partial class DiagnosticTranslator
 
         var localized = diagnostic.GetMessage(PtBr);
         return string.IsNullOrWhiteSpace(localized) ? diagnostic.GetMessage(English) : localized;
+    }
+
+    /// <summary>O símbolo que falta fica no fim de uma linha, e a próxima instrução começa na linha de baixo?</summary>
+    private static bool MissingAtLineEnd(Diagnostic diagnostic)
+    {
+        try
+        {
+            if (diagnostic.Location.SourceTree is not { } tree) return false;
+            var root = tree.GetRoot();
+            int position = diagnostic.Location.SourceSpan.Start;
+            var next = root.FindToken(position);
+            if (next.SpanStart < position || next.IsMissing) next = next.GetNextToken();
+            var previous = next.GetPreviousToken();
+            if (next.RawKind == 0 || previous.RawKind == 0) return false;
+            var lines = tree.GetText().Lines;
+            return lines.GetLineFromPosition(previous.Span.End).LineNumber < lines.GetLineFromPosition(next.SpanStart).LineNumber;
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>Mensagem em português para um diagnóstico vindo da compilação do SDK (texto em inglês).</summary>

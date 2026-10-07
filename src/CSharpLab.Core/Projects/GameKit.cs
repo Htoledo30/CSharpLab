@@ -14,6 +14,8 @@ public static class GameKit
     public const string Namespace = "CSharpLab.GameEngine";
     public const string LibraryFolder = "lib";
     public const string AssetsFolder = "Assets";
+    /// <summary>Telas desenhadas na aba Tela (uma por cena, em JSON).</summary>
+    public const string ScreensFolder = "Screens";
     public const string TargetFramework = "net10.0-windows";
 
     /// <summary>O motor que veio com o CSharp Lab (ao lado do programa).</summary>
@@ -54,7 +56,7 @@ public static class GameKit
             "    <Nullable>enable</Nullable>",
             "  </PropertyGroup>",
             "",
-            "  <!-- Motor do jogo do CSharp Lab: game.Say, game.Button, game.Bar... -->",
+            "  <!-- Motor do jogo do CSharp Lab: game.Write, game.Button, game.Bar... -->",
             "  <ItemGroup>",
             $"    <Reference Include=\"{LibraryName}\">",
             $"      <HintPath>{LibraryFolder}\\{LibraryName}.dll</HintPath>",
@@ -64,9 +66,10 @@ public static class GameKit
             "    <Using Include=\"System.IO\" />",
             "  </ItemGroup>",
             "",
-            "  <!-- Imagens do jogo: tudo que estiver na pasta Assets vai junto. -->",
+            "  <!-- Imagens (Assets) e telas desenhadas (Screens) vão junto com o jogo. -->",
             "  <ItemGroup>",
             $"    <None Include=\"{AssetsFolder}\\**\" CopyToOutputDirectory=\"PreserveNewest\" />",
+            $"    <None Include=\"{ScreensFolder}\\**\" CopyToOutputDirectory=\"PreserveNewest\" />",
             "  </ItemGroup>",
             "",
             "</Project>",
@@ -93,8 +96,18 @@ public static class GameKit
     }
 
     /// <summary>
-    /// Se o CSharp Lab tem um motor mais novo que o do projeto, atualiza a cópia em lib\.
-    /// Nunca troca por um mais antigo. Retorna true se atualizou.
+    /// Mantém o jogo em dia com o CSharp Lab: o motor em lib\ e o guia AGENTS.md (se a pessoa não o trocou por outro).
+    /// Chamado antes de compilar.
+    /// </summary>
+    public static void RefreshProject(string projectDirectory)
+    {
+        RefreshLibrary(projectDirectory);
+        RefreshGuide(projectDirectory);
+    }
+
+    /// <summary>
+    /// Se o CSharp Lab tem um motor mais novo que o do projeto (ou a mesma versão, compilada de novo),
+    /// atualiza a cópia em lib\. Nunca troca por um mais antigo. Retorna true se atualizou.
     /// </summary>
     public static bool RefreshLibrary(string projectDirectory)
     {
@@ -105,7 +118,8 @@ public static class GameKit
         {
             var have = AssemblyName.GetAssemblyName(target).Version;
             var available = AssemblyName.GetAssemblyName(source).Version;
-            if (have == null || available == null || available <= have) return false;
+            if (have == null || available == null || available < have) return false;
+            if (available == have && SameBytes(source, target)) return false;
             CopyLibrary(projectDirectory);
             return true;
         }
@@ -114,6 +128,37 @@ public static class GameKit
             Settings.AppPaths.Log(ex, "Atualizando o motor do jogo");
             return false;
         }
+    }
+
+    /// <summary>Primeira linha do guia que o CSharp Lab escreve: só esse arquivo é atualizado sozinho.</summary>
+    internal const string GuideHeader = "# Guia deste jogo (para IAs e para quem programa)";
+
+    /// <summary>Atualiza o AGENTS.md criado pelo CSharp Lab quando o motor ganha recursos. Retorna true se atualizou.</summary>
+    public static bool RefreshGuide(string projectDirectory)
+    {
+        var path = Path.Combine(projectDirectory, "AGENTS.md");
+        try
+        {
+            if (!File.Exists(path)) return false;
+            var current = File.ReadAllText(path);
+            if (!current.StartsWith(GuideHeader, StringComparison.Ordinal)) return false;
+            var latest = AgentsGuide;
+            if (current.Replace("\r\n", "\n") == latest.Replace("\r\n", "\n")) return false;
+            File.WriteAllText(path, latest, TextFileIO.Utf8NoBom);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Settings.AppPaths.Log(ex, "Atualizando o guia do jogo");
+            return false;
+        }
+    }
+
+    private static bool SameBytes(string a, string b)
+    {
+        var infoA = new FileInfo(a);
+        var infoB = new FileInfo(b);
+        return infoA.Length == infoB.Length && File.ReadAllBytes(a).AsSpan().SequenceEqual(File.ReadAllBytes(b));
     }
 
     private static IEnumerable<string> LibraryFiles(string dll)

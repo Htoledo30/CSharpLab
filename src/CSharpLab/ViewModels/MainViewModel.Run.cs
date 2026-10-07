@@ -157,8 +157,8 @@ public sealed partial class MainViewModel
     /// </summary>
     private async Task<ProcessLaunch?> BuildOrReuseAsync(ProjectFile project, CancellationToken ct)
     {
-        // Jogo com botões: se o CSharp Lab trouxe um motor mais novo, o jogo passa a usá-lo.
-        if (project.IsWindowApp) await Task.Run(() => GameKit.RefreshLibrary(project.Directory), ct);
+        // Jogo com botões: se o CSharp Lab trouxe um motor mais novo, o jogo (e o guia para IAs) passa a usá-lo.
+        if (project.IsWindowApp) await Task.Run(() => GameKit.RefreshProject(project.Directory), ct);
         var fingerprint = await Task.Run(() => BuildService.InputFingerprint(project.Path), ct);
         if (_runCache.TryReuse(project.Path, fingerprint) is { } reused)
         {

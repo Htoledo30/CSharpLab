@@ -12,7 +12,9 @@ public enum RecentKind
 public sealed record RecentItem(string Path, RecentKind Kind)
 {
     [JsonIgnore]
-    public string Name => System.IO.Path.GetFileName(Path.TrimEnd('\\')) is { Length: > 0 } n ? n : Path;
+    public string Name =>
+        (Kind == RecentKind.Project ? System.IO.Path.GetFileNameWithoutExtension(Path) : System.IO.Path.GetFileName(Path.TrimEnd('\\')))
+            is { Length: > 0 } n ? n : Path;
 }
 
 public sealed class WindowPlacement

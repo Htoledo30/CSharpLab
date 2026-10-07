@@ -1,7 +1,7 @@
 namespace CSharpLab.GameEngine;
 
-/// <summary>Cores para textos e barras. Exemplo: <c>game.Say("Cuidado!", GameColor.Red);</c></summary>
-public enum GameColor
+/// <summary>Cores para textos e barras. Exemplo: <c>game.Write("Cuidado!", Color.Red);</c></summary>
+public enum Color
 {
     /// <summary>Branco (a cor normal dos textos).</summary>
     White,

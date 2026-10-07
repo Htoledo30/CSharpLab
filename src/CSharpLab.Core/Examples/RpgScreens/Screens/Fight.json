@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Title", "x": 40, "y": 32, "width": 560, "height": 52, "text": "Um goblin aparece!", "size": 34, "bold": true },
+    { "type": "Text", "name": "Story", "x": 40, "y": 92, "width": 560, "height": 64, "text": "Ele segura uma faca enferrujada e ri de você.", "size": 19 },
+    { "type": "Box", "name": "Panel", "x": 620, "y": 32, "width": 300, "height": 128 },
+    { "type": "Bar", "name": "PlayerHealth", "x": 640, "y": 48, "width": 260, "height": 44, "text": "Vida", "value": 100, "max": 100, "color": "Green" },
+    { "type": "Bar", "name": "EnemyHealth", "x": 640, "y": 100, "width": 260, "height": 44, "text": "Goblin", "value": 30, "max": 30, "color": "Red" },
+    { "type": "Messages", "name": "Log", "x": 40, "y": 176, "width": 880, "height": 240 },
+    { "type": "Button", "name": "Attack", "x": 40, "y": 448, "width": 180, "height": 56, "text": "Atacar" },
+    { "type": "Button", "name": "Potion", "x": 236, "y": 448, "width": 220, "height": 56, "text": "Beber poção", "color": "Green" },
+    { "type": "Button", "name": "Flee", "x": 472, "y": 448, "width": 140, "height": 56, "text": "Fugir", "color": "Gray" }
+  ]
+}

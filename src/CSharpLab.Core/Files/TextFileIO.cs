@@ -88,10 +88,13 @@ public static class TextFileIO
                 fs.Flush(true);
             }
 
-            if (File.Exists(full))
-                File.Replace(temp, full, null, ignoreMetadataErrors: true);
-            else
-                File.Move(temp, full);
+            DiskRetry.Run(() =>
+            {
+                if (File.Exists(full))
+                    File.Replace(temp, full, null, ignoreMetadataErrors: true);
+                else
+                    File.Move(temp, full);
+            });
         }
         catch
         {

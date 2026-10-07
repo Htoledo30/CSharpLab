@@ -97,6 +97,7 @@ public sealed partial class MainViewModel
         doc.TextChanged += OnDocumentTextChanged;
         doc.PropertyChanged += OnDocumentPropertyChanged;
         AttachLanguage(doc);
+        SyncScreenText(doc);
         UpdateHints();
         if (activate) ActiveDocument = doc;
         if (pristine != null) RemoveDocument(pristine);
@@ -113,9 +114,16 @@ public sealed partial class MainViewModel
     {
         if (_disposed) return;
         if (doc.IsCSharp) _ls?.UpdateDocument(doc.LanguageKey, doc.SourceText, doc.Version);
+        SyncScreenText(doc);
         Problems.InvalidateBuildFor(doc.LanguageKey);
         ScheduleDiagnostics();
         ScheduleRecovery();
+    }
+
+    /// <summary>Telas abertas valem pelo texto da aba (mesmo sem salvar) para as sugestões e avisos do game.Find.</summary>
+    private static void SyncScreenText(DocumentViewModel doc)
+    {
+        if (doc.IsScreen) GameScreens.OpenTexts[Path.GetFullPath(doc.FilePath!)] = doc.Document.Text;
     }
 
     private void OnDocumentPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -164,6 +172,7 @@ public sealed partial class MainViewModel
         doc.TextChanged -= OnDocumentTextChanged;
         doc.PropertyChanged -= OnDocumentPropertyChanged;
         if (doc.IsCSharp) _ls?.CloseDocument(doc.LanguageKey);
+        if (doc.IsScreen) GameScreens.OpenTexts.TryRemove(Path.GetFullPath(doc.FilePath!), out _);
         _recovery.Delete(doc.RecoveryId);
         _recoveryVersions.Remove(doc.RecoveryId);
         Documents.RemoveAt(index);

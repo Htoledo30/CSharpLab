@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Threading;
 using CSharpLab.Editor;
+using CSharpLab.Screens;
 using CSharpLab.ViewModels;
 
 namespace CSharpLab.Views;
@@ -11,10 +12,11 @@ namespace CSharpLab.Views;
 /// <summary>
 /// Mantém um editor por documento aberto (preserva cursor, rolagem e desfazer ao trocar de aba)
 /// e mostra apenas o da aba ativa. Os editores são criados na primeira vez que a aba é mostrada.
+/// Telas de jogo (Screens/*.json) abrem no editor visual, com a opção de ver o texto.
 /// </summary>
 public sealed class EditorHost : Grid
 {
-    private readonly Dictionary<DocumentViewModel, CodeEditor> _editors = [];
+    private readonly Dictionary<DocumentViewModel, FrameworkElement> _editors = [];
     private readonly Grid _editorLayer = new();
     private MainViewModel? _vm;
 
@@ -33,7 +35,18 @@ public sealed class EditorHost : Grid
 
     public FindReplaceBar FindBar { get; }
 
-    public CodeEditor? ActiveEditor => _vm?.ActiveDocument is { } d && _editors.TryGetValue(d, out var e) ? e : null;
+    private FrameworkElement? ActiveView => _vm?.ActiveDocument is { } d && _editors.TryGetValue(d, out var e) ? e : null;
+
+    /// <summary>O editor de texto da aba ativa (null quando ela mostra o editor visual de uma tela).</summary>
+    public CodeEditor? ActiveEditor => ActiveView switch
+    {
+        CodeEditor editor => editor,
+        ScreenEditorView screen => screen.ActiveTextEditor,
+        _ => null,
+    };
+
+    /// <summary>O editor visual da aba ativa, quando ela é uma tela na aba Tela.</summary>
+    public ScreenEditorView? ActiveScreen => ActiveView is ScreenEditorView { IsDesignMode: true } screen ? screen : null;
 
     public void Bind(MainViewModel vm)
     {
@@ -43,13 +56,23 @@ public sealed class EditorHost : Grid
         vm.GoToRequested += (doc, line, column, offset) =>
         {
             ShowActive();
-            if (_editors.TryGetValue(doc, out var editor))
+            if (!_editors.TryGetValue(doc, out var view)) return;
+            if (view is ScreenEditorView screen)
+            {
+                screen.GoTo(line, column, offset);
+            }
+            else if (view is CodeEditor editor)
             {
                 // Depois do layout, para que a rolagem funcione na aba recém-mostrada.
                 Dispatcher.BeginInvoke(() => editor.GoTo(line, column, offset), DispatcherPriority.Loaded);
             }
         };
         vm.FocusEditorRequested += FocusActive;
+        vm.ScreenDesignRequested += doc =>
+        {
+            ShowActive();
+            if (_editors.TryGetValue(doc, out var view) && view is ScreenEditorView screen) screen.ShowDesign();
+        };
         ShowActive();
     }
 
@@ -63,9 +86,10 @@ public sealed class EditorHost : Grid
         if (_vm == null) return;
         foreach (var doc in _editors.Keys.Where(d => !_vm.Documents.Contains(d)).ToList())
         {
-            var editor = _editors[doc];
-            editor.Detach();
-            _editorLayer.Children.Remove(editor);
+            var view = _editors[doc];
+            if (view is CodeEditor editor) editor.Detach();
+            else if (view is ScreenEditorView screen) screen.Detach();
+            _editorLayer.Children.Remove(view);
             _editors.Remove(doc);
         }
     }
@@ -75,15 +99,19 @@ public sealed class EditorHost : Grid
         var active = _vm?.ActiveDocument;
         if (active != null && !_editors.ContainsKey(active))
         {
-            var editor = new CodeEditor(active, _vm!);
-            _editors[active] = editor;
-            _editorLayer.Children.Add(editor);
+            FrameworkElement view = active.IsScreen ? new ScreenEditorView(active, _vm!) : new CodeEditor(active, _vm!);
+            _editors[active] = view;
+            _editorLayer.Children.Add(view);
         }
-        foreach (var (doc, editor) in _editors)
+        foreach (var (doc, view) in _editors)
         {
             bool visible = doc == active;
-            if (!visible) editor.ClosePopups();
-            editor.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+            if (!visible)
+            {
+                if (view is CodeEditor editor) editor.ClosePopups();
+                else if (view is ScreenEditorView screen) screen.ClosePopups();
+            }
+            view.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         }
         ActiveEditor?.ReportCaret();
         if (FindBar.IsOpen) FindBar.Attach(ActiveEditor);
@@ -91,6 +119,11 @@ public sealed class EditorHost : Grid
 
     public void FocusActive()
     {
+        if (ActiveView is ScreenEditorView screen)
+        {
+            screen.FocusActive();
+            return;
+        }
         var editor = ActiveEditor;
         if (editor == null) return;
         Dispatcher.BeginInvoke(() =>

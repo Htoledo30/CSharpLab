@@ -56,15 +56,19 @@ public sealed class RuntimeErrorTests
         using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = terminal };
         await vm.InitializeAsync();
         var created = ProjectCreator.CreateGameProject(Ui.NewFolder("jogo"), "Jogo",
-            "var game = new Game(\"Teste\");\ngame.Scene(\"Start\", () =>\n{\n    game.GoTo(\"Florest\");\n});\ngame.Scene(\"Forest\", () => { });\ngame.Run(\"Start\");\n");
+            "var game = new Game(\"Teste\");\ngame.Scene(\"Start\", () =>\n{\n    game.GoTo(\"Florest\");\n});\ngame.Scene(\"Forest\", () => { });\ngame.Start(\"Start\");\n");
         await vm.OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: false);
         Assert.True(vm.RunProject?.IsWindowApp);
 
+        var dialogs = (FakeDialogs)vm.Dialogs;
         vm.RunOrStopCommand.Execute(null);
-        await Ui.WaitUntil(() => vm.RunState == RunState.Running, 120_000, "execução");
+        // O jogo para logo ao abrir: espera o aviso do terminal, não o estado "executando" (que dura pouco).
+        await Ui.WaitUntil(() => terminal.Notices.Any(n => n.Contains("janela própria")) || vm.RunState == RunState.Idle, 120_000, "execução");
+        Assert.True(terminal.Notices.Any(n => n.Contains("janela própria")),
+            "O jogo não rodou: " + vm.StatusText + " " + string.Join(" | ", vm.Problems.Errors.Select(p => p.Diagnostic.Message)) + string.Join(" | ", dialogs.Errors));
+        Assert.Empty(dialogs.Errors);
         await Ui.WaitUntil(() => vm.RunState == RunState.Idle, 30_000, "o jogo parar");
 
-        Assert.Contains(terminal.Notices, n => n.Contains("janela própria"));
         Assert.Contains(terminal.Notices, n => n.Contains("Erro na linha 4 (Program.cs)") &&
                                                n.Contains("A cena \"Florest\" não existe. Você quis dizer \"Forest\"?"));
         var problem = Assert.Single(vm.Problems.Errors, p => p.Diagnostic.Id == RuntimeErrors.DiagnosticId);

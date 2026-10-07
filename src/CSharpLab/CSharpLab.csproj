@@ -27,6 +27,7 @@
     <!-- Motor dos jogos com botões: copiado para a pasta lib\ de cada jogo novo (não é usado pelo editor). -->
     <ProjectReference Include="..\CSharpLab.Game\CSharpLab.Game.csproj" />
     <AssemblyMetadata Include="UpdateRepository" Value="$(UpdateRepository)" Condition="'$(UpdateRepository)' != ''" />
+    <InternalsVisibleTo Include="CSharpLab.App.Tests" />
   </ItemGroup>
 
   <!-- Símbolos nativos do controle de terminal (80 MB) não fazem parte do pacote. -->

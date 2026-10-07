@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Title", "x": 40, "y": 64, "width": 880, "height": 64, "text": "A Torre do Goblin", "size": 44, "bold": true, "align": "Center" },
+    { "type": "Text", "name": "Story", "x": 40, "y": 136, "width": 880, "height": 40, "text": "Um goblin roubou o tesouro da vila e se escondeu na torre.", "size": 20, "align": "Center", "color": "Gray" },
+    { "type": "Box", "name": "Card", "x": 240, "y": 224, "width": 480, "height": 152 },
+    { "type": "Input", "name": "NameField", "x": 272, "y": 256, "width": 416, "height": 96, "text": "Qual é o seu nome, aventureiro?", "size": 18 }
+  ]
+}

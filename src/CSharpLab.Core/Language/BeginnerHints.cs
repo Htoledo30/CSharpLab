@@ -29,7 +29,7 @@ public static class BeginnerHints
             {
                 case InvocationExpressionSyntax invocation when gameProject && UsesTerminal(model, invocation, ct):
                     yield return (ConsoleInGameId,
-                        "Num jogo com botões o terminal não aparece. Para mostrar um texto use game.Say(...); para perguntar algo, game.Ask(...).",
+                        "Num jogo com botões o terminal não aparece. Para mostrar um texto use game.Write(...); para perguntar algo, game.Ask(...).",
                         invocation.GetLocation());
                     break;
                 case InvocationExpressionSyntax invocation when PrintsCollection(model, invocation, ct) is { } argument:

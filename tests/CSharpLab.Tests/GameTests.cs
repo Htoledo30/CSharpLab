@@ -7,6 +7,7 @@ using CSharpLab.Core.Files;
 using CSharpLab.Core.Language;
 using CSharpLab.Core.Projects;
 using CSharpLab.GameEngine;
+using Color = CSharpLab.GameEngine.Color;
 using Microsoft.CodeAnalysis.Text;
 
 namespace CSharpLab.Tests;
@@ -35,7 +36,7 @@ public sealed class GameEngineTests
         var game = new Game("Teste");
         setup(game);
         var view = new FakeView();
-        game.Start(first, view);
+        game.Begin(first, view);
         return (game, view);
     }
 
@@ -46,14 +47,14 @@ public sealed class GameEngineTests
         var (game, view) = Started(g => g.Scene("Start", () =>
         {
             g.Title("Vila");
-            g.Say($"Ouro: {gold}");
-            g.Bar("Vida", 50, 100, GameColor.Red);
+            g.Write($"Ouro: {gold}");
+            g.Bar("Vida", 50, 100, Color.Red);
             g.Button("Procurar", () => gold += 5);
         }));
 
         Assert.Equal("Vila", view.Last.Title);
         Assert.Contains("Ouro: 0", view.Texts);
-        Assert.Equal(new BarItem("Vida", 50, 100, GameColor.Red), view.Last.Bars.Single());
+        Assert.Equal(new BarItem("Vida", 50, 100, Color.Red), view.Last.Bars.Single());
 
         game.Act(view.Button("Procurar").OnClick);
         Assert.Equal(5, gold);
@@ -66,8 +67,8 @@ public sealed class GameEngineTests
     {
         var (game, view) = Started(g => g.Scene("Start", () =>
         {
-            g.Say("Descrição");
-            g.Button("Atacar", () => g.Say("7 de dano!"));
+            g.Write("Descrição");
+            g.Button("Atacar", () => g.Write("7 de dano!"));
             g.Button("Esperar", () => { });
         }));
 
@@ -86,7 +87,7 @@ public sealed class GameEngineTests
         {
             g.Scene("Start", () => g.Button("Entrar", () =>
             {
-                g.Say("A porta range.");
+                g.Write("A porta range.");
                 g.GoTo("hall"); // maiúsculas não importam
             }));
             g.Scene("Hall", () => g.Title("Salão"));
@@ -145,13 +146,13 @@ public sealed class GameEngineTests
     {
         var game = new Game("Teste");
         Assert.Contains("dentro de uma cena", Assert.Throws<GameException>(() => game.Button("Ok", () => { })).Message);
-        Assert.Contains("nenhuma cena", Assert.Throws<GameException>(() => game.Start("Start")).Message);
-        Assert.Contains("game.Run", Assert.Throws<GameException>(() => game.GoTo("Start")).Message);
+        Assert.Contains("nenhuma cena", Assert.Throws<GameException>(() => game.Begin("Start")).Message);
+        Assert.Contains("game.Start", Assert.Throws<GameException>(() => game.GoTo("Start")).Message);
 
         game.Scene("Start", () => g());
         Assert.Contains("Já existe", Assert.Throws<GameException>(() => game.Scene("start", () => { })).Message);
-        game.Start("Start", new FakeView());
-        Assert.Contains("uma vez", Assert.Throws<GameException>(() => game.Start("Start", new FakeView())).Message);
+        game.Begin("Start", new FakeView());
+        Assert.Contains("uma vez", Assert.Throws<GameException>(() => game.Begin("Start", new FakeView())).Message);
 
         static void g() { }
     }
@@ -174,7 +175,7 @@ public sealed class GameEngineTests
                 name = answer;
                 g.GoTo("Hello");
             }));
-            g.Scene("Hello", () => g.Say($"Olá, {name}!"));
+            g.Scene("Hello", () => g.Write($"Olá, {name}!"));
         });
         var ask = view.Last.Items.OfType<AskItem>().Single();
         Assert.Equal("Seu nome?", ask.Question);
@@ -198,12 +199,12 @@ public sealed class GameEngineTests
                 var window = new GameWindow(game);
                 var screen = new Screen { Title = "Um goblin aparece!" };
                 screen.Items.Add(new TextItem("Ele segura uma faca enferrujada e ri de você.", null, false));
-                screen.Items.Add(new TextItem("Ouro: 10", GameColor.Gold, false));
+                screen.Items.Add(new TextItem("Ouro: 10", Color.Gold, false));
                 screen.Items.Add(new ImageItem("nao-existe.png"));
                 screen.Items.Add(new TextItem("Você causou 7 de dano!", null, true));
                 screen.Items.Add(new AskItem("Qual é o seu nome?", _ => { }));
-                screen.Bars.Add(new BarItem("Henrique", 72, 100, GameColor.Green));
-                screen.Bars.Add(new BarItem("Goblin", 9, 30, GameColor.Red));
+                screen.Bars.Add(new BarItem("Henrique", 72, 100, Color.Green));
+                screen.Bars.Add(new BarItem("Goblin", 9, 30, Color.Red));
                 screen.Buttons.Add(new ButtonItem("Atacar", () => { }));
                 screen.Buttons.Add(new ButtonItem("Beber poção (1)", () => { }));
                 screen.Buttons.Add(new ButtonItem("Fugir", () => { }));
@@ -233,7 +234,7 @@ public sealed class GameEngineTests
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        Assert.Null(failure);
+        Assert.Null(failure?.ToString());
     }
 }
 
@@ -292,7 +293,7 @@ public sealed class GameProjectTests : IDisposable
     {
         var program = "var game = new Game(\"Teste\");\n" +
                       "game.Scene(\"Start\", () =>\n{\n    game.GoTo(\"Nowhere\");\n});\n" +
-                      "game.Run(\"Start\");\n";
+                      "game.Start(\"Start\");\n";
         var created = ProjectCreator.CreateGameProject(_dir, "Quebra", program);
         var result = await BuildService.BuildAsync(created.ProjectPath, null, CancellationToken.None);
         Assert.True(result.Success, result.Log);
@@ -323,20 +324,23 @@ public sealed class GameProjectTests : IDisposable
 
         using var ls = new LanguageService();
         ls.LoadProject(model);
-        var text = "var game = new Game(\"T\");\ngame.Scene(\"Start\", () => game.Say(\"Oi\"));\nConsole.WriteLine(\"x\");\ngame.";
+        var text = "var game = new Game(\"T\");\ngame.Scene(\"Start\", () => game.Write(\"Oi\"));\nConsole.WriteLine(\"x\");\ngame.";
         var key = LanguageService.KeyFor(created.ProgramPath);
         ls.OpenDocument(key, created.ProgramPath, SourceText.From(text), 1);
 
         var completions = await ls.GetCompletionsAsync(key, text.Length, '.', CancellationToken.None);
         Assert.NotNull(completions);
         var names = completions!.Items.Select(i => i.DisplayText).ToList();
-        foreach (var expected in new[] { "Say", "Button", "Bar", "Ask", "GoTo", "Scene", "Run", "Title", "Image" })
+        foreach (var expected in new[] { "Write", "Button", "Bar", "Ask", "GoTo", "Scene", "Start", "Title", "Image" })
             Assert.Contains(expected, names);
-        var say = completions.Items.First(i => i.DisplayText == "Say");
-        Assert.Contains("Say = dizer", await LanguageService.GetDescriptionAsync(completions, say, CancellationToken.None));
+        // O que vem de object não aparece em "game." (só atrapalha quem está começando).
+        foreach (var noise in new[] { "Equals", "GetHashCode", "GetType", "ToString" })
+            Assert.DoesNotContain(noise, names);
+        var say = completions.Items.First(i => i.DisplayText == "Write");
+        Assert.Contains("Write = escrever", await LanguageService.GetDescriptionAsync(completions, say, CancellationToken.None));
 
-        var info = await ls.GetQuickInfoAsync(key, text.IndexOf("Say", StringComparison.Ordinal) + 1, CancellationToken.None);
-        Assert.Contains("Say = dizer", info?.Doc?.Text);
+        var info = await ls.GetQuickInfoAsync(key, text.IndexOf("Write", StringComparison.Ordinal) + 1, CancellationToken.None);
+        Assert.Contains("Write = escrever", info?.Doc?.Text);
 
         var diagnostics = await ls.GetDiagnosticsAsync(CancellationToken.None);
         Assert.Contains(diagnostics.Diagnostics, d => d.Id == BeginnerHints.ConsoleInGameId);

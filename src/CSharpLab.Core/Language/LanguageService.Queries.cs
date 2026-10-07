@@ -35,7 +35,39 @@ public sealed partial class LanguageService
 
         var list = await service.GetCompletionsAsync(document, position, trigger, cancellationToken: ct).ConfigureAwait(false);
         if (list.ItemsList.Count == 0) return null;
-        return new CompletionResult(document, service, list.ItemsList, list.Span, list.SuggestionModeItem != null);
+        IReadOnlyList<CompletionItem> items = list.ItemsList;
+        // Em "game." (e nas peças e cores do motor), Equals, GetHashCode, GetType e ToString só atrapalham quem está começando.
+        if (await IsGameEngineMemberAccessAsync(document, list.Span.Start, ct).ConfigureAwait(false))
+            items = items.Where(i => !ObjectMembers.Contains(i.DisplayText)).ToList();
+        if (items.Count == 0) return null;
+        return new CompletionResult(document, service, items, list.Span, list.SuggestionModeItem != null);
+    }
+
+    private static readonly HashSet<string> ObjectMembers = new(StringComparer.Ordinal)
+    {
+        "Equals", "GetHashCode", "GetType", "ToString", "ReferenceEquals", "MemberwiseClone",
+    };
+
+    /// <summary>A sugestão é de um membro (depois do ".") de algo do motor dos jogos?</summary>
+    private static async Task<bool> IsGameEngineMemberAccessAsync(Document document, int start, CancellationToken ct)
+    {
+        try
+        {
+            var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
+            if (root == null || start <= 0) return false;
+            var dot = root.FindToken(start - 1);
+            if (!dot.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.DotToken) ||
+                dot.Parent is not Microsoft.CodeAnalysis.CSharp.Syntax.MemberAccessExpressionSyntax access)
+                return false;
+            var model = await document.GetSemanticModelAsync(ct).ConfigureAwait(false);
+            if (model == null) return false;
+            var type = model.GetTypeInfo(access.Expression, ct).Type ?? model.GetSymbolInfo(access.Expression, ct).Symbol as ITypeSymbol;
+            return type?.ContainingNamespace?.ToDisplayString() == Projects.GameKit.Namespace;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return false;
+        }
     }
 
     public static async Task<CompletionChangeResult?> GetCompletionChangeAsync(CompletionResult result, CompletionItem item, CancellationToken ct)
@@ -194,8 +226,12 @@ public sealed partial class LanguageService
         Dictionary<DocumentId, string> keysById;
         HashSet<DocumentId> generated;
         List<ProjectId> projects;
+        ProjectId? mainProject;
+        Projects.ProjectModel? mainModel;
         lock (_gate)
         {
+            mainProject = _mainProject;
+            mainModel = _mainModel;
             solution = _solution;
             versions = _open.ToDictionary(o => o.Key, o => o.Value.Version, StringComparer.OrdinalIgnoreCase);
             keysById = _documents.ToDictionary(d => d.Value, d => d.Key);
@@ -238,13 +274,18 @@ public sealed partial class LanguageService
                     FromBuild: false));
             }
 
+            // Jogo com telas desenhadas: confere os nomes do game.Find com as telas (Screens/*.json).
+            var gameDirectory = projectId == mainProject && mainModel is { UsesGameEngine: true } game ? game.Directory : null;
+
             // Dicas para armadilhas que o compilador aceita (lista impressa direto, divisão inteira…).
             foreach (var tree in compilation.SyntaxTrees)
             {
                 var docId = solution.GetDocumentId(tree);
                 if (docId == null || generated.Contains(docId) || !keysById.TryGetValue(docId, out var hintKey)) continue;
                 var model = compilation.GetSemanticModel(tree);
-                foreach (var (id, message, location) in BeginnerHints.Analyze(model, ct))
+                var hints = BeginnerHints.Analyze(model, ct);
+                if (gameDirectory != null) hints = hints.Concat(GameAssist.CheckFindNames(tree.GetRoot(ct), gameDirectory));
+                foreach (var (id, message, location) in hints)
                 {
                     var span = location.GetLineSpan();
                     result.Add(new CodeDiagnostic(id, DiagnosticLevel.Warning, message, "Dica do CSharp Lab", hintKey,

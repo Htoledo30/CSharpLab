@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Windows.Media;
 using CSharpLab.Core.Language;
+using CSharpLab.Core.Projects;
 using ICSharpCode.AvalonEdit.Document;
 using Microsoft.CodeAnalysis.Completion;
 using Microsoft.CodeAnalysis.Tags;
@@ -23,6 +24,20 @@ public sealed class CompletionEntry
         Priority = item.Rules.MatchPriority;
     }
 
+    /// <summary>Nome de uma peça desenhada na aba Tela (dentro de game.Find("…")).</summary>
+    public CompletionEntry(ScreenPiece piece, string scene)
+    {
+        PieceName = piece.Name;
+        Text = piece.Name;
+        DisplayText = piece.Name;
+        Glyph = "▣";
+        GlyphBrush = SyntaxTheme.Freeze("#E2B66A");
+        KindName = "peça";
+        _detail = $"{GameScreens.Describe(piece.Type)} na tela \"{scene}\"";
+        _detailRequested = true;
+        Priority = 10;
+    }
+
     public CompletionEntry(SnippetDefinition snippet)
     {
         Snippet = snippet;
@@ -40,6 +55,7 @@ public sealed class CompletionEntry
     public CompletionItem? Item { get; }
     public CompletionResult? Result { get; }
     public SnippetDefinition? Snippet { get; }
+    public string? PieceName { get; }
 
     public string Text { get; }
     public string DisplayText { get; }
@@ -142,10 +158,43 @@ public sealed class CompletionController
 
     public static bool IsIdentifierStart(char c) => char.IsLetter(c) || c == '_' || c == '@';
 
+    /// <summary>
+    /// Dentro das aspas de game.Find("…"): sugere os nomes das peças da tela daquela cena
+    /// (ou de todas as telas, fora de uma cena). True se mostrou as sugestões.
+    /// </summary>
+    public bool RequestPieceNames()
+    {
+        if (_editor.LanguageServices?.MainModel is not { UsesGameEngine: true } model || !_editor.Doc.IsCSharp) return false;
+        FindNameContext? context;
+        try
+        {
+            context = GameAssist.FindNameAt(_editor.Syntax.Root, _editor.CaretOffset);
+        }
+        catch (Exception ex)
+        {
+            Core.Settings.AppPaths.Log(ex, "Nomes das peças");
+            return false;
+        }
+        if (context == null) return false;
+
+        var entries = new List<CompletionEntry>();
+        var scenes = context.Scene != null ? [context.Scene] : GameScreens.Scenes(model.Directory);
+        foreach (var scene in scenes)
+        {
+            foreach (var piece in GameScreens.Pieces(model.Directory, scene) ?? [])
+                entries.Add(new CompletionEntry(piece, scene));
+        }
+        if (entries.Count == 0) return false;
+        _cts?.Cancel();
+        _popup.Show(entries.DistinctBy(e => e.Text, StringComparer.OrdinalIgnoreCase).ToList(), context.Start);
+        return true;
+    }
+
     public async void Request(char? typedChar)
     {
         var ls = _editor.LanguageServices;
         if (ls == null || !_editor.Doc.IsCSharp) return;
+        if (typedChar == null && RequestPieceNames()) return;
         _cts?.Cancel();
         var cts = _cts = new CancellationTokenSource();
         var doc = _editor.Doc;
@@ -211,6 +260,16 @@ public sealed class CompletionController
         if (entry.Snippet != null)
         {
             SnippetExpander.Expand(textArea, entry.Snippet, start, length);
+            return;
+        }
+        if (entry.PieceName != null)
+        {
+            // O nome da peça entra no lugar do que foi digitado; o cursor passa a aspa de fechamento.
+            int end = start + length;
+            while (end < document.TextLength && CompletionController.IsIdentifierChar(document.GetCharAt(end))) end++;
+            document.Replace(start, end - start, entry.PieceName);
+            int after = start + entry.PieceName.Length;
+            textArea.Caret.Offset = after < document.TextLength && document.GetCharAt(after) == '"' ? after + 1 : after;
             return;
         }
         if (entry.Item == null || entry.Result == null) return;

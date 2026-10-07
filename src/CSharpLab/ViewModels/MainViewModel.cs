@@ -171,12 +171,14 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(ProjectLabel));
         OnPropertyChanged(nameof(RunTargetName));
         OnPropertyChanged(nameof(RunButtonToolTip));
+        OnPropertyChanged(nameof(HasGame));
     }
 
     partial void OnProjectsChanged(IReadOnlyList<ProjectFile> value)
     {
         OnPropertyChanged(nameof(HasMultipleProjects));
         OnPropertyChanged(nameof(RunButtonToolTip));
+        OnPropertyChanged(nameof(HasGame));
     }
 
     partial void OnActiveDocumentChanged(DocumentViewModel? oldValue, DocumentViewModel? newValue)
@@ -395,6 +397,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         {
             doc.TextChanged -= OnDocumentTextChanged;
             doc.PropertyChanged -= OnDocumentPropertyChanged;
+            if (doc.IsScreen) Core.Projects.GameScreens.OpenTexts.TryRemove(Path.GetFullPath(doc.FilePath!), out _);
         }
         if (_ls != null)
         {

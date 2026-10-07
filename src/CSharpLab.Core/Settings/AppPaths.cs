@@ -47,10 +47,13 @@ public static class AppPaths
                 writer.Flush();
                 fs.Flush(true);
             }
-            if (File.Exists(path))
-                File.Replace(temp, path, null, ignoreMetadataErrors: true);
-            else
-                File.Move(temp, path);
+            Files.DiskRetry.Run(() =>
+            {
+                if (File.Exists(path))
+                    File.Replace(temp, path, null, ignoreMetadataErrors: true);
+                else
+                    File.Move(temp, path);
+            });
         }
         catch
         {

@@ -22,7 +22,7 @@ public static partial class PortugueseDocs
     }
 
     /// <summary>
-    /// Explicação para a assinatura que o autocomplete mostra ("void Game.Say(string text, ...)",
+    /// Explicação para a assinatura que o autocomplete mostra ("void Game.Write(string text, ...)",
     /// "int int.Parse(string s)", "class System.Console"), que traz o nome sem o namespace.
     /// </summary>
     public static PortugueseDoc? ForSignature(string signature)
@@ -205,7 +205,8 @@ public static partial class PortugueseDocs
             ["System.Random"] = D("Sorteia números.", "var random = new Random();\nint dice = random.Next(1, 7); // 1 a 6"),
             ["System.Random.Next"] = D("Número inteiro sorteado. Next(min, max) inclui o min e NÃO inclui o max.", "int dice = random.Next(1, 7); // 1 a 6"),
             ["System.Random.NextDouble"] = D("Número sorteado entre 0.0 e 1.0 (sem incluir o 1).", "bool critical = random.NextDouble() < 0.2; // 20%"),
-            ["System.Random.Shared"] = D("Um Random pronto para usar, sem precisar de new.", "int n = Random.Shared.Next(1, 11);"),
+            ["System.Random.Shared"] = D("Shared = compartilhado. Um sorteador que o .NET já deixa pronto para o programa inteiro usar, sem precisar criar um com new Random().",
+                "int damage = Random.Shared.Next(5, 11); // de 5 a 10 (o 11 não entra)"),
 
             // Coleções
             ["System.Collections.Generic.List"] = D("Lista que cresce e diminui. As posições começam em 0.", "var inventory = new List<string>();\ninventory.Add(\"Espada\");"),
@@ -284,20 +285,42 @@ public static partial class PortugueseDocs
         const string game = "CSharpLab.GameEngine.Game";
         m[game] = D("Game = jogo. A janela do jogo, com cenas, textos, barras e botões.", "var game = new Game(\"A Torre\");");
         m[game + ".Scene"] = D("Scene = cena. Cria uma tela do jogo. Ela é desenhada de novo depois de cada clique, sempre com os valores atuais das variáveis.",
-            "game.Scene(\"Forest\", () =>\n{\n    game.Say(\"Árvores por todo lado.\");\n    game.Button(\"Voltar\", () => game.GoTo(\"Start\"));\n});");
+            "game.Scene(\"Forest\", () =>\n{\n    game.Write(\"Árvores por todo lado.\");\n    game.Button(\"Voltar\", () => game.GoTo(\"Start\"));\n});");
         m[game + ".GoTo"] = D("GoTo = ir para. Troca para outra cena.", "game.GoTo(\"Forest\");");
         m[game + ".Title"] = D("Title = título. Texto grande no alto da cena.", "game.Title(\"Capítulo 1\");");
-        m[game + ".Say"] = D("Say = dizer. Mostra um texto na tela. Dentro de um botão, aparece destacado depois do clique.",
-            "game.Say($\"Ouro: {gold}\", GameColor.Gold);");
+        m[game + ".Write"] = D("Write = escrever. Mostra um texto na tela. Dentro de um botão, aparece destacado depois do clique.",
+            "game.Write($\"Ouro: {gold}\", Color.Gold);");
         m[game + ".Button"] = D("Button = botão. O código entre as chaves roda quando o jogador clica. As teclas 1 a 9 também apertam os botões.",
-            "game.Button(\"Atacar\", () =>\n{\n    enemyHealth -= 10;\n    game.Say(\"Você acertou!\");\n});");
-        m[game + ".Bar"] = D("Bar = barra. Mostra uma barra de vida, mana ou energia, à direita da tela.", "game.Bar(\"Vida\", health, 100, GameColor.Green);");
+            "game.Button(\"Atacar\", () =>\n{\n    enemyHealth -= 10;\n    game.Write(\"Você acertou!\");\n});");
+        m[game + ".Bar"] = D("Bar = barra. Mostra uma barra de vida, mana ou energia, à direita da tela.", "game.Bar(\"Vida\", health, 100, Color.Green);");
         m[game + ".Ask"] = D("Ask = perguntar. Mostra uma pergunta com um campo para o jogador escrever; a resposta chega entre as chaves.",
             "game.Ask(\"Qual é o seu nome?\", answer =>\n{\n    playerName = answer;\n    game.GoTo(\"Start\");\n});");
         m[game + ".Image"] = D("Image = imagem. Mostra uma imagem (png ou jpg) da pasta Assets do projeto.", "game.Image(\"goblin.png\");");
-        m[game + ".Run"] = D("Run = começar. Abre a janela do jogo na primeira cena. Fica sempre na última linha.", "game.Run(\"Start\");");
+        m[game + ".Start"] = D("Start = começar. Abre a janela do jogo na primeira cena. Fica sempre na última linha.", "game.Start(\"Start\");");
         m[game + ".CurrentScene"] = D("CurrentScene = cena atual. O nome da cena que está na tela.");
-        m["CSharpLab.GameEngine.GameColor"] = D("GameColor = cor do jogo: White, Gray, Red, Green, Blue, Gold, Purple, Orange.", "game.Say(\"Cuidado!\", GameColor.Red);");
+        m[game + ".Find"] = D("Find = encontrar. Pega uma peça desenhada na aba Tela pelo nome, para mudar ela pelo código com =.",
+            "game.Find(\"Story\").Text = \"Um goblin aparece!\";\ngame.Find(\"Attack\").OnClick(() => enemyHealth -= 10);");
+
+        const string item = "CSharpLab.GameEngine.Item";
+        m[item] = D("Item = peça. Uma peça desenhada na aba Tela (texto, botão, barra, imagem…). Mude as propriedades dela com =.",
+            "var story = game.Find(\"Story\");\nstory.Text = \"Olá!\";\nstory.Color = Color.Gold;");
+        m[item + ".Name"] = D("Name = nome. O nome da peça na aba Tela.");
+        m[item + ".Text"] = D("Text = texto. O texto de um Texto ou Botão, o rótulo de uma Barra ou a pergunta de um Campo de escrita.",
+            "game.Find(\"Story\").Text = $\"Ouro: {gold}\";");
+        m[item + ".Value"] = D("Value = valor. Quanto a Barra tem agora.", "game.Find(\"PlayerHealth\").Value = health;");
+        m[item + ".Max"] = D("Max = máximo. O valor da Barra cheia.", "game.Find(\"PlayerHealth\").Max = maxHealth;");
+        m[item + ".Visible"] = D("Visible = visível. false esconde a peça; true mostra de novo.", "game.Find(\"Potion\").Visible = potions > 0;");
+        m[item + ".Color"] = D("Color = cor. A cor do texto, do botão, da barra ou da caixa.", "game.Find(\"Story\").Color = Color.Red;");
+        m[item + ".Image"] = D("Image = imagem. O arquivo da pasta Assets que a peça Imagem mostra.", "game.Find(\"Enemy\").Image = \"dragon.png\";");
+        m[item + ".X"] = D("X = posição da esquerda para a direita (0 até 960).", "game.Find(\"Goblin\").X += 20;");
+        m[item + ".Y"] = D("Y = posição de cima para baixo (0 até 540).", "game.Find(\"Goblin\").Y = 100;");
+        m[item + ".Width"] = D("Width = largura da peça.");
+        m[item + ".Height"] = D("Height = altura da peça.");
+        m[item + ".OnClick"] = D("OnClick = ao clicar. O código entre as chaves roda quando o jogador clica no Botão (ou na Imagem).",
+            "game.Find(\"Attack\").OnClick(() =>\n{\n    enemyHealth -= 10;\n    game.Write(\"Você acertou!\");\n});");
+        m[item + ".OnAnswer"] = D("OnAnswer = ao responder. Recebe o que o jogador escreveu no Campo de escrita.",
+            "game.Find(\"NameField\").OnAnswer(answer =>\n{\n    playerName = answer;\n    game.GoTo(\"Village\");\n});");
+        m["CSharpLab.GameEngine.Color"] = D("Color = cor: White, Gray, Red, Green, Blue, Gold, Purple, Orange.", "game.Write(\"Cuidado!\", Color.Red);");
         m["CSharpLab.GameEngine.GameException"] = D("Erro do motor do jogo. A mensagem explica em português o que fazer.");
     }
 }

@@ -17,7 +17,7 @@ public sealed partial class CodeEditor
 {
     private CancellationTokenSource? _hoverCts;
     private readonly ContextMenu _menu = new();
-    private MenuItem? _goToItem, _renameItem, _fixItem;
+    private MenuItem? _goToItem, _renameItem, _fixItem, _sceneItem;
 
     private static readonly HashSet<string> MissingNameErrors = ["CS0246", "CS0103"];
 
@@ -82,7 +82,7 @@ public sealed partial class CodeEditor
         if (offset == null) return;
         CaretOffset = offset.Value;
         TextArea.ClearSelection();
-        _ = GoToDefinitionAsync();
+        _ = GoToDefinitionAsync();   // num nome de cena, abre a tela ou o código da cena
         e.Handled = true;
     }
 
@@ -122,6 +122,10 @@ public sealed partial class CodeEditor
         _fixItem = Item("Correções rápidas…", "Ctrl+.", () => _ = ShowQuickFixesAsync());
         _goToItem = Item("Ir para definição", "F12", () => _ = GoToDefinitionAsync());
         _renameItem = Item("Renomear…", "F2", () => _ = RenameSymbolAsync());
+        _sceneItem = Item("Ver a tela da cena", "", () =>
+        {
+            if (_sceneItem!.Tag is (string dir, string scene)) _vm.OpenSceneScreen(dir, scene);
+        });
         _menu.Items.Add(new Separator());
         Item("Recortar", "Ctrl+X", () => ApplicationCommands.Cut.Execute(null, TextArea));
         Item("Copiar", "Ctrl+C", () => ApplicationCommands.Copy.Execute(null, TextArea));
@@ -137,6 +141,24 @@ public sealed partial class CodeEditor
             _goToItem.Visibility = csharp ? Visibility.Visible : Visibility.Collapsed;
             _renameItem.Visibility = _goToItem.Visibility;
             _fixItem.Visibility = csharp && MissingNameAtCaret() != null ? Visibility.Visible : Visibility.Collapsed;
+
+            // Dentro de um game.Scene("Nome", …) de um jogo: abrir (ou criar) a tela dessa cena.
+            _sceneItem.Visibility = Visibility.Collapsed;
+            if (Doc.IsCSharp && _vm.GameDirectoryOf(Doc.FilePath) is { } dir)
+            {
+                SceneCall? scene = null;
+                try { scene = GameAssist.SceneAt(Syntax.Root, CaretOffset); }
+                catch { }
+                if (scene != null)
+                {
+                    _sceneItem.Tag = (dir, scene.Name);
+                    var name = scene.Name.Replace("_", "__");   // "_" sozinho vira tecla de atalho no menu
+                    _sceneItem.Header = _vm.HasScreen(dir, scene.Name)
+                        ? $"Ver a tela da cena \"{name}\""
+                        : $"Desenhar a tela da cena \"{name}\"…";
+                    _sceneItem.Visibility = Visibility.Visible;
+                }
+            }
         };
         TextArea.ContextMenu = _menu;
     }
@@ -145,6 +167,7 @@ public sealed partial class CodeEditor
 
     public async Task GoToDefinitionAsync()
     {
+        if (TryOpenSceneAt(CaretOffset)) return;
         var ls = LanguageServices;
         if (ls == null) return;
         var caret = CaretOffset;
@@ -171,6 +194,28 @@ public sealed partial class CodeEditor
         }
         var target = _vm.FindOrOpen(result.DocumentKey, result.FilePath);
         if (target != null) _vm.NavigateTo(target, result.Line, result.Column, result.Offset);
+    }
+
+    /// <summary>
+    /// F12 ou Ctrl+clique num nome de cena: o "Fight" de game.Scene("Fight", …) abre a tela da cena;
+    /// o de game.GoTo("Fight") ou game.Start("Fight") vai até o código da cena.
+    /// </summary>
+    private bool TryOpenSceneAt(int offset)
+    {
+        if (!Doc.IsCSharp || _vm.GameDirectoryOf(Doc.FilePath) is not { } dir) return false;
+        SceneReference? reference;
+        try
+        {
+            reference = GameAssist.SceneReferenceAt(Syntax.Root, offset);
+        }
+        catch
+        {
+            return false;
+        }
+        if (reference == null) return false;
+        if (reference.IsDeclaration) _vm.OpenSceneScreen(dir, reference.Name);
+        else _vm.GoToSceneCode(dir, reference.Name);
+        return true;
     }
 
     // ================================================================ renomear

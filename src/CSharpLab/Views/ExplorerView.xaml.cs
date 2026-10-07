@@ -13,6 +13,26 @@ public partial class ExplorerView : UserControl
 
     private MainViewModel? Vm => DataContext as MainViewModel;
 
+    /// <summary>A lista de exemplos, como em Arquivo → Exemplos para estudar.</summary>
+    private void OnExamplesClick(object sender, RoutedEventArgs e)
+    {
+        if (Vm is not { } vm) return;
+        var menu = new ContextMenu { PlacementTarget = ExamplesButton, Placement = PlacementMode.Bottom };
+        foreach (var example in vm.ExampleProjects)
+        {
+            var header = new StackPanel { Margin = new Thickness(0, 2, 0, 2) };
+            header.Children.Add(new TextBlock { Text = example.Title });
+            var description = new TextBlock { Text = example.Description, FontSize = 11, MaxWidth = 340, TextWrapping = TextWrapping.Wrap };
+            description.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+            header.Children.Add(description);
+            var item = new MenuItem { Header = header };
+            var chosen = example;
+            item.Click += (_, _) => vm.OpenExampleCommand.Execute(chosen);
+            menu.Items.Add(item);
+        }
+        menu.IsOpen = true;
+    }
+
     private void OnSelectedItemChanged(object sender, RoutedPropertyChangedEventArgs<object> e)
     {
         if (Vm != null) Vm.Explorer.Selected = e.NewValue as ExplorerNode;

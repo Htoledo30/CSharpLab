@@ -200,7 +200,8 @@ public static class UpdateService
             AppPaths.WriteAllTextAtomic(Path.Combine(root, "pronto.json"), JsonSerializer.Serialize(manifest));
             ct.ThrowIfCancellationRequested();
             if (Directory.Exists(destination)) DeleteOwnedDirectory(destination);
-            Directory.Move(root, destination);
+            // O antivírus costuma examinar os arquivos recém-extraídos e segurar a pasta por um instante.
+            Files.DiskRetry.Run(() => Directory.Move(root, destination), attempts: 12);
             return Path.Combine(destination, manifest.AppDirectory);
         }
         finally

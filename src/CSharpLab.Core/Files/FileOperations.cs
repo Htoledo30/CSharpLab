@@ -69,17 +69,17 @@ public static class FileOperations
             if (onlyCase)
             {
                 var temp = Path.Combine(parent, newName + "." + Guid.NewGuid().ToString("N")[..6]);
-                Directory.Move(path, temp);
-                Directory.Move(temp, target);
+                DiskRetry.Run(() => Directory.Move(path, temp));
+                DiskRetry.Run(() => Directory.Move(temp, target));
             }
             else
             {
-                Directory.Move(path, target);
+                DiskRetry.Run(() => Directory.Move(path, target));
             }
         }
         else
         {
-            File.Move(path, target);
+            DiskRetry.Run(() => File.Move(path, target));
         }
         return target;
     }

@@ -203,7 +203,7 @@ public sealed class NewProjectDialog : DialogWindow
         {
             panel.Children.Add(Label("Tipo"));
             var console = KindOption("Programa console", "Texto no terminal: Console.WriteLine, ReadLine, jogos de terminal.", isChecked: true);
-            _game = KindOption("Jogo com botões", "Uma janela com títulos, textos, barras de vida e botões: game.Say, game.Button…", isChecked: false);
+            _game = KindOption("Jogo com botões", "Janela com botões, barras de vida e telas que você desenha arrastando.", isChecked: false);
             panel.Children.Add(console);
             panel.Children.Add(_game);
             // O nome padrão acompanha o tipo, enquanto a pessoa não escolher outro.

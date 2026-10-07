@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Title", "x": 40, "y": 136, "width": 880, "height": 72, "text": "Vitória!", "size": 52, "bold": true, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Story", "x": 120, "y": 224, "width": 720, "height": 64, "text": "Você derrotou o goblin e recuperou o tesouro!", "size": 21, "align": "Center" },
+    { "type": "Button", "name": "PlayAgain", "x": 370, "y": 328, "width": 220, "height": 56, "text": "Voltar para a vila", "color": "Gold" }
+  ]
+}

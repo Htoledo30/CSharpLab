@@ -1,47 +1,45 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using WpfImage = System.Windows.Controls.Image;
 
 namespace CSharpLab.GameEngine;
 
 /// <summary>
-/// A janela do jogo: área fixa de 960×540 que cresce e diminui com a janela (sem distorcer).
-/// Título em cima, textos no meio, barras à direita e botões embaixo. Teclas 1 a 9 apertam os botões.
+/// A janela do jogo: palco fixo de 960×540 que cresce e diminui com a janela (sem distorcer).
+/// Cena automática: título em cima, textos no meio, barras à direita e botões embaixo (teclas 1 a 9 apertam os botões).
+/// Cena desenhada: as peças da aba Tela, cada uma no seu lugar.
 /// </summary>
 internal sealed class GameWindow : Window, IGameView
 {
-    public const double StageWidth = 960, StageHeight = 540;
-
-    private static readonly Brush Background1 = Freeze(new SolidColorBrush(Color.FromRgb(0x17, 0x19, 0x1F)));
-    private static readonly Brush PanelBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x21, 0x24, 0x2C)));
-    private static readonly Brush Track = Freeze(new SolidColorBrush(Color.FromRgb(0x2E, 0x32, 0x3C)));
-    private static readonly Brush TextBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xDD, 0xE1, 0xE8)));
-    private static readonly Brush Muted = Freeze(new SolidColorBrush(Color.FromRgb(0x8C, 0x93, 0xA0)));
-    private static readonly Brush Accent = Freeze(new SolidColorBrush(Color.FromRgb(0x3D, 0x7B, 0xE8)));
-    private static readonly Brush AccentHover = Freeze(new SolidColorBrush(Color.FromRgb(0x55, 0x8D, 0xF0)));
-    private static readonly Brush AccentPressed = Freeze(new SolidColorBrush(Color.FromRgb(0x2F, 0x66, 0xC9)));
-    private static readonly Brush NewsBack = Freeze(new SolidColorBrush(Color.FromArgb(0x30, 0xF2, 0xC1, 0x4E)));
+    public const double StageWidth = ScreenLayout.Width, StageHeight = ScreenLayout.Height;
 
     private readonly Game _game;
-    private readonly TextBlock _title = new() { FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = TextBrush, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
+
+    // Cena automática
+    private readonly Border _auto;
+    private readonly TextBlock _title = new() { FontSize = 30, FontWeight = FontWeights.SemiBold, Foreground = Theme.Text, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 14) };
     private readonly StackPanel _items = new();
     private readonly ScrollViewer _scroll = new() { VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
     private readonly StackPanel _bars = new();
     private readonly Border _barsPanel;
     private readonly WrapPanel _buttons = new() { Margin = new Thickness(0, 16, 0, 0) };
     private readonly List<ButtonItem> _buttonItems = [];
+
+    // Cena desenhada
+    private readonly Canvas _designed = new() { Width = StageWidth, Height = StageHeight, ClipToBounds = true };
+
     private TextBox? _answerBox;
 
     public GameWindow(Game game)
     {
         _game = game;
         Title = game.WindowTitle;
-        Background = Background1;
-        FontFamily = new FontFamily("Segoe UI");
+        Background = Theme.Background;
+        FontFamily = Theme.Font;
         UseLayoutRounding = true;
         SizeToContent = SizeToContent.WidthAndHeight;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -51,7 +49,7 @@ internal sealed class GameWindow : Window, IGameView
         _scroll.Content = _items;
         _barsPanel = new Border
         {
-            Background = PanelBrush,
+            Background = Theme.Panel,
             CornerRadius = new CornerRadius(10),
             Padding = new Thickness(16, 14, 16, 6),
             Margin = new Thickness(20, 0, 0, 0),
@@ -71,14 +69,17 @@ internal sealed class GameWindow : Window, IGameView
         stage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         stage.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         stage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var padded = new Border { Padding = new Thickness(36, 28, 36, 28), Child = stage, Width = StageWidth, Height = StageHeight };
         stage.Children.Add(_title);
         Grid.SetRow(middle, 1);
         stage.Children.Add(middle);
         Grid.SetRow(_buttons, 2);
         stage.Children.Add(_buttons);
+        _auto = new Border { Padding = new Thickness(36, 28, 36, 28), Child = stage };
 
-        Content = new Viewbox { Stretch = Stretch.Uniform, Child = padded };
+        var root = new Grid { Width = StageWidth, Height = StageHeight };
+        root.Children.Add(_auto);
+        root.Children.Add(_designed);
+        Content = new Viewbox { Stretch = Stretch.Uniform, Child = root };
 
         // Abre com 960×540 e depois deixa o jogador redimensionar à vontade.
         ContentRendered += (_, _) => SizeToContent = SizeToContent.Manual;
@@ -87,11 +88,112 @@ internal sealed class GameWindow : Window, IGameView
 
     public void Show(Screen screen)
     {
+        _answerBox = null;
+        if (screen.Designed != null)
+        {
+            _auto.Visibility = Visibility.Collapsed;
+            _designed.Visibility = Visibility.Visible;
+            _buttonItems.Clear();
+            ShowDesigned(screen);
+        }
+        else
+        {
+            _designed.Visibility = Visibility.Collapsed;
+            _designed.Children.Clear();
+            _auto.Visibility = Visibility.Visible;
+            ShowAutomatic(screen);
+        }
+
+        if (_answerBox != null)
+            Dispatcher.BeginInvoke(() => _answerBox?.Focus(), DispatcherPriority.Input);
+        else
+            Dispatcher.BeginInvoke(() => Keyboard.Focus(this), DispatcherPriority.Input);
+    }
+
+    private void OnKey(object sender, KeyEventArgs e)
+    {
+        if (e.OriginalSource is TextBox) return;
+        int number = e.Key switch
+        {
+            >= Key.D1 and <= Key.D9 => e.Key - Key.D1,
+            >= Key.NumPad1 and <= Key.NumPad9 => e.Key - Key.NumPad1,
+            _ => -1,
+        };
+        if (number < 0 || number >= _buttonItems.Count) return;
+        e.Handled = true;
+        _game.Act(_buttonItems[number].OnClick);
+    }
+
+    // ------------------------------------------------------------------ cena desenhada
+
+    private void ShowDesigned(Screen screen)
+    {
+        var scene = screen.Designed!;
+        var messages = screen.Messages;
+        var context = new RenderContext
+        {
+            Live = true,
+            Click = _game.ClickPiece,
+            Answer = _game.AnswerPiece,
+            Messages = messages,
+            IsClickable = _game.IsClickable,
+        };
+
+        _designed.Children.Clear();
+        if (ScreenRenderer.Background(scene.Layout) is { } background)
+            _designed.Children.Add(background);
+
+        bool hasMessagesPiece = false;
+        foreach (var piece in scene.Layout.Pieces)
+        {
+            if (!piece.Visible) continue;
+            hasMessagesPiece |= piece.Type == PieceType.Messages;
+            var element = ScreenRenderer.Create(piece, context);
+            Canvas.SetLeft(element, piece.X);
+            Canvas.SetTop(element, piece.Y);
+            _designed.Children.Add(element);
+            if (_answerBox == null && element.Tag is TextBox box) _answerBox = box;
+        }
+
+        // Sem a peça Mensagens, o que o game.Write escreveu aparece num aviso embaixo da tela.
+        if (!hasMessagesPiece && messages.Count > 0)
+            _designed.Children.Add(Toast(messages));
+    }
+
+    private static FrameworkElement Toast(IReadOnlyList<MessageLine> messages)
+    {
+        var list = new StackPanel();
+        foreach (var line in messages.TakeLast(4))
+            list.Children.Add(ScreenRenderer.MessageView(line, 17));
+        var toast = new Border
+        {
+            Background = Theme.Freeze(System.Windows.Media.Color.FromArgb(0xEE, 0x21, 0x24, 0x2C)),
+            BorderBrush = Theme.PanelBorder,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(10),
+            Padding = new Thickness(14, 10, 14, 4),
+            Child = list,
+            Width = 620,
+            IsHitTestVisible = false,
+        };
+        Canvas.SetLeft(toast, (StageWidth - 620) / 2);
+        toast.Loaded += (_, _) =>
+        {
+            Canvas.SetTop(toast, StageHeight - toast.ActualHeight - 20);
+            toast.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
+        };
+        Canvas.SetTop(toast, StageHeight - 120);
+        return toast;
+    }
+
+    // ------------------------------------------------------------------ cena automática
+
+    private void ShowAutomatic(Screen screen)
+    {
         _title.Text = screen.Title ?? "";
         _title.Visibility = string.IsNullOrEmpty(screen.Title) ? Visibility.Collapsed : Visibility.Visible;
 
         _items.Children.Clear();
-        _answerBox = null;
         bool hasNews = false;
         foreach (var item in screen.Items)
         {
@@ -99,7 +201,9 @@ internal sealed class GameWindow : Window, IGameView
             {
                 case TextItem text:
                     hasNews |= text.IsNews;
-                    _items.Children.Add(TextView(text));
+                    var view = ScreenRenderer.MessageView(new MessageLine(text.Text, text.Color, text.IsNews), 19);
+                    if (!text.IsNews) view.Margin = new Thickness(0, 0, 0, 10);
+                    _items.Children.Add(view);
                     break;
                 case ImageItem image:
                     _items.Children.Add(ImageView(image.Path));
@@ -124,112 +228,36 @@ internal sealed class GameWindow : Window, IGameView
             _buttons.Children.Add(ButtonView(item, i < 9 ? i + 1 : null));
         }
 
-        if (hasNews) Dispatcher.BeginInvoke(_scroll.ScrollToEnd, System.Windows.Threading.DispatcherPriority.Loaded);
+        if (hasNews) Dispatcher.BeginInvoke(_scroll.ScrollToEnd, DispatcherPriority.Loaded);
         else _scroll.ScrollToHome();
-
-        if (_answerBox != null)
-            Dispatcher.BeginInvoke(() => _answerBox?.Focus(), System.Windows.Threading.DispatcherPriority.Input);
-        else
-            Dispatcher.BeginInvoke(() => Keyboard.Focus(this), System.Windows.Threading.DispatcherPriority.Input);
-    }
-
-    private void OnKey(object sender, KeyEventArgs e)
-    {
-        if (e.OriginalSource is TextBox) return;
-        int number = e.Key switch
-        {
-            >= Key.D1 and <= Key.D9 => e.Key - Key.D1,
-            >= Key.NumPad1 and <= Key.NumPad9 => e.Key - Key.NumPad1,
-            _ => -1,
-        };
-        if (number < 0 || number >= _buttonItems.Count) return;
-        e.Handled = true;
-        _game.Act(_buttonItems[number].OnClick);
-    }
-
-    // ------------------------------------------------------------------ peças da tela
-
-    private static FrameworkElement TextView(TextItem item)
-    {
-        var block = new TextBlock
-        {
-            Text = item.Text,
-            FontSize = 19,
-            LineHeight = 28,
-            TextWrapping = TextWrapping.Wrap,
-            Foreground = item.Color is { } c ? ColorBrush(c) : TextBrush,
-        };
-        if (!item.IsNews)
-        {
-            block.Margin = new Thickness(0, 0, 0, 10);
-            return block;
-        }
-        return new Border
-        {
-            Background = NewsBack,
-            BorderBrush = ColorBrush(item.Color ?? GameColor.Gold),
-            BorderThickness = new Thickness(3, 0, 0, 0),
-            CornerRadius = new CornerRadius(4),
-            Padding = new Thickness(12, 6, 12, 6),
-            Margin = new Thickness(0, 4, 0, 6),
-            Child = block,
-        };
     }
 
     private static FrameworkElement ImageView(string path)
     {
-        var file = FindImage(path);
-        if (file == null)
+        var image = Theme.LoadImage(path);
+        if (image == null)
         {
             return new TextBlock
             {
                 Text = $"[imagem não encontrada: {path} — coloque o arquivo na pasta Assets do projeto]",
-                FontSize = 15, FontStyle = FontStyles.Italic, Foreground = Muted,
+                FontSize = 15, FontStyle = FontStyles.Italic, Foreground = Theme.Muted,
                 TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 10),
             };
         }
-        try
-        {
-            var bitmap = new BitmapImage();
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.UriSource = new Uri(file);
-            bitmap.EndInit();
-            bitmap.Freeze();
-            return new WpfImage { Source = bitmap, MaxHeight = 240, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12) };
-        }
-        catch (Exception)
-        {
-            return new TextBlock { Text = $"[não deu para abrir a imagem: {path}]", FontSize = 15, Foreground = Muted, Margin = new Thickness(0, 0, 0, 10) };
-        }
-    }
-
-    /// <summary>Procura na pasta Assets e na pasta do jogo (onde o .exe está e onde ele foi aberto).</summary>
-    internal static string? FindImage(string path)
-    {
-        if (string.IsNullOrWhiteSpace(path)) return null;
-        if (Path.IsPathRooted(path)) return File.Exists(path) ? path : null;
-        foreach (var root in new[] { AppContext.BaseDirectory, Environment.CurrentDirectory })
-        {
-            foreach (var candidate in new[] { Path.Combine(root, "Assets", path), Path.Combine(root, path) })
-            {
-                if (File.Exists(candidate)) return Path.GetFullPath(candidate);
-            }
-        }
-        return null;
+        return new WpfImage { Source = image, MaxHeight = 240, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12) };
     }
 
     private FrameworkElement AskView(AskItem item)
     {
-        var question = new TextBlock { Text = item.Question, FontSize = 19, TextWrapping = TextWrapping.Wrap, Foreground = TextBrush, Margin = new Thickness(0, 4, 0, 8) };
+        var question = new TextBlock { Text = item.Question, FontSize = 19, TextWrapping = TextWrapping.Wrap, Foreground = Theme.Text, Margin = new Thickness(0, 4, 0, 8) };
         var box = new TextBox
         {
             FontSize = 18,
             Padding = new Thickness(8, 6, 8, 6),
-            Background = PanelBrush,
-            Foreground = TextBrush,
-            CaretBrush = TextBrush,
-            BorderBrush = Track,
+            Background = Theme.Panel,
+            Foreground = Theme.Text,
+            CaretBrush = Theme.Text,
+            BorderBrush = Theme.PanelBorder,
             MinWidth = 320,
         };
         _answerBox ??= box;
@@ -249,7 +277,7 @@ internal sealed class GameWindow : Window, IGameView
             e.Handled = true;
             Submit();
         };
-        var ok = MakeButton("OK", null);
+        var ok = Theme.MakeButton(new TextBlock { Text = "OK", FontSize = 17 });
         ok.Margin = new Thickness(10, 0, 0, 0);
         ok.Click += (_, _) => Submit();
 
@@ -266,39 +294,21 @@ internal sealed class GameWindow : Window, IGameView
 
     private static FrameworkElement BarView(BarItem bar)
     {
-        double fraction = Math.Clamp((double)bar.Value / bar.Max, 0, 1);
-        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 5) };
-        var amount = new TextBlock { Text = $"{bar.Value} / {bar.Max}", FontSize = 15, Foreground = Muted };
-        DockPanel.SetDock(amount, Dock.Right);
-        header.Children.Add(amount);
-        header.Children.Add(new TextBlock { Text = bar.Label, FontSize = 16, FontWeight = FontWeights.SemiBold, Foreground = TextBrush, TextTrimming = TextTrimming.CharacterEllipsis });
-
-        var fill = new Border { Background = ColorBrush(bar.Color), CornerRadius = new CornerRadius(6), HorizontalAlignment = HorizontalAlignment.Left };
-        var track = new Border { Background = Track, CornerRadius = new CornerRadius(6), Height = 12, Child = fill };
-        track.SizeChanged += (_, e) => fill.Width = e.NewSize.Width * fraction;
-
-        var panel = new StackPanel { Margin = new Thickness(0, 0, 0, 14) };
-        panel.Children.Add(header);
-        panel.Children.Add(track);
-        return panel;
+        var piece = new Piece { Type = PieceType.Bar, Name = "Bar", Text = bar.Label, Value = bar.Value, Max = bar.Max, Color = bar.Color, Width = 218, Height = 40 };
+        var view = ScreenRenderer.Create(piece, new RenderContext { Live = true });
+        view.Width = double.NaN; // ocupa a largura do painel
+        view.Margin = new Thickness(0, 0, 0, 12);
+        return view;
     }
 
     private Button ButtonView(ButtonItem item, int? number)
-    {
-        var button = MakeButton(item.Text, number);
-        button.Margin = new Thickness(0, 0, 10, 10);
-        button.Click += (_, _) => _game.Act(item.OnClick);
-        return button;
-    }
-
-    private static Button MakeButton(string text, int? number)
     {
         var content = new StackPanel { Orientation = Orientation.Horizontal };
         if (number != null)
         {
             content.Children.Add(new Border
             {
-                Background = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)),
+                Background = Theme.Freeze(System.Windows.Media.Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF)),
                 CornerRadius = new CornerRadius(4),
                 Padding = new Thickness(6, 0, 6, 0),
                 Margin = new Thickness(0, 0, 10, 0),
@@ -306,58 +316,11 @@ internal sealed class GameWindow : Window, IGameView
                 Child = new TextBlock { Text = number.ToString(), FontSize = 13, Foreground = Brushes.White },
             });
         }
-        content.Children.Add(new TextBlock { Text = text, FontSize = 17, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
-        return new Button { Content = content, Template = ButtonTemplate, Cursor = Cursors.Hand, Focusable = false };
-    }
-
-    private static readonly ControlTemplate ButtonTemplate = CreateButtonTemplate();
-
-    private static ControlTemplate CreateButtonTemplate()
-    {
-        var border = new FrameworkElementFactory(typeof(Border), "Back");
-        border.SetValue(Border.BackgroundProperty, Accent);
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
-        border.SetValue(Border.PaddingProperty, new Thickness(18, 10, 18, 10));
-        var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
-        presenter.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
-        border.AppendChild(presenter);
-
-        var template = new ControlTemplate(typeof(Button)) { VisualTree = border };
-        var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-        hover.Setters.Add(new Setter(Border.BackgroundProperty, AccentHover, "Back"));
-        var pressed = new Trigger { Property = Button.IsPressedProperty, Value = true };
-        pressed.Setters.Add(new Setter(Border.BackgroundProperty, AccentPressed, "Back"));
-        template.Triggers.Add(hover);
-        template.Triggers.Add(pressed);
-        template.Seal();
-        return template;
-    }
-
-    internal static Brush ColorBrush(GameColor color) => color switch
-    {
-        GameColor.Gray => Muted,
-        GameColor.Red => Palette[0],
-        GameColor.Green => Palette[1],
-        GameColor.Blue => Palette[2],
-        GameColor.Gold => Palette[3],
-        GameColor.Purple => Palette[4],
-        GameColor.Orange => Palette[5],
-        _ => TextBrush,
-    };
-
-    private static readonly Brush[] Palette =
-    [
-        Freeze(new SolidColorBrush(Color.FromRgb(0xF2, 0x6B, 0x6B))),
-        Freeze(new SolidColorBrush(Color.FromRgb(0x5C, 0xCB, 0x7A))),
-        Freeze(new SolidColorBrush(Color.FromRgb(0x5E, 0xA8, 0xFF))),
-        Freeze(new SolidColorBrush(Color.FromRgb(0xF2, 0xC1, 0x4E))),
-        Freeze(new SolidColorBrush(Color.FromRgb(0xB4, 0x8C, 0xFF))),
-        Freeze(new SolidColorBrush(Color.FromRgb(0xF2, 0x9A, 0x4E))),
-    ];
-
-    private static Brush Freeze(SolidColorBrush brush)
-    {
-        brush.Freeze();
-        return brush;
+        content.Children.Add(new TextBlock { Text = item.Text, FontSize = 17, Foreground = Brushes.White, VerticalAlignment = VerticalAlignment.Center });
+        var button = Theme.MakeButton(content);
+        button.Padding = new Thickness(0);
+        button.Margin = new Thickness(0, 0, 10, 10);
+        button.Click += (_, _) => _game.Act(item.OnClick);
+        return button;
     }
 }

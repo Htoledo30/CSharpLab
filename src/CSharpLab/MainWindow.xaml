@@ -72,6 +72,14 @@
                                 </StackPanel>
                             </MenuItem.Header>
                         </MenuItem>
+                        <MenuItem Command="{Binding NewScreenCommand}" AutomationProperties.Name="Nova tela do jogo…">
+                            <MenuItem.Header>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock Text="Nova tela do jogo…" />
+                                    <TextBlock Text="Desenhar uma cena arrastando botões, textos e barras" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                </StackPanel>
+                            </MenuItem.Header>
+                        </MenuItem>
                         <Separator />
                         <MenuItem Command="{Binding OpenFolderDialogCommand}" AutomationProperties.Name="Abrir pasta…">
                             <MenuItem.Header>
@@ -184,8 +192,43 @@
                            HorizontalAlignment="Center" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
                            IsHitTestVisible="False" Margin="12,0" />
 
+                <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Cenas do jogo: abre a tela (ou o código) de cada cena. Só aparece em jogos com botões. -->
+                <Button x:Name="ScenesButton" Click="OnScenesButton" ToolTip="Cenas do jogo: abrir a tela ou o código de uma cena"
+                        AutomationProperties.Name="Cenas do jogo" WindowChrome.IsHitTestVisibleInChrome="True"
+                        Height="26" Margin="0,0,8,0" Padding="10,0,9,0" Cursor="Hand" Focusable="False"
+                        Visibility="{Binding HasGame, Converter={StaticResource BoolToVis}}">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <Setter Property="Background" Value="{StaticResource BgElevated}" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="6" Padding="{TemplateBinding Padding}"
+                                                BorderBrush="{StaticResource BorderStrong}" BorderThickness="1">
+                                            <ContentPresenter VerticalAlignment="Center" />
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgHover}" />
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </Button.Style>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource Icon}" Text="&#xE7F4;" FontSize="12" Margin="0,1,7,0" Foreground="{StaticResource Accent}" />
+                        <TextBlock Text="Cenas" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Style="{StaticResource Icon}" Text="{StaticResource IconChevronDown}" FontSize="8" Margin="7,1,0,0"
+                                   Foreground="{StaticResource TextMuted}" />
+                    </StackPanel>
+                </Button>
+
                 <!-- Executar / Parar -->
-                <Button x:Name="RunButton" Grid.Column="3" Command="{Binding RunOrStopCommand}" ToolTip="{Binding RunButtonToolTip}"
+                <Button x:Name="RunButton" Command="{Binding RunOrStopCommand}" ToolTip="{Binding RunButtonToolTip}"
                         AutomationProperties.Name="{Binding RunButtonText}" WindowChrome.IsHitTestVisibleInChrome="True"
                         Height="26" Margin="0,0,10,0" Padding="10,0,12,0" Cursor="Hand" Focusable="False">
                     <Button.Style>
@@ -235,6 +278,7 @@
                                    Visibility="{Binding RunTargetName, Converter={StaticResource NullToVis}}" />
                     </StackPanel>
                 </Button>
+                </StackPanel>
 
                 <StackPanel Grid.Column="4" Orientation="Horizontal" Margin="0,0,6,0" VerticalAlignment="Center">
                     <Button Style="{StaticResource IconButton}" Content="{StaticResource IconSidebar}" ToolTip="Mostrar/ocultar explorador (Ctrl+B)"

@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Title", "x": 40, "y": 32, "width": 560, "height": 52, "text": "Vila", "size": 34, "bold": true },
+    { "type": "Text", "name": "Story", "x": 40, "y": 92, "width": 560, "height": 64, "text": "Bem-vindo! A torre do goblin fica logo ali.", "size": 19 },
+    { "type": "Box", "name": "Panel", "x": 620, "y": 32, "width": 300, "height": 112 },
+    { "type": "Bar", "name": "PlayerHealth", "x": 640, "y": 48, "width": 260, "height": 44, "text": "Vida", "value": 100, "max": 100, "color": "Green" },
+    { "type": "Text", "name": "Gold", "x": 640, "y": 104, "width": 130, "height": 32, "text": "Ouro: 10", "size": 18, "color": "Gold" },
+    { "type": "Text", "name": "Potions", "x": 776, "y": 104, "width": 124, "height": 32, "text": "Poções: 1", "size": 18, "align": "Right" },
+    { "type": "Messages", "name": "Log", "x": 40, "y": 176, "width": 880, "height": 240 },
+    { "type": "Button", "name": "Shop", "x": 40, "y": 448, "width": 280, "height": 56, "text": "Comprar poção (5 de ouro)", "color": "Green" },
+    { "type": "Button", "name": "Tower", "x": 336, "y": 448, "width": 200, "height": 56, "text": "Entrar na torre" }
+  ]
+}

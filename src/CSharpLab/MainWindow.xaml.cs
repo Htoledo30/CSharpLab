@@ -293,11 +293,47 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnUndo(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Undo);
-    private void OnRedo(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Redo);
+    private void OnUndo(object sender, RoutedEventArgs e)
+    {
+        if (Editors.ActiveScreen is { } screen) screen.Model.Undo();
+        else Exec(ApplicationCommands.Undo);
+    }
+
+    private void OnRedo(object sender, RoutedEventArgs e)
+    {
+        if (Editors.ActiveScreen is { } screen) screen.Model.Redo();
+        else Exec(ApplicationCommands.Redo);
+    }
     private void OnCut(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Cut);
     private void OnCopy(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Copy);
     private void OnPaste(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Paste);
+
+    // ================================================================ cenas do jogo
+
+    private void OnScenesButton(object sender, RoutedEventArgs e)
+    {
+        Editors.ActiveEditor?.ClosePopups();
+        ScenesMenu.Show(ScenesMenu.Build(_vm, CurrentScene()), ScenesButton);
+    }
+
+    /// <summary>A cena da aba ativa: a tela aberta, ou o game.Scene onde está o cursor do código.</summary>
+    private SceneContext? CurrentScene()
+    {
+        if (_vm.ActiveDocument is { IsScreen: true, FilePath: { } screen })
+            return new SceneContext(System.IO.Path.GetFileNameWithoutExtension(screen), OnScreen: true);
+        if (Editors.ActiveEditor is { Doc.IsCSharp: true } editor)
+        {
+            try
+            {
+                if (Core.Language.GameAssist.SceneAt(editor.Syntax.Root, editor.CaretOffset) is { } scene)
+                    return new SceneContext(scene.Name, OnScreen: false);
+            }
+            catch
+            {
+            }
+        }
+        return null;
+    }
 
     // ================================================================ janela
 
