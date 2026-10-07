@@ -12,7 +12,7 @@ interativo para programas e jogos de texto.
 
 ## Instalar
 
-1. Baixe `CSharpLab-win-x64.zip` e extraia a pasta inteira.
+1. Baixe `CSharpLab-win-x64.zip` da [última versão](https://github.com/Htoledo30/CSharpLab/releases/latest) e extraia a pasta inteira.
 2. Dê dois cliques em **Instalar.cmd**.
    Ele copia o programa para `%LocalAppData%\Programs\CSharpLab` e cria atalhos na
    Área de Trabalho e no Menu Iniciar. Não precisa de administrador.
