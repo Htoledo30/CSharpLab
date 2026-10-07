@@ -23,8 +23,12 @@ public static class Dotnet
         ["MSBUILDTERMINALLOGGER"] = "off",
     };
 
+    /// <summary>Testes: age como num computador sem o SDK instalado.</summary>
+    internal static bool SimulateMissing { get; set; }
+
     public static string? FindExecutable()
     {
+        if (SimulateMissing) return null;
         if (_path != null && File.Exists(_path)) return _path;
 
         var candidates = new List<string>();

@@ -90,7 +90,12 @@ public sealed class FakeDialogs : IDialogService
 
     public void ShowError(string title, string message, string? details = null) => Errors.Add(title + ": " + message + " " + details);
     public ExternalChangeChoice AskExternalChange(string fileName) => ExternalChangeChoice.KeepMine;
-    public bool ShowSdkMissing(string message, string? details) => false;
+    public int SdkMissingShown { get; private set; }
+    public bool ShowSdkMissing(string message, string? details)
+    {
+        SdkMissingShown++;
+        return false;
+    }
     public string? PickFolder(string title, string? initialDirectory) => null;
     public string? FileAnswer { get; set; }
     public string? PickFile(string title, string filter, string? initialDirectory) => FileAnswer;
