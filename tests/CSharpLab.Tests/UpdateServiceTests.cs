@@ -179,6 +179,13 @@ public sealed class UpdateServiceTests : IDisposable
     }
 
     [Fact]
+    public void Aplicador_nao_herda_modulos_do_PowerShell_7()
+    {
+        var start = UpdateService.CreateApplierStartInfo(_dir, new Version(1, 1, 0), false, Environment.ProcessId, _dir);
+        Assert.False(start.Environment.ContainsKey("PSModulePath"));
+    }
+
+    [Fact]
     public async Task Aplicacao_real_preserva_desinstalador_e_arquivos_pessoais()
     {
         var staged = await UpdateService.DownloadAndStageAsync(Package(), null, CancellationToken.None);

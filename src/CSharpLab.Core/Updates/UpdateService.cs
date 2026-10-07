@@ -360,6 +360,9 @@ public static class UpdateService
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden,
         };
+        // Aberto a partir do PowerShell 7 (ex.: terminal do VS Code), o PSModulePath herdado aponta
+        // para módulos que o Windows PowerShell 5.1 não carrega (Get-FileHash, ConvertFrom-Json…).
+        psi.Environment.Remove("PSModulePath");
         foreach (var arg in new[]
                  {
                      "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", script,

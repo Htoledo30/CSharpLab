@@ -1,8 +1,9 @@
 name: release
 
-# Ao enviar uma tag v1.2.3, compila, testa e publica o zip do CSharp Lab numa Release do GitHub.
+# A cada envio para main: compila e testa. Ao enviar uma tag v1.2.3, também publica o zip numa Release do GitHub.
 on:
   push:
+    branches: [main]
     tags: ["v*"]
   workflow_dispatch:
 
