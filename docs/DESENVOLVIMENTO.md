@@ -53,6 +53,7 @@ oferecer versões novas, mas uma cópia anterior ao recurso precisa ser instalad
 | `src/CSharpLab.Core/Build` | `dotnet restore/build` com diagnósticos SARIF, comando de execução e o que o F5 reaproveita na sessão (`RunCache`) |
 | `src/CSharpLab.Core/Terminal` | Sessão ConPTY + Job Object (processo do usuário fora do editor) |
 | `src/CSharpLab.Core/Settings` | Preferências JSON, recentes, recuperação de rascunhos |
+| `src/CSharpLab.RuntimeHook` | Gancho (`DOTNET_STARTUP_HOOKS`, .NET 8+) carregado no programa do usuário: registra tipo, mensagem e linhas de um erro não tratado para o editor explicar em português (`RuntimeErrors`). Não altera o comportamento do programa. |
 | `src/CSharpLab/ViewModels` | MVVM. `MainViewModel` é dividido por assunto: `.cs` (estado, início, painéis, avisos, encerramento), `.Documents` (abas, salvar, recuperação), `.Folders` (pasta e projetos), `.FileSystem` (mudanças no disco), `.Analysis` (erros ao vivo, navegação), `.Run` (SDK → salvar → compilar → terminal), `.Updates`. Mais explorador e problemas. |
 | `src/CSharpLab/Editor` | AvalonEdit + recursos de C# (cores, sublinhados, sugestões, assinatura, snippets, indentação) |
 | `src/CSharpLab/Views` | Explorador, terminal, busca, diálogos, host de editores |

@@ -44,7 +44,8 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | Executar | `F5` ou o botão **Executar** (ele mostra o nome do projeto que vai rodar). Os arquivos do projeto são salvos e compilados antes. |
 | Digitar no programa | Clique no **Terminal** e digite. `ReadLine`, `ReadKey`, setas e cores funcionam. |
 | Parar | `Shift+F5` ou o botão **Parar** (funciona até em loop infinito). |
-| Ver erros | Aba **Problemas**: "Program.cs · Linha 12 — Faltou ";"." Clique para ir até a linha. |
+| Ver erros | Aba **Problemas**: "Program.cs · Linha 12 — Faltou ";"." Clique para ir até a linha; **Saiba mais** abre a explicação da Microsoft em português. |
+| Programa parou com erro | O terminal explica em português o que aconteceu e em que linha (ex.: "abc" não é um número válido), com uma dica. A linha fica sublinhada. |
 | Entender o código | Pare o mouse sobre um nome: aparece o tipo e a explicação. |
 | Consertar um erro | Com o cursor no sublinhado, `Ctrl+.` mostra correções (ex.: adicionar o `using` que falta). |
 | Fazer jogos no console | `Ctrl+Shift+J` expande o terminal para quase a tela toda. |

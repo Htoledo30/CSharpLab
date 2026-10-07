@@ -3,6 +3,7 @@ using System.Windows;
 using CommunityToolkit.Mvvm.Input;
 using CSharpLab.Core.Build;
 using CSharpLab.Core.Files;
+using CSharpLab.Core.Language;
 using CSharpLab.Core.Projects;
 using CSharpLab.Core.Settings;
 using CSharpLab.Core.Terminal;
@@ -68,6 +69,9 @@ public sealed partial class MainViewModel
         StatusText = "Preparando…";
         try
         {
+            // O erro de execução anterior deixa de valer.
+            Problems.SetRuntime(null);
+            RefreshDocumentDiagnostics();
             var project = await ResolveRunTargetAsync(ct);
             ct.ThrowIfCancellationRequested();
             if (project == null || _stopRequested || !await EnsureSdkAsync(project, ct) || !SaveProjectFiles(project))
@@ -203,6 +207,7 @@ public sealed partial class MainViewModel
         ct.ThrowIfCancellationRequested();
         var terminal = Terminal ?? throw new InvalidOperationException("Terminal indisponível.");
         var (cols, rows) = terminal.Size;
+        var crashReport = WithCrashReport(project, ref launch);
         var session = PseudoConsoleSession.Start(launch, cols, rows);
         _session = session;
         terminal.Attach(session);
@@ -227,12 +232,70 @@ public sealed partial class MainViewModel
             terminal.WriteNotice("Programa encerrado (código 0).");
             RunInfo = $"{project.Name} — encerrado";
         }
-        else
+        else if (!ExplainCrash(project, crashReport, exitCode, terminal))
         {
             terminal.WriteNotice($"O programa encerrou com erro (código {exitCode}).", isError: true);
             RunInfo = $"{project.Name} — encerrou com erro";
         }
+        if (crashReport != null) TryDelete(crashReport);
         StatusText = "";
+    }
+
+    /// <summary>
+    /// Liga o gancho que registra onde o programa parou com um erro (DOTNET_STARTUP_HOOKS).
+    /// Programas anteriores ao .NET 8 rodam sem ele. Retorna o arquivo do relatório.
+    /// </summary>
+    private static string? WithCrashReport(ProjectFile project, ref ProcessLaunch launch)
+    {
+        var hook = Path.Combine(AppContext.BaseDirectory, RuntimeErrors.HookFileName);
+        if (!File.Exists(hook) || SdkLocator.RequiredMajorFor(project.EffectiveTargetFramework) < RuntimeErrors.MinimumMajor) return null;
+        var report = Path.Combine(Path.GetTempPath(), "csharplab-erro-" + Guid.NewGuid().ToString("N")[..12] + ".txt");
+        var env = new Dictionary<string, string?>(launch.Environment ?? new Dictionary<string, string?>(), StringComparer.OrdinalIgnoreCase);
+        var existing = env.TryGetValue("DOTNET_STARTUP_HOOKS", out var v) ? v : Environment.GetEnvironmentVariable("DOTNET_STARTUP_HOOKS");
+        env["DOTNET_STARTUP_HOOKS"] = string.IsNullOrEmpty(existing) ? hook : hook + Path.PathSeparator + existing;
+        env[RuntimeErrors.ReportVariable] = report;
+        launch = launch with { Environment = env };
+        return report;
+    }
+
+    /// <summary>Explica em português o erro que parou o programa e marca a linha. False se não há o que explicar.</summary>
+    private bool ExplainCrash(ProjectFile project, string? reportPath, int exitCode, ITerminalHost terminal)
+    {
+        if (RuntimeErrors.ExplainExitCode(exitCode) is { } exitText)
+        {
+            terminal.WriteNotice(exitText, isError: true);
+            RunInfo = $"{project.Name} — parou com erro";
+            return true;
+        }
+        if (reportPath == null || RuntimeErrors.Read(reportPath) is not { } crash) return false;
+
+        var frame = RuntimeErrors.UserFrame(crash, project.Directory);
+        string? sourceLine = null;
+        if (frame != null)
+        {
+            try { sourceLine = File.ReadLines(frame.File).Skip(frame.Line - 1).FirstOrDefault(); }
+            catch (IOException) { }
+        }
+        var explanation = RuntimeErrors.Explain(crash, sourceLine);
+        var where = frame != null ? $"Erro na linha {frame.Line} ({Path.GetFileName(frame.File)}): " : "Erro: ";
+        terminal.WriteNotice(where + explanation.Message, isError: true);
+        if (explanation.Tip != null) terminal.WriteNotice("Dica: " + explanation.Tip);
+        RunInfo = frame != null ? $"{project.Name} — parou com erro na linha {frame.Line}" : $"{project.Name} — parou com erro";
+
+        var stack = string.Join("\n", crash.Frames.Select(f => $"  em {f.Method} — {Path.GetFileName(f.File)}, linha {f.Line}"));
+        Problems.SetRuntime(new CodeDiagnostic(RuntimeErrors.DiagnosticId, DiagnosticLevel.Error, "Ao executar: " + explanation.Message,
+            $"{crash.Type}: {crash.Message}", frame != null ? Path.GetFullPath(frame.File) : null, frame?.Line ?? 0, Math.Max(1, frame?.Column ?? 1),
+            -1, 0, FromBuild: true)
+        {
+            Detail = (explanation.Tip != null ? "Dica: " + explanation.Tip + "\n\n" : "") + stack,
+        });
+        RefreshDocumentDiagnostics();
+        return true;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
     private void RefreshDocumentDiagnostics()

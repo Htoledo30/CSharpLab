@@ -18,6 +18,9 @@ public sealed class ProblemItem
     public string FileName { get; }
     public bool IsError => Diagnostic.Level == DiagnosticLevel.Error;
     public string LevelLabel => IsError ? "Erro" : Diagnostic.Id.StartsWith("DICA", StringComparison.Ordinal) ? "Dica" : "Aviso";
+
+    /// <summary>Há uma página em português explicando este erro (Saiba mais).</summary>
+    public bool HasHelp => HelpLinks.HasHelp(Diagnostic.Id);
     public string Location => Diagnostic.HasLocation ? $"Linha {Diagnostic.Line}" : "Projeto";
 
     /// <summary>"Program.cs · Linha 12 — Faltou ";"."</summary>
@@ -95,6 +98,14 @@ public sealed partial class ProblemsViewModel : ObservableObject
                 "Restore failed", null, 0, 0, -1, 0, FromBuild: true) { Detail = Trim(result.Log) });
         }
         Rebuild();
+    }
+
+    /// <summary>Erro que parou o programa durante a execução (vale até a próxima execução ou edição do arquivo).</summary>
+    public void SetRuntime(CodeDiagnostic? diagnostic)
+    {
+        int removed = _build.RemoveAll(d => d.Id == RuntimeErrors.DiagnosticId);
+        if (diagnostic != null) _build.Add(diagnostic);
+        if (removed > 0 || diagnostic != null) Rebuild();
     }
 
     public void ClearBuild()

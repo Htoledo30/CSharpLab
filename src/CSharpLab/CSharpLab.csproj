@@ -22,6 +22,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CSharpLab.Core\CSharpLab.Core.csproj" />
+    <!-- Gancho carregado nos programas do usuário para explicar erros de execução (não é usado pelo editor). -->
+    <ProjectReference Include="..\CSharpLab.RuntimeHook\CSharpLab.RuntimeHook.csproj" />
     <AssemblyMetadata Include="UpdateRepository" Value="$(UpdateRepository)" Condition="'$(UpdateRepository)' != ''" />
   </ItemGroup>
 

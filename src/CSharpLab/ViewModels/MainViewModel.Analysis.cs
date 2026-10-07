@@ -83,6 +83,18 @@ public sealed partial class MainViewModel
     public IReadOnlyDictionary<string, int> DocumentVersions() =>
         Documents.ToDictionary(d => d.LanguageKey, d => d.Version, StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Abre a explicação da Microsoft, em português, do erro (Saiba mais).</summary>
+    [RelayCommand]
+    private async Task OpenProblemHelp(ProblemItem? item)
+    {
+        if (item == null || !item.HasHelp) return;
+        var d = item.Diagnostic;
+        var url = d.Id == RuntimeErrors.DiagnosticId
+            ? RuntimeErrors.HelpUrl(d.OriginalMessage.Split(':')[0])
+            : await HelpLinks.ForCompilerAsync(d.Id, _updatesCts.Token);
+        if (!_disposed) Dialogs.OpenUrl(url);
+    }
+
     [RelayCommand]
     private void NavigateToProblem(ProblemItem? item)
     {

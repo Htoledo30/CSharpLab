@@ -54,6 +54,13 @@ public sealed class DiagnosticRenderer : IBackgroundRenderer
                 var line = _document.GetLineByNumber(d.Line);
                 start = line.Offset + Math.Clamp(d.Column - 1, 0, line.Length);
                 len = 0;
+                if (d.Id == RuntimeErrors.DiagnosticId)
+                {
+                    // Erro ao executar: sublinha o comando inteiro, do ponto onde parou até o fim da linha.
+                    var text = _document.GetText(line).TrimEnd();
+                    if (start - line.Offset >= text.Length) start = line.Offset + (text.Length - text.TrimStart().Length);
+                    len = Math.Max(0, line.Offset + text.Length - start);
+                }
             }
             else
             {

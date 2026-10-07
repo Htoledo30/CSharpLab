@@ -34,6 +34,8 @@ public interface IDialogService
     ProjectFile? SelectProject(IReadOnlyList<ProjectFile> projects, string folder);
     /// <summary>Pede um texto curto (ex.: novo nome). Null se cancelar.</summary>
     string? AskText(string title, string message, string initial, Func<string, string?>? validate = null);
+    /// <summary>Abre uma página no navegador.</summary>
+    void OpenUrl(string url);
 }
 
 /// <summary>O terminal integrado, visto pelo ViewModel.</summary>

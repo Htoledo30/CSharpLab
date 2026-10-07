@@ -143,6 +143,12 @@ public sealed class DialogService : IDialogService
         return dialog.ShowDialog() == true ? dialog.Request : null;
     }
 
+    public void OpenUrl(string url)
+    {
+        try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); }
+        catch (Exception ex) { ShowError("Não foi possível abrir o navegador", url, ex.Message); }
+    }
+
     public string? AskText(string title, string message, string initial, Func<string, string?>? validate = null)
     {
         var dialog = new TextPromptDialog(title, message, initial, validate);
