@@ -56,12 +56,39 @@
 
                 <Menu Grid.Column="1" VerticalAlignment="Center" WindowChrome.IsHitTestVisibleInChrome="True" Grid.IsSharedSizeScope="True">
                     <MenuItem Header="_Arquivo">
-                        <MenuItem Header="Novo arquivo" InputGestureText="Ctrl+N" Command="{Binding NewFileCommand}" />
-                        <MenuItem Header="Novo projeto…" Command="{Binding NewProjectCommand}" />
+                        <MenuItem Command="{Binding NewProjectCommand}" AutomationProperties.Name="Novo projeto…">
+                            <MenuItem.Header>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock Text="Novo projeto…" />
+                                    <TextBlock Text="Para programas e jogos: é o que o Executar roda" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                </StackPanel>
+                            </MenuItem.Header>
+                        </MenuItem>
+                        <MenuItem InputGestureText="Ctrl+N" Command="{Binding NewFileCommand}" AutomationProperties.Name="Novo arquivo">
+                            <MenuItem.Header>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock Text="Novo arquivo" />
+                                    <TextBlock Text="Rascunho rápido para testar uma ideia" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                </StackPanel>
+                            </MenuItem.Header>
+                        </MenuItem>
                         <Separator />
-                        <MenuItem Header="Abrir arquivo…" InputGestureText="Ctrl+O" Command="{Binding OpenFileDialogCommand}" />
-                        <MenuItem Header="Abrir pasta…" Command="{Binding OpenFolderDialogCommand}" />
-                        <MenuItem Header="Abrir projeto…" Command="{Binding OpenProjectDialogCommand}" />
+                        <MenuItem Command="{Binding OpenFolderDialogCommand}" AutomationProperties.Name="Abrir pasta…">
+                            <MenuItem.Header>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock Text="Abrir pasta…" />
+                                    <TextBlock Text="Um projeto inteiro, com todos os arquivos (use esta na dúvida)" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                </StackPanel>
+                            </MenuItem.Header>
+                        </MenuItem>
+                        <MenuItem InputGestureText="Ctrl+O" Command="{Binding OpenFileDialogCommand}" AutomationProperties.Name="Abrir arquivo…">
+                            <MenuItem.Header>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock Text="Abrir arquivo…" />
+                                    <TextBlock Text="Só um arquivo .cs, para ler ou copiar algo" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                </StackPanel>
+                            </MenuItem.Header>
+                        </MenuItem>
                         <MenuItem x:Name="RecentMenu" Header="Abrir recente" ItemsSource="{Binding RecentItems}">
                             <MenuItem.ItemContainerStyle>
                                 <Style TargetType="MenuItem" BasedOn="{StaticResource {x:Type MenuItem}}">
@@ -182,6 +209,9 @@
                             </TextBlock.Style>
                         </TextBlock>
                         <TextBlock Text="{Binding RunButtonText}" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding RunTargetName}" FontSize="12" VerticalAlignment="Center" Margin="6,0,0,0" MaxWidth="160"
+                                   TextTrimming="CharacterEllipsis" Foreground="{StaticResource TextSecondary}"
+                                   Visibility="{Binding RunTargetName, Converter={StaticResource NullToVis}}" />
                     </StackPanel>
                 </Button>
 
@@ -350,11 +380,11 @@
                             </StackPanel.Style>
                             <TextBlock Text="Nenhum arquivo aberto" Foreground="{StaticResource TextSecondary}" FontSize="14" HorizontalAlignment="Center" />
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
-                                <Button Style="{StaticResource LinkButton}" Content="Novo arquivo" Command="{Binding NewFileCommand}" />
-                                <TextBlock Text="·" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
-                                <Button Style="{StaticResource LinkButton}" Content="Abrir arquivo" Command="{Binding OpenFileDialogCommand}" />
-                                <TextBlock Text="·" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
                                 <Button Style="{StaticResource LinkButton}" Content="Novo projeto" Command="{Binding NewProjectCommand}" />
+                                <TextBlock Text="·" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
+                                <Button Style="{StaticResource LinkButton}" Content="Abrir pasta" Command="{Binding OpenFolderDialogCommand}" />
+                                <TextBlock Text="·" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" />
+                                <Button Style="{StaticResource LinkButton}" Content="Novo arquivo" Command="{Binding NewFileCommand}" />
                             </StackPanel>
                         </StackPanel>
 
@@ -408,8 +438,30 @@
                                     <StackPanel Orientation="Horizontal">
                                         <TextBlock Text="PROBLEMAS" />
                                         <Border Margin="7,0,0,0" CornerRadius="8" Padding="6,0" Background="{StaticResource BgActive}"
-                                                Visibility="{Binding Problems.Summary, Converter={StaticResource NullToVis}}">
-                                            <TextBlock Text="{Binding Problems.Summary}" FontSize="11" />
+                                                Visibility="{Binding Problems.Summary, Converter={StaticResource NullToVis}}"
+                                                ToolTip="{Binding Problems.Summary}" AutomationProperties.Name="{Binding Problems.Summary}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <StackPanel Orientation="Horizontal" Visibility="{Binding Problems.HasErrors, Converter={StaticResource BoolToVis}}">
+                                                    <TextBlock Style="{StaticResource Icon}" Text="{StaticResource IconError}" FontSize="10"
+                                                               Foreground="{StaticResource ErrorBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Problems.ErrorCount}" FontSize="11" />
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Visibility="{Binding Problems.HasWarnings, Converter={StaticResource BoolToVis}}">
+                                                    <StackPanel.Style>
+                                                        <Style TargetType="StackPanel">
+                                                            <Setter Property="Margin" Value="8,0,0,0" />
+                                                            <Style.Triggers>
+                                                                <DataTrigger Binding="{Binding Problems.HasErrors}" Value="False">
+                                                                    <Setter Property="Margin" Value="0" />
+                                                                </DataTrigger>
+                                                            </Style.Triggers>
+                                                        </Style>
+                                                    </StackPanel.Style>
+                                                    <TextBlock Style="{StaticResource Icon}" Text="{StaticResource IconWarning}" FontSize="10"
+                                                               Foreground="{StaticResource WarningBrush}" Margin="0,0,4,0" VerticalAlignment="Center" />
+                                                    <TextBlock Text="{Binding Problems.WarningCount}" FontSize="11" />
+                                                </StackPanel>
+                                            </StackPanel>
                                         </Border>
                                     </StackPanel>
                                 </RadioButton>
@@ -449,8 +501,20 @@
                                     </Button.Style>
                                 </Button>
                             </StackPanel>
-                            <TextBlock Text="{Binding RunInfo}" Foreground="{StaticResource TextMuted}" FontSize="12" VerticalAlignment="Center"
-                                       Margin="12,0" TextTrimming="CharacterEllipsis" />
+                            <TextBlock FontSize="12" VerticalAlignment="Center" Margin="12,0" TextTrimming="CharacterEllipsis">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value="{Binding RunInfo}" />
+                                        <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding ShowTerminalHint}" Value="True">
+                                                <Setter Property="Text" Value="A saída do seu programa aparece aqui. Para responder (ReadLine, jogos), clique no terminal e digite." />
+                                                <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </DockPanel>
                     </Border>
 
@@ -501,10 +565,10 @@
                         <TextBlock Text="{Binding StatusText}" Margin="16,0,0,0" Foreground="{StaticResource TextPrimary}" />
                         <TextBlock Text="{Binding LanguageStatus}" Margin="16,0,0,0" Foreground="{StaticResource TextMuted}" />
                         <Button Style="{StaticResource TextButton}" Height="20" Padding="6,0" Margin="12,0,0,0" Command="{Binding ShowSdkHelpCommand}"
-                                Visibility="{Binding SdkMissing, Converter={StaticResource BoolToVis}}" ToolTip="O SDK .NET 10 é necessário para executar">
+                                Visibility="{Binding SdkMissing, Converter={StaticResource BoolToVis}}" ToolTip="O SDK .NET 10 não foi encontrado. Ele é necessário para executar seus programas. Clique para ver como instalar.">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Style="{StaticResource Icon}" Text="{StaticResource IconWarning}" FontSize="11" Foreground="{StaticResource WarningBrush}" Margin="0,0,6,0" />
-                                <TextBlock Text="SDK .NET 10 não encontrado" FontSize="12" />
+                                <TextBlock Text="Instalar SDK para executar" FontSize="12" />
                             </StackPanel>
                         </Button>
                     </StackPanel>

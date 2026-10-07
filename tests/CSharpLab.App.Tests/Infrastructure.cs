@@ -92,7 +92,8 @@ public sealed class FakeDialogs : IDialogService
     public ExternalChangeChoice AskExternalChange(string fileName) => ExternalChangeChoice.KeepMine;
     public bool ShowSdkMissing(string message, string? details) => false;
     public string? PickFolder(string title, string? initialDirectory) => null;
-    public string? PickFile(string title, string filter, string? initialDirectory) => null;
+    public string? FileAnswer { get; set; }
+    public string? PickFile(string title, string filter, string? initialDirectory) => FileAnswer;
     public string? PickSaveFile(string suggestedName, string? initialDirectory) => null;
     public NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation) => null;
     public ProjectFile? SelectProject(IReadOnlyList<ProjectFile> projects, string folder) => projects.FirstOrDefault();

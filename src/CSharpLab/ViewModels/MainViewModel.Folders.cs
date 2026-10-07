@@ -15,29 +15,30 @@ public sealed partial class MainViewModel
     private int _evaluationsInFlight;
 
     [RelayCommand]
-    private void OpenFileDialog()
+    private async Task OpenFileDialog()
     {
         var path = Dialogs.PickFile("Abrir arquivo", "Arquivos C# (*.cs;*.csproj)|*.cs;*.csproj|Todos os arquivos (*.*)|*.*",
             CurrentFolder ?? Settings.LastProjectLocation);
-        if (path != null)
+        if (path == null) return;
+        // Escolher um .csproj abre o projeto inteiro (a pasta dele), não o XML numa aba.
+        if (path.EndsWith(".csproj", StringComparison.OrdinalIgnoreCase))
         {
-            OpenFile(path);
-            FocusEditorRequested?.Invoke();
+            await OpenProjectFileAsync(path);
+            return;
         }
+        OpenFile(path);
+        FocusEditorRequested?.Invoke();
     }
 
     [RelayCommand]
     private async Task OpenFolderDialog()
     {
-        var path = Dialogs.PickFolder("Abrir pasta", CurrentFolder ?? Settings.LastProjectLocation);
+        var path = Dialogs.PickFolder("Abrir pasta do projeto (a pasta onde está o .csproj)", CurrentFolder ?? Settings.LastProjectLocation);
         if (path != null) await OpenFolderAsync(path, null, promptForUnsaved: true);
     }
 
-    [RelayCommand]
-    private async Task OpenProjectDialog()
+    private async Task OpenProjectFileAsync(string path)
     {
-        var path = Dialogs.PickFile("Abrir projeto", "Projeto C# (*.csproj)|*.csproj", CurrentFolder ?? Settings.LastProjectLocation);
-        if (path == null) return;
         ProjectFile file;
         try { file = await ProjectFile.ReadEvaluatedAsync(path, _updatesCts.Token); }
         catch (OperationCanceledException) when (_disposed) { return; }
@@ -270,7 +271,9 @@ public sealed partial class MainViewModel
     [RelayCommand]
     private async Task NewProject()
     {
-        var request = Dialogs.AskNewProject("Novo projeto", null, "MeuProjeto", DefaultProjectLocation());
+        var request = Dialogs.AskNewProject("Novo projeto",
+            "Um projeto é uma pasta com seus arquivos .cs e um arquivo .csproj. É ele que o botão Executar compila e roda.",
+            "MeuProjeto", DefaultProjectLocation());
         if (request == null) return;
         if (!ConfirmCloseAll(Documents)) return;
         try

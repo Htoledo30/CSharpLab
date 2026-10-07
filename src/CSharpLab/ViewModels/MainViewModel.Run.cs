@@ -212,6 +212,11 @@ public sealed partial class MainViewModel
         terminal.FocusTerminal();
 
         var exitCode = await session.Completion;
+        if (Settings.TerminalHintRuns < 3)
+        {
+            Settings.TerminalHintRuns++;
+            ScheduleSettingsSave();
+        }
         if (_stopRequested)
         {
             terminal.WriteNotice("Execução interrompida.");

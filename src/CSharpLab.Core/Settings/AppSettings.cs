@@ -50,6 +50,8 @@ public sealed class AppSettings
     public bool CheckForUpdates { get; set; } = true;
     /// <summary>Versão aberta da última vez (para avisar "atualizado para…").</summary>
     public string? LastRunVersion { get; set; }
+    /// <summary>Quantas vezes a dica "a saída aparece aqui" já foi mostrada no terminal.</summary>
+    public int TerminalHintRuns { get; set; }
 
     public const int MaxRecent = 10;
 

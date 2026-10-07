@@ -39,9 +39,9 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | --- | --- |
 | Escrever algo rápido | Ao abrir, já existe um rascunho `Sem título.cs`. É só digitar. |
 | Criar um projeto | **Arquivo → Novo projeto…**: nome e pasta. Abre o `Program.cs`. |
-| Abrir o que já tenho | **Arquivo → Abrir pasta…** (ou **Abrir projeto…** para um `.csproj`). |
+| Abrir o que já tenho | **Arquivo → Abrir pasta…** e escolha a pasta do projeto. (Escolher um `.csproj` em **Abrir arquivo…** também abre o projeto.) |
 | Salvar | `Ctrl+S` (salvar tudo: `Ctrl+Shift+S`). Abas com `●` têm alterações não salvas. |
-| Executar | `F5` ou o botão **Executar**. Os arquivos do projeto são salvos e compilados antes. |
+| Executar | `F5` ou o botão **Executar** (ele mostra o nome do projeto que vai rodar). Os arquivos do projeto são salvos e compilados antes. |
 | Digitar no programa | Clique no **Terminal** e digite. `ReadLine`, `ReadKey`, setas e cores funcionam. |
 | Parar | `Shift+F5` ou o botão **Parar** (funciona até em loop infinito). |
 | Ver erros | Aba **Problemas**: "Program.cs · Linha 12 — Faltou ";"." Clique para ir até a linha. |

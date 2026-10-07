@@ -59,14 +59,14 @@ public sealed partial class ProblemsViewModel : ObservableObject
     public int WarningCount => Warnings.Count;
     public bool IsEmpty => Errors.Count == 0 && Warnings.Count == 0;
     public bool HasWarnings => Warnings.Count > 0;
+    public bool HasErrors => Errors.Count > 0;
 
-    public string Summary => (ErrorCount, WarningCount) switch
+    /// <summary>Por extenso, ex.: "2 erros, 1 aviso". Vazio quando não há nada.</summary>
+    public string Summary => string.Join(", ", new[]
     {
-        (0, 0) => "",
-        (_, 0) => ErrorCount.ToString(),
-        (0, _) => WarningCount.ToString(),
-        _ => $"{ErrorCount} · {WarningCount}",
-    };
+        ErrorCount == 0 ? null : ErrorCount == 1 ? "1 erro" : $"{ErrorCount} erros",
+        WarningCount == 0 ? null : WarningCount == 1 ? "1 aviso" : $"{WarningCount} avisos",
+    }.OfType<string>());
 
     public void SetLive(IReadOnlyList<CodeDiagnostic> diagnostics)
     {
@@ -137,6 +137,7 @@ public sealed partial class ProblemsViewModel : ObservableObject
         OnPropertyChanged(nameof(WarningCount));
         OnPropertyChanged(nameof(IsEmpty));
         OnPropertyChanged(nameof(HasWarnings));
+        OnPropertyChanged(nameof(HasErrors));
         OnPropertyChanged(nameof(Summary));
     }
 

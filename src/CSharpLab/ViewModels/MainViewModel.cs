@@ -93,7 +93,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public partial ProjectFile? RunProject { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBusy), nameof(IsRunning), nameof(RunButtonText), nameof(RunButtonToolTip))]
+    [NotifyPropertyChangedFor(nameof(IsBusy), nameof(IsRunning), nameof(RunButtonText), nameof(RunButtonToolTip),
+        nameof(RunTargetName), nameof(ShowTerminalHint))]
     public partial RunState RunState { get; set; }
 
     [ObservableProperty]
@@ -138,9 +139,19 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public bool IsBusy => RunState != RunState.Idle;
     public bool IsRunning => RunState == RunState.Running;
     public string RunButtonText => IsBusy ? "Parar" : "Executar";
-    public string RunButtonToolTip => IsBusy
-        ? "Parar a execução (Shift+F5)"
+
+    /// <summary>Nome do projeto que o Executar vai rodar, mostrado no próprio botão.</summary>
+    public string? RunTargetName => IsBusy ? null : RunProject?.Name;
+
+    public string RunButtonToolTip =>
+        IsBusy ? "Parar a execução (Shift+F5)"
+        : RunProject != null ? $"Salvar, compilar e executar o projeto \"{RunProject.Name}\" (F5)"
+        : CurrentFolder == null ? "Executar este código. Na primeira vez, ele vira um projeto. (F5)"
+        : HasMultipleProjects ? "Escolher qual projeto executar (F5)"
         : "Salvar os arquivos do projeto, compilar e executar (F5)";
+
+    /// <summary>Dica discreta no terminal nas primeiras execuções: a saída aparece ali e dá para digitar.</summary>
+    public bool ShowTerminalHint => IsRunning && PanelTab == "terminal" && Settings.TerminalHintRuns < 3;
 
     public string WindowTitle => CurrentFolder != null ? $"{Path.GetFileName(CurrentFolder.TrimEnd('\\'))} — CSharp Lab" : "CSharp Lab";
 
@@ -152,11 +163,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         OnPropertyChanged(nameof(WindowTitle));
         OnPropertyChanged(nameof(ProjectLabel));
+        OnPropertyChanged(nameof(RunButtonToolTip));
     }
 
-    partial void OnRunProjectChanged(ProjectFile? value) => OnPropertyChanged(nameof(ProjectLabel));
+    partial void OnRunProjectChanged(ProjectFile? value)
+    {
+        OnPropertyChanged(nameof(ProjectLabel));
+        OnPropertyChanged(nameof(RunTargetName));
+        OnPropertyChanged(nameof(RunButtonToolTip));
+    }
 
-    partial void OnProjectsChanged(IReadOnlyList<ProjectFile> value) => OnPropertyChanged(nameof(HasMultipleProjects));
+    partial void OnProjectsChanged(IReadOnlyList<ProjectFile> value)
+    {
+        OnPropertyChanged(nameof(HasMultipleProjects));
+        OnPropertyChanged(nameof(RunButtonToolTip));
+    }
 
     partial void OnActiveDocumentChanged(DocumentViewModel? oldValue, DocumentViewModel? newValue)
     {
@@ -178,7 +199,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnExplorerWidthChanged(double value) => ScheduleSettingsSave();
     partial void OnPanelHeightChanged(double value) => ScheduleSettingsSave();
     partial void OnIsPanelOpenChanged(bool value) => ScheduleSettingsSave();
-    partial void OnPanelTabChanged(string value) => ScheduleSettingsSave();
+    partial void OnPanelTabChanged(string value)
+    {
+        OnPropertyChanged(nameof(ShowTerminalHint));
+        ScheduleSettingsSave();
+    }
 
     // ================================================================ inicialização
 
