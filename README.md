@@ -50,6 +50,7 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | Consertar um erro | Com o cursor no sublinhado, `Ctrl+.` mostra correções (ex.: adicionar o `using` que falta). |
 | Fazer jogos no console | `Ctrl+Shift+J` expande o terminal para quase a tela toda. |
 | Organizar o código | `Ctrl+Shift+F` formata o arquivo (desfaz com `Ctrl+Z`). |
+| Estudar com exemplos | **Arquivo → Exemplos para estudar**: adivinhe o número, calculadora, jogo da velha, batalha RPG e cobrinha. Código em inglês, comentários em português. Ficam em `Documentos\CSharp Lab\Exemplos` e suas mudanças nunca são apagadas. |
 
 Executar um rascunho pede uma única vez o nome e a pasta de um projeto novo; o código vira o `Program.cs` dele.
 
@@ -81,8 +82,12 @@ Espaço e pontuação nunca aceitam uma sugestão sozinhos.
 Tudo isso também está no menu **Editar** e no botão direito do mouse, para não precisar decorar.
 
 **Dicas** (sublinhado azul) apontam armadilhas que o compilador aceita calado: imprimir uma lista
-direto (`Console.WriteLine(lista)` mostra o nome do tipo) e divisão entre inteiros que perde as casas
-decimais (`double media = soma / qtd;`). Não impedem a execução.
+direto (`Console.WriteLine(list)` mostra o nome do tipo), divisão entre inteiros que perde as casas
+decimais (`double average = sum / count;`), `int.Parse(Console.ReadLine())` sem conferir, comparação
+com o que foi digitado que diferencia maiúsculas e `while (true)` sem saída. Não impedem a execução.
+
+**Mouse em cima** de uma palavra-chave (`static`, `foreach`…) ou de um método comum (`ReadLine`, `Random.Next`…)
+mostra uma explicação em português com exemplo. Sugestões de método já entram com `()`.
 
 ## Snippets
 

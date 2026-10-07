@@ -17,6 +17,9 @@
     <InternalsVisibleTo Include="CSharpLab.Tests" />
     <InternalsVisibleTo Include="CSharpLab.App.Tests" />
     <EmbeddedResource Include="Updates\ApplyUpdate.ps1" />
+    <!-- Projetos de exemplo: guardados dentro do programa, não compilados com ele. -->
+    <Compile Remove="Examples\**" />
+    <EmbeddedResource Include="Examples\**\*.cs" />
   </ItemGroup>
 
 </Project>

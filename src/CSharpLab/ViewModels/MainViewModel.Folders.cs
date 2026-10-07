@@ -268,6 +268,29 @@ public sealed partial class MainViewModel
         ScheduleDiagnostics();
     }
 
+    /// <summary>Projetos prontos para estudar (menu Arquivo → Exemplos para estudar).</summary>
+    public IReadOnlyList<ExampleProject> ExampleProjects => Examples.All;
+
+    /// <summary>Copia o exemplo para Documentos\CSharp Lab\Exemplos (ou reabre a cópia que já existe) e abre.</summary>
+    [RelayCommand]
+    private async Task OpenExample(ExampleProject? example)
+    {
+        if (example == null) return;
+        CreatedProject created;
+        try
+        {
+            created = await Task.Run(() => Examples.Create(example, Examples.DefaultFolder));
+        }
+        catch (Exception ex)
+        {
+            Dialogs.ShowError("Não foi possível abrir o exemplo", FileErrors.Describe(ex, Examples.DefaultFolder));
+            return;
+        }
+        if (!await OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: true)) return;
+        OpenFile(created.ProgramPath);
+        FocusEditorRequested?.Invoke();
+    }
+
     [RelayCommand]
     private async Task NewProject()
     {
