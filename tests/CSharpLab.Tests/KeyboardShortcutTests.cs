@@ -207,14 +207,26 @@ public sealed class KeyboardShortcutTests : IDisposable
         try
         {
             game.Begin("Menu", window);
+            window.UpdateLayout();
             Assert.True(window.HandleKey(Key.Space, ModifierKeys.None, false, false));
             Assert.Equal("Play", game.CurrentScene);
             Assert.False(window.HandleKey(Key.D1, ModifierKeys.None, false, false));
-            window.Pause(0.5);
-            Assert.True(window.HandleKey(Key.D1, ModifierKeys.None, false, false));
-            Assert.Equal(1, count);
+            Assert.Equal(0, count);
         }
         finally { window.Close(); }
+
+        // A cena automática é testada numa janela nova, sem depender do tempo da animação anterior.
+        var automatic = new Game("Automático") { Screens = new ScreenLibrary { Roots = [_dir] } };
+        automatic.Scene("Play", () => automatic.Button("Contar", () => count++));
+        var automaticWindow = new GameWindow(automatic) { Left = -10000, Top = -10000, ShowActivated = false, ShowInTaskbar = false };
+        automaticWindow.Show();
+        try
+        {
+            automatic.Begin("Play", automaticWindow);
+            Assert.True(automaticWindow.HandleKey(Key.D1, ModifierKeys.None, false, false));
+            Assert.Equal(1, count);
+        }
+        finally { automaticWindow.Close(); }
     });
 
     private static void OnSta(Action test)
@@ -224,6 +236,6 @@ public sealed class KeyboardShortcutTests : IDisposable
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        Assert.Null(failure?.ToString());
+        if (failure != null) Assert.Fail(failure.ToString());
     }
 }
