@@ -1,0 +1,12 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Title", "x": 40, "y": 32, "width": 560, "height": 52, "text": "Vila", "size": 34, "bold": true },
+    { "type": "Text", "name": "Story", "x": 40, "y": 92, "width": 560, "height": 64, "text": "Você está numa vila tranquila. Dizem que há moedas escondidas por aqui.", "size": 19 },
+    { "type": "Box", "name": "Panel", "x": 620, "y": 32, "width": 300, "height": 72 },
+    { "type": "Text", "name": "Gold", "x": 640, "y": 50, "width": 260, "height": 36, "text": "Ouro: 0", "size": 22, "bold": true, "color": "Gold" },
+    { "type": "Messages", "name": "Log", "x": 40, "y": 176, "width": 880, "height": 240 },
+    { "type": "Button", "name": "Search", "x": 40, "y": 448, "width": 240, "height": 56, "text": "Procurar moedas" },
+    { "type": "Button", "name": "Forest", "x": 296, "y": 448, "width": 240, "height": 56, "text": "Ir para a floresta", "color": "Green" }
+  ]
+}

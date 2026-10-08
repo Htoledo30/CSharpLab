@@ -1,4 +1,4 @@
-// RPG com botões: um jogo de janela com cenas, botões e barras de vida.
+// RPG só com código: um jogo de janela com cenas, botões e barras de vida, sem telas desenhadas.
 // Cada game.Scene é uma tela. Depois de cada clique, a tela é desenhada de novo
 // com os valores atuais das variáveis: por isso as barras se atualizam sozinhas.
 

@@ -49,7 +49,7 @@ public sealed class ScreenDesignerModel : IDisposable
 
     internal Piece? Selected => SelectedName != null ? Layout?.Find(SelectedName) : null;
 
-    /// <summary>A tela mudou (edição, desfazer, texto mudado na aba Texto ou no disco).</summary>
+    /// <summary>A tela mudou (edição, desfazer, texto mudado no Arquivo ou no disco).</summary>
     public event Action? Changed;
 
     public event Action? SelectionChanged;
@@ -58,7 +58,7 @@ public sealed class ScreenDesignerModel : IDisposable
     public event Action<string, string>? Renamed;
 
     /// <summary>
-    /// Quando o texto muda enquanto a aba Tela está escondida (aba Texto), a leitura espera ela aparecer.
+    /// Quando o texto muda enquanto a aba Tela está escondida (Arquivo aberto), a leitura espera ela aparecer.
     /// </summary>
     public bool IsLive { get; set; } = true;
 
@@ -320,7 +320,7 @@ public sealed class ScreenDesignerModel : IDisposable
 
     /// <summary>
     /// Grava a tela no documento. Só a parte do texto que mudou é trocada, para o desfazer ficar leve e a
-    /// aba Texto não pular de lugar.
+    /// o Arquivo não pular de lugar.
     /// </summary>
     private void Commit(ScreenLayout layout, string? mergeKey = null)
     {

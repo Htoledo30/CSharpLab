@@ -260,6 +260,17 @@ public sealed class GameProjectTests : IDisposable
         Assert.Contains("@AGENTS.md", File.ReadAllText(Path.Combine(created.Directory, "CLAUDE.md")));
         Assert.Contains("game.Button", File.ReadAllText(Path.Combine(created.Directory, "AGENTS.md")));
 
+        // Já nasce com as telas desenhadas das cenas, e o código só usa peças que existem nelas.
+        foreach (var scene in new[] { "Start", "Forest" })
+        {
+            var parsed = ScreenFile.Parse(File.ReadAllText(Path.Combine(created.Directory, "Screens", scene + ".json")));
+            Assert.True(parsed.Success, $"{scene}: {parsed.Error}");
+            Assert.Empty(parsed.Warnings);
+        }
+        var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(File.ReadAllText(created.ProgramPath)).GetRoot();
+        Assert.Empty(GameAssist.CheckFindNames(root, created.Directory).Select(h => h.Message));
+        Assert.Equal(["Start", "Forest"], GameAssist.FindScenes(root).Select(s => s.Name));
+
         var project = ProjectFile.Read(created.ProjectPath);
         Assert.True(project.IsWindowApp);
         Assert.True(project.IsRunnable);

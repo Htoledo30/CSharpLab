@@ -43,6 +43,31 @@ public sealed partial class LanguageService
         return new CompletionResult(document, service, items, list.Span, list.SuggestionModeItem != null);
     }
 
+    /// <summary>Um nome visível naquele ponto do código e quase igual ao que foi escrito (até 2 letras de diferença).</summary>
+    private static string? SimilarName(SemanticModel model, TextSpan span)
+    {
+        try
+        {
+            var written = model.SyntaxTree.GetText().ToString(span);
+            if (written.Length < 3) return null;
+            int limit = written.Length <= 4 ? 1 : 2;
+            return model.LookupSymbols(span.Start)
+                .Select(s => s.Name)
+                .Where(n => n.Length > 0 && n != written && char.IsLetter(n[0]))
+                .Distinct()
+                .Select(n => (Name: n, Distance: GameAssist.Distance(n.ToLowerInvariant(), written.ToLowerInvariant())))
+                .Where(c => c.Distance <= limit)
+                .OrderBy(c => c.Distance)
+                .ThenBy(c => c.Name.Length)
+                .Select(c => c.Name)
+                .FirstOrDefault();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     private static readonly HashSet<string> ObjectMembers = new(StringComparer.Ordinal)
     {
         "Equals", "GetHashCode", "GetType", "ToString", "ReferenceEquals", "MemberwiseClone",
@@ -261,10 +286,14 @@ public sealed partial class LanguageService
                     keysById.TryGetValue(doc, out key);
                 }
                 var span = d.Location.GetLineSpan();
+                var message = DiagnosticTranslator.Translate(d);
+                // Nome que não existe, mas parecido com um que existe ("nome" e "name"): sugere o certo.
+                if (d.Id == "CS0103" && tree != null && SimilarName(compilation.GetSemanticModel(tree), d.Location.SourceSpan) is { } guess)
+                    message += $" Você quis dizer \"{guess}\"?";
                 result.Add(new CodeDiagnostic(
                     d.Id,
                     d.Severity == DiagnosticSeverity.Error ? DiagnosticLevel.Error : DiagnosticLevel.Warning,
-                    DiagnosticTranslator.Translate(d),
+                    message,
                     d.GetMessage(System.Globalization.CultureInfo.GetCultureInfo("en-US")),
                     key ?? (tree?.FilePath is { Length: > 0 } fp ? fp : null),
                     tree != null ? span.StartLinePosition.Line + 1 : 0,
@@ -284,7 +313,11 @@ public sealed partial class LanguageService
                 if (docId == null || generated.Contains(docId) || !keysById.TryGetValue(docId, out var hintKey)) continue;
                 var model = compilation.GetSemanticModel(tree);
                 var hints = BeginnerHints.Analyze(model, ct);
-                if (gameDirectory != null) hints = hints.Concat(GameAssist.CheckFindNames(tree.GetRoot(ct), gameDirectory));
+                if (gameDirectory != null)
+                {
+                    var root = tree.GetRoot(ct);
+                    hints = hints.Concat(GameAssist.CheckFindNames(root, gameDirectory)).Concat(GameAssist.CheckBuildCallsInDrawnScenes(root, gameDirectory));
+                }
                 foreach (var (id, message, location) in hints)
                 {
                     var span = location.GetLineSpan();

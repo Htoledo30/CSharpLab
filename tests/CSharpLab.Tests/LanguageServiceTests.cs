@@ -94,6 +94,12 @@ public sealed class LanguageServiceTests : IDisposable
         d = await Diagnose("Console.WriteLine(vidaa);");
         Assert.Contains(d, e => e.Id == "CS0103" && e.Message == "\"vidaa\" não foi encontrado neste trecho.");
 
+        // Nome quase igual a um que existe: sugere o certo (o erro continua sendo para a pessoa corrigir).
+        d = await Diagnose("string name = \"Ana\";\nConsole.WriteLine(nome);");
+        Assert.Contains(d, e => e.Id == "CS0103" && e.Message == "\"nome\" não foi encontrado neste trecho. Você quis dizer \"name\"?");
+        d = await Diagnose("int playerHealth = 10;\nplayerhealth -= 2;");
+        Assert.Contains(d, e => e.Id == "CS0103" && e.Message.EndsWith("Você quis dizer \"playerHealth\"?"));
+
         d = await Diagnose("Console.Escrever(\"oi\");");
         Assert.Contains(d, e => e.Id == "CS0117" && e.Message == "\"Console\" não possui um membro chamado \"Escrever\".");
 

@@ -45,6 +45,7 @@ public sealed partial class DocumentViewModel : ObservableObject
             _encoding = value;
             OnPropertyChanged();
             OnPropertyChanged(nameof(EncodingName));
+            OnPropertyChanged(nameof(UnusualEncoding));
         }
     }
     public FileStamp? DiskStamp { get; set; }
@@ -92,7 +93,8 @@ public sealed partial class DocumentViewModel : ObservableObject
 
     public string EncodingName => TextFileIO.DescribeEncoding(Encoding);
 
-    public string LineEnding => TextFileIO.DetectLineEnding(Document.Text);
+    /// <summary>A codificação, quando não é UTF-8 (a de sempre); null no caso comum.</summary>
+    public string? UnusualEncoding => Encoding is System.Text.UTF8Encoding ? null : EncodingName;
 
     /// <summary>Texto atual para o Roslyn, mantido de forma incremental.</summary>
     public SourceText SourceText

@@ -309,12 +309,14 @@ public sealed class DesignedSceneTests : IDisposable
         Assert.Null(failure?.ToString());
     }
 
-    /// <summary>As telas do exemplo "RPG com tela desenhada", como o jogo mostra (em %TEMP%\csharplab-exemplo-*.png).</summary>
+    /// <summary>As telas do exemplo "RPG com botões", como o jogo mostra (em %TEMP%\csharplab-exemplo-*.png).</summary>
     [Fact]
     public void Telas_do_exemplo_aparecem_na_janela()
     {
         var example = CSharpLab.Core.Projects.Examples.All.Single(e => e.Id == "RpgScreens");
         var screens = CSharpLab.Core.Projects.Examples.FilesOf(example).Where(f => f.Key.StartsWith("Screens/", StringComparison.Ordinal)).ToList();
+        // E as telas do jogo novo (Arquivo → Novo projeto → Jogo com botões).
+        screens.AddRange(CSharpLab.Core.Projects.GameKit.StarterScreens.Select(s => new KeyValuePair<string, string>("Screens/Novo-" + s.Key, s.Value)));
         Exception? failure = null;
         var thread = new Thread(() =>
         {

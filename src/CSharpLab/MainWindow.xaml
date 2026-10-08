@@ -60,7 +60,7 @@
                             <MenuItem.Header>
                                 <StackPanel Margin="0,2">
                                     <TextBlock Text="Novo projeto…" />
-                                    <TextBlock Text="Para programas e jogos: é o que o Executar roda" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                    <TextBlock Text="Um programa de console ou um jogo com botões" FontSize="11" Foreground="{StaticResource TextMuted}" />
                                 </StackPanel>
                             </MenuItem.Header>
                         </MenuItem>
@@ -72,7 +72,8 @@
                                 </StackPanel>
                             </MenuItem.Header>
                         </MenuItem>
-                        <MenuItem Command="{Binding NewScreenCommand}" AutomationProperties.Name="Nova tela do jogo…">
+                        <MenuItem Command="{Binding NewScreenCommand}" AutomationProperties.Name="Nova tela do jogo…"
+                                  Visibility="{Binding HasGame, Converter={StaticResource BoolToVis}}">
                             <MenuItem.Header>
                                 <StackPanel Margin="0,2">
                                     <TextBlock Text="Nova tela do jogo…" />
@@ -640,8 +641,9 @@
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Right"
                                 DataContext="{Binding ActiveDocument}" Visibility="{Binding Converter={StaticResource NullToVis}}">
                         <TextBlock Text="{Binding DataContext.CaretText, RelativeSource={RelativeSource AncestorType=Window}}" />
-                        <TextBlock Text="{Binding EncodingName}" Margin="18,0,0,0" />
-                        <TextBlock Text="{Binding LineEnding}" Margin="18,0,0,0" ToolTip="Final de linha do arquivo" />
+                        <!-- A codificação só aparece quando não é a de sempre (UTF-8): aí ela importa ao salvar. -->
+                        <TextBlock Text="{Binding UnusualEncoding}" Margin="18,0,0,0" ToolTip="Codificação do arquivo"
+                                   Visibility="{Binding UnusualEncoding, Converter={StaticResource NullToVis}}" />
                         <TextBlock Margin="18,0,0,0">
                             <TextBlock.Style>
                                 <Style TargetType="TextBlock">

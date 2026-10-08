@@ -602,7 +602,7 @@ public sealed class ScreenStage : Grid
         menu.Items.Add(Item("Trazer para frente", "Ctrl+]", _model.BringToFront));
         menu.Items.Add(Item("Enviar para trás", "Ctrl+[", _model.SendToBack));
         menu.Items.Add(new Separator());
-        menu.Items.Add(Item("Copiar o código desta peça", null, () =>
+        menu.Items.Add(Item("Copiar o código da peça (game.Find)", null, () =>
         {
             if (_model.Selected is { } piece) TrySetClipboard(ScreenDesignerModel.CodeExample(piece).Replace("\n", Environment.NewLine));
         }));

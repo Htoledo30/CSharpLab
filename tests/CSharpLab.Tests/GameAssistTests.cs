@@ -127,6 +127,84 @@ public sealed class GameAssistTests : IDisposable
             Assert.NotNull(GameScreens.Pieces(created.Directory, scene));
     }
 
+    private const string HandlerCode = """
+        var game = new Game("T");
+        game.Scene("Fight", () =>
+        {
+            game.Find("Attack").OnClick(() => { });
+            game.Find("Potion").Visible = false;
+        });
+        game.Scene("Empty", () =>
+        {
+        });
+        game.Scene("Inline", () => { game.Write("x"); });
+        game.Scene("Expr", () => game.Write("x"));
+        game.Start("Fight");
+        """;
+
+    [Fact]
+    public void Comandos_de_montar_tela_numa_cena_desenhada_ganham_dica()
+    {
+        var code = """
+            var game = new Game("T");
+            game.Scene("Fight", () =>
+            {
+                game.Title("Luta");
+                game.Write("Isto pode: vai para as mensagens.");
+                game.Find("Attack").OnClick(() => game.GoTo("Plain"));
+            });
+            game.Scene("Plain", () =>
+            {
+                game.Title("Sem tela: aqui pode.");
+                game.Button("Voltar", () => game.GoTo("Fight"));
+            });
+            game.Start("Fight");
+            """;
+        var root = CSharpSyntaxTree.ParseText(code).GetRoot();
+        var hint = Assert.Single(GameAssist.CheckBuildCallsInDrawnScenes(root, _dir));
+        Assert.Equal(GameAssist.BuildInDrawnSceneId, hint.Id);
+        Assert.Contains("game.Title não funciona", hint.Message);
+        Assert.Contains("um Texto na aba Tela", hint.Message);
+        Assert.Equal(code.IndexOf("Title(\"Luta\")", StringComparison.Ordinal), hint.Location.SourceSpan.Start);
+    }
+
+    [Fact]
+    public void Sabe_se_o_botao_ja_faz_algo_no_codigo()
+    {
+        var root = CSharpSyntaxTree.ParseText(HandlerCode).GetRoot();
+        var attack = Assert.Single(GameAssist.FindPieceUses(root, "Fight", "Attack", "OnClick"));
+        Assert.True(attack.IsHandler);
+        Assert.Equal(HandlerCode.IndexOf("game.Find(\"Attack\")", StringComparison.Ordinal), attack.Start);
+        Assert.False(Assert.Single(GameAssist.FindPieceUses(root, "Fight", "Potion", "OnClick")).IsHandler);
+        Assert.Empty(GameAssist.FindPieceUses(root, "Empty", "Attack", "OnClick"));   // outra cena
+    }
+
+    [Theory]
+    [InlineData("Fight", "    game.Find(\"Potion\").Visible = false;\n\n    game.Find(\"Run\").OnClick(() =>\n    {\n        \n    });\n});")]
+    [InlineData("Empty", "game.Scene(\"Empty\", () =>\n{\n    game.Find(\"Run\").OnClick(() =>\n    {\n        \n    });\n});")]
+    [InlineData("Inline", "game.Scene(\"Inline\", () => { game.Write(\"x\");\n\n    game.Find(\"Run\").OnClick(() =>\n    {\n        \n    });\n});")]
+    public void Escreve_o_OnClick_no_fim_da_cena_com_o_recuo_certo(string scene, string expected)
+    {
+        var code = HandlerCode.Replace("\r\n", "\n");
+        var root = CSharpSyntaxTree.ParseText(code).GetRoot();
+        var insertion = GameAssist.HandlerInsertion(root, scene, "Run", "OnClick", "()", "\n")!;
+        var result = code.Remove(insertion.Offset, insertion.Length).Insert(insertion.Offset, insertion.Text);
+        Assert.Contains(expected, result);
+        Assert.Empty(CSharpSyntaxTree.ParseText(result).GetDiagnostics());
+        // O cursor fica na linha vazia entre as chaves do OnClick.
+        int caret = insertion.Offset + insertion.Caret;
+        Assert.Equal("        ", result[result.LastIndexOf('\n', caret - 1)..caret].TrimStart('\n'));
+        Assert.Equal('\n', result[caret]);
+    }
+
+    [Fact]
+    public void Cena_numa_linha_so_sem_chaves_nao_recebe_OnClick()
+    {
+        var root = CSharpSyntaxTree.ParseText(HandlerCode).GetRoot();
+        Assert.Null(GameAssist.HandlerInsertion(root, "Expr", "Run", "OnClick", "()", "\n"));
+        Assert.Null(GameAssist.HandlerInsertion(root, "Nowhere", "Run", "OnClick", "()", "\n"));
+    }
+
     [Fact]
     public void Acha_as_cenas_do_codigo_e_o_nome_de_cena_sob_o_cursor()
     {

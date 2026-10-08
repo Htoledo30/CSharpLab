@@ -28,6 +28,18 @@ public static class GameKit
 
     public static string StarterProgram => Resource("Starter.cs");
 
+    /// <summary>As telas do jogo inicial (nome do arquivo → conteúdo): o jogo novo já nasce com telas desenhadas.</summary>
+    public static IReadOnlyDictionary<string, string> StarterScreens
+    {
+        get
+        {
+            const string prefix = "CSharpLab.Core.GameKit." + ScreensFolder + ".";
+            return typeof(GameKit).Assembly.GetManifestResourceNames()
+                .Where(n => n.StartsWith(prefix, StringComparison.Ordinal))
+                .ToDictionary(n => n[prefix.Length..], n => Resource(n["CSharpLab.Core.GameKit.".Length..]), StringComparer.OrdinalIgnoreCase);
+        }
+    }
+
     /// <summary>Guia do motor para IAs (AGENTS.md), também útil para quem programa.</summary>
     public static string AgentsGuide => Resource("AGENTS.md");
 

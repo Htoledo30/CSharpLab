@@ -301,6 +301,81 @@ public sealed class ScreenDesignerTests
         Assert.True(offset < code.IndexOf("game.Start(", StringComparison.Ordinal));
     });
 
+    [Fact]
+    public void Painel_do_botao_mostra_o_que_ele_faz_e_escreve_o_OnClick() => Ui.Run(async () =>
+    {
+        var dialogs = new FakeDialogs();
+        using var vm = new MainViewModel(new AppSettings()) { Dialogs = dialogs, Terminal = new FakeTerminal() };
+        await vm.InitializeAsync();
+        var program = "var game = new Game(\"T\");\n" +
+                      "game.Scene(\"Fight\", () =>\n{\n    game.Find(\"Continue\").OnClick(() =>\n    {\n        game.Write(\"Oi\");\n    });\n});\n" +
+                      "game.Start(\"Fight\");\n";
+        var created = ProjectCreator.CreateGameProject(Ui.NewFolder("jogos"), "Torre", program);
+        Directory.CreateDirectory(Path.Combine(created.Directory, "Screens"));
+        var layout = ScreenLayout.CreateDefault("Fight");
+        layout.Pieces.Add(Piece.CreateDefault(PieceType.Button, "Attack", 300, 400));
+        var screen = Path.Combine(created.Directory, "Screens", "Fight.json");
+        File.WriteAllText(screen, ScreenFile.Serialize(layout));
+        await vm.OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: false);
+        await Ui.WaitUntil(() => vm.Projects.Count > 0, 60_000, "projetos");
+
+        // Onde está a cena e o que o código já faz com cada botão.
+        var sceneCode = vm.FindSceneCode(created.Directory, "Fight")!;
+        Assert.Equal((created.ProgramPath, 2), (sceneCode.File, sceneCode.Line));
+        Assert.Null(vm.FindSceneCode(created.Directory, "Nowhere"));
+        var cont = vm.FindPieceCode(created.Directory, "Fight", "Continue", "OnClick")!;
+        Assert.True(cont.HasHandler);
+        Assert.Equal(4, cont.Line);
+        Assert.Null(vm.FindPieceCode(created.Directory, "Fight", "Attack", "OnClick"));
+
+        var view = new ScreenEditorView(vm.OpenFile(screen)!, vm);
+        var window = new Window { Content = view, Width = 1280, Height = 760, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Left = -10000, Top = -10000 };
+        window.Show();
+        try
+        {
+            string PanelText() => string.Join(" | ", Descendants(view.Properties).OfType<System.Windows.Controls.TextBlock>()
+                .Where(t => t.IsVisible).Select(t => t.Text));
+            void Show() => window.UpdateLayout();
+            // Sem peça escolhida: onde a cena está no código.
+            Show();
+            Assert.Contains("game.Scene(\"Fight\")", PanelText());
+            Assert.Contains("Program.cs, linha 2", string.Join(" ", Descendants(view.Properties).OfType<System.Windows.Controls.Button>()
+                .Where(b => b.IsVisible).Select(b => b.Content as string)));
+            view.Model.Select("Continue");
+            Show();
+            Assert.Contains("Já faz algo", PanelText());
+            view.Model.Select("Attack");
+            Show();
+            Assert.Contains("Ainda não faz nada", PanelText());
+
+            // "Escrever o que ele faz": a estrutura vazia entra na cena, com o cursor entre as chaves.
+            int? caret = null;
+            vm.GoToRequested += (_, _, _, o) => caret = o;
+            vm.WritePieceHandler(created.Directory, "Fight", "Attack", "OnClick");
+            var code = vm.FindDocument(created.ProgramPath)!.Document.Text;
+            Assert.Contains("    game.Find(\"Attack\").OnClick(() =>\n    {\n        \n    });\n});", code);
+            Assert.Equal(code.IndexOf("game.Find(\"Attack\")", StringComparison.Ordinal) + "game.Find(\"Attack\").OnClick(() =>\n    {\n        ".Length, caret);
+            Assert.True(vm.FindPieceCode(created.Directory, "Fight", "Attack", "OnClick")!.HasHandler);
+            view.Model.Select("Continue");
+            view.Model.Select("Attack");
+            Show();
+            Assert.Contains("Já faz algo", PanelText());
+
+            // A aba nesse estado fica em %TEMP%\csharplab-ao-clicar.png para conferir o visual.
+            var bitmap = new RenderTargetBitmap((int)view.ActualWidth, (int)view.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(view);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var file = File.Create(Path.Combine(Path.GetTempPath(), "csharplab-ao-clicar.png"));
+            encoder.Save(file);
+        }
+        finally
+        {
+            window.Close();
+            view.Detach();
+        }
+    });
+
     /// <summary>
     /// O botão Cenas (ao lado do Executar) lista as cenas do jogo e troca entre a tela e o código da cena atual.
     /// O menu fica em %TEMP%\csharplab-menu-cenas.png para conferir o visual.

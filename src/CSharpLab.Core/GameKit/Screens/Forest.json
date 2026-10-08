@@ -1,0 +1,8 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Title", "x": 40, "y": 32, "width": 560, "height": 52, "text": "Floresta", "size": 34, "bold": true },
+    { "type": "Text", "name": "Story", "x": 40, "y": 92, "width": 560, "height": 64, "text": "Árvores altas e um silêncio estranho...", "size": 19 },
+    { "type": "Button", "name": "Back", "x": 40, "y": 448, "width": 240, "height": 56, "text": "Voltar para a vila" }
+  ]
+}

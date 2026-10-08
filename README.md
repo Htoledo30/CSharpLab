@@ -50,14 +50,39 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | Consertar um erro | Com o cursor no sublinhado, `Ctrl+.` mostra correções (ex.: adicionar o `using` que falta). |
 | Fazer jogos no console | `Ctrl+Shift+J` expande o terminal para quase a tela toda. |
 | Organizar o código | `Ctrl+Shift+F` formata o arquivo (desfaz com `Ctrl+Z`). |
-| Estudar com exemplos | **Arquivo → Exemplos para estudar**: adivinhe o número, calculadora, jogo da velha, batalha RPG, cobrinha e RPG com botões. Código em inglês, comentários em português. Ficam em `Documentos\CSharp Lab\Exemplos` e suas mudanças nunca são apagadas. |
+| Estudar com exemplos | **Arquivo → Exemplos para estudar**: adivinhe o número, calculadora, jogo da velha, batalha RPG, cobrinha e dois RPGs de janela (com telas desenhadas e só com código). Código em inglês, comentários em português. Ficam em `Documentos\CSharp Lab\Exemplos` e suas mudanças nunca são apagadas. |
 
 Executar um rascunho pede uma única vez o nome e a pasta de um projeto novo; o código vira o `Program.cs` dele.
 
 ## Jogos com botões
 
-Um **jogo com botões** abre numa janela própria, com título, textos, barras de vida e botões, em vez do terminal.
-Crie em **Arquivo → Novo projeto… → Jogo com botões** (ou abra o exemplo **RPG com botões**). Cada coisa na tela é uma linha de C#:
+Um **jogo com botões** abre numa janela própria, com textos, barras de vida e botões, em vez do terminal.
+Crie em **Arquivo → Novo projeto… → Jogo com botões**. Ele já nasce com duas cenas prontas para mexer
+(ou abra o exemplo **RPG com botões**).
+
+O jogo tem duas partes, cada uma no seu lugar:
+
+- **A tela** (aba Tela): onde fica cada coisa, tamanho, cor e texto. Você arrasta com o mouse.
+- **O código** (`Program.cs`): o que muda na tela e o que cada botão faz. Você escreve em C#.
+
+### A tela
+
+Cada cena tem a sua tela em `Screens/<Cena>.json`. Abra pelo botão **Cenas** (ao lado do **Executar**) ou pelo explorador.
+Para uma cena nova: **Cenas → Nova tela do jogo…**.
+
+- **Peças** à esquerda: Texto, Botão, Barra, Imagem, Caixa, Campo de escrita e Mensagens. Clique para pôr no meio ou arraste até o lugar.
+- **Palco** no meio: arraste para mover, puxe os quadradinhos para mudar o tamanho (Shift mantém a proporção).
+  As peças grudam nas bordas e nos centros das outras, com linhas-guia (Alt solta livre).
+  Setas movem 1 (Shift: 10), `Ctrl+D` duplica, `Del` apaga, `Ctrl+Z` desfaz, Tab passa para a próxima peça, botão direito tem mais opções.
+- **Propriedades** à direita: nome, texto, letra, cor, imagem, posição e tamanho.
+  Num botão, **Ao clicar** mostra se ele já faz algo e em que linha do código (clique para ir até lá). Se ainda não faz nada,
+  **Escrever o que ele faz** cria o `game.Find("Nome").OnClick(() => { });` na cena certa e deixa o cursor entre as chaves:
+  o que o botão faz, você escreve. O campo de escrita tem o mesmo com **Ao responder** (`OnAnswer`).
+
+### O código
+
+Cada `game.Scene` liga o código à tela de mesmo nome. A cena pega as peças pelo nome com `game.Find` e muda
+as propriedades com `=`:
 
 ```csharp
 var game = new Game("A Torre");
@@ -65,68 +90,53 @@ int gold = 0;
 
 game.Scene("Start", () =>
 {
-    game.Title("Vila");
-    game.Write($"Ouro: {gold}", Color.Gold);
-    game.Button("Procurar moedas", () => gold += 5);
-    game.Button("Ir para a floresta", () => game.GoTo("Forest"));
-});
+    game.Find("Gold").Text = $"Ouro: {gold}";
 
-game.Scene("Forest", () => game.Write("Árvores por todo lado."));
+    game.Find("Search").OnClick(() =>
+    {
+        gold += 5;
+        game.Write("Você achou 5 moedas!");
+    });
+
+    game.Find("Forest").OnClick(() =>
+    {
+        game.GoTo("Forest");
+    });
+});
 
 game.Start("Start");
 ```
 
 | Comando | Em português | O que faz |
 | --- | --- | --- |
-| `Scene` | cena | Uma tela do jogo. É desenhada de novo depois de cada clique, com os valores atuais das variáveis. |
-| `Title` | título | Texto grande no alto. |
-| `Write` | dizer | Um texto. Dentro de um botão, aparece destacado depois do clique. |
-| `Button` | botão | O código entre as chaves roda no clique. As teclas 1 a 9 também apertam os botões. |
-| `Bar` | barra | Vida, mana, energia… |
-| `Ask` | perguntar | Campo para o jogador escrever (ex.: o nome). |
-| `Image` | imagem | Uma imagem da pasta `Assets` do projeto. |
+| `Scene` | cena | O código de uma tela. Roda de novo depois de cada clique, com os valores atuais das variáveis. |
+| `Find("Nome")` | achar | Pega uma peça da tela. Depois: `.Text`, `.Value`, `.Max`, `.Visible`, `.Color`, `.Image`. |
+| `OnClick` | ao clicar | O código entre as chaves roda quando o jogador clica no botão. |
+| `OnAnswer` | ao responder | O mesmo, para o campo de escrita: `answer` é o que o jogador escreveu. |
+| `Write` | escrever | Uma mensagem para o jogador (aparece na peça Mensagens). |
 | `GoTo` | ir para | Troca de cena. |
-| `Start` | começar | Abre a janela. Sempre na última linha. |
+| `Start` | começar | Abre a janela na primeira cena. Sempre na última linha. |
 
-O autocomplete e o mouse em cima de cada comando mostram a tradução e um exemplo. Os snippets `scene` e `button`
-escrevem a estrutura com as chaves. O jogo leva uma cópia do motor em `lib\` (funciona mesmo se a pasta mudar de lugar)
-e um `AGENTS.md`/`CLAUDE.md` que ensina o motor para IAs como o Claude e o Codex.
+O autocomplete e o mouse em cima de cada comando mostram a tradução e um exemplo. Ao digitar `game.Find("`, o editor
+sugere os nomes das peças daquela tela; um nome que não existe ganha uma dica antes de rodar, e renomear uma peça na Tela
+também troca o nome no código.
 
-### Desenhar a tela (aba Tela)
+Para ir e voltar: o botão **Cenas** troca entre a tela e o código da cena em que você está; no alto da aba Tela,
+**Código da cena** leva até o `game.Scene`; `Ctrl`+clique ou `F12` no nome da cena abre a tela dela, e no nome de
+um `game.GoTo("Shop")` vai até o código da cena.
 
-Em vez de montar a tela pelo código, dá para **desenhar**: **Arquivo → Nova tela do jogo…**, dê o nome da cena
-(ex.: `Fight`) e a tela abre na aba **Tela**:
+### Cenas só com código
 
-- **Peças** à esquerda: Texto, Botão, Barra, Imagem, Caixa, Campo de escrita e Mensagens. Clique para pôr no meio ou arraste até o lugar.
-- **Palco** no meio: arraste para mover, puxe os quadradinhos para mudar o tamanho (Shift mantém a proporção).
-  As peças grudam nas bordas e nos centros das outras, com linhas-guia (Alt solta livre).
-  Setas movem 1 (Shift: 10), `Ctrl+D` duplica, `Del` apaga, `Ctrl+Z` desfaz, Tab passa para a próxima peça, botão direito tem mais opções.
-- **Propriedades** à direita: nome, texto, letra, cor, imagem, posição e tamanho, e o código para usar a peça.
+Uma cena sem tela desenhada também funciona: o próprio código monta a tela com `game.Title`, `game.Write`,
+`game.Button`, `game.Bar`, `game.Ask` e `game.Image` (exemplo: **RPG só com código**; snippets `scene` e `button`).
+É um bom jeito de treinar C#. Numa cena com tela desenhada esses comandos não funcionam (as peças vêm da tela),
+e o editor avisa antes de rodar.
 
-No código, a cena pega as peças pelo nome com `game.Find` e muda as propriedades com `=` (como na Unity):
+### Para IAs
 
-```csharp
-game.Scene("Fight", () =>
-{
-    game.Find("PlayerHealth").Value = health;
-    game.Find("Potion").Visible = potions > 0;
-    game.Find("Attack").OnClick(() =>
-    {
-        enemyHealth -= 10;
-        game.Write("Você acertou!");
-    });
-});
-```
-
-Ao digitar `game.Find("`, o editor sugere os nomes das peças daquela tela. Um nome que não existe ganha uma dica antes de rodar,
-e renomear uma peça na Tela também troca o nome no código.
-
-O botão **Cenas**, ao lado do **Executar**, lista as cenas do jogo (qual tem tela, qual é só código, onde o jogo começa)
-e troca entre a tela e o código da cena em que você está. No alto da aba Tela, **Código da cena** leva até o `game.Scene("Fight", …)`.
-Atalhos no código: `Ctrl`+clique ou `F12` no nome da cena abre a tela dela, e no nome de um `game.GoTo("Shop")` vai até o código da cena.
-
-A tela é um arquivo de texto (`Screens/Fight.json`, botão **Texto** no alto da aba), então uma IA também consegue criar e
-mudar telas. Exemplo pronto: **RPG com tela desenhada**.
+A tela é um arquivo de texto (`Screens/Fight.json`, botão **Arquivo** no alto da aba), então uma IA também consegue
+criar e mudar telas. Cada jogo leva um `AGENTS.md`/`CLAUDE.md` que ensina o motor para o Claude e o Codex, e uma
+cópia do motor em `lib\` (funciona mesmo se a pasta mudar de lugar).
 
 ## Atalhos
 

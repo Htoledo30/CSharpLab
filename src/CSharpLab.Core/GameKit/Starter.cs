@@ -1,31 +1,38 @@
-// Jogo com botões: cada cena é uma tela do jogo. Aperte F5 para jogar.
-// Dica: pare o mouse em cima de Write, Button, Bar... para ver a explicação.
+// Jogo com botões. Aperte F5 para jogar.
+// As telas ficam na pasta Screens, uma por cena: abra Screens/Start.json (ou use o botão Cenas,
+// lá em cima) para arrastar os botões e mudar textos e cores.
+// Aqui no código fica o que muda na tela e o que cada botão faz.
 
 var game = new Game("Meu jogo");
 
 // As variáveis do jogo ficam aqui em cima, fora das cenas.
 int gold = 0;
 
+// A vila (tela: Screens/Start.json).
 game.Scene("Start", () =>
 {
-    game.Title("Bem-vindo!");
-    game.Write("Você está numa vila tranquila.");
-    game.Write($"Ouro: {gold}", Color.Gold);
+    // game.Find("Nome") pega a peça da tela pelo nome. Aqui, o texto do ouro mostra o valor atual.
+    game.Find("Gold").Text = $"Ouro: {gold}";
 
-    game.Button("Procurar moedas", () =>
+    game.Find("Search").OnClick(() =>
     {
         gold += 5;
         game.Write("Você achou 5 moedas!");
     });
 
-    game.Button("Ir para a floresta", () => game.GoTo("Forest"));
+    game.Find("Forest").OnClick(() =>
+    {
+        game.GoTo("Forest");
+    });
 });
 
+// A floresta (tela: Screens/Forest.json).
 game.Scene("Forest", () =>
 {
-    game.Title("Floresta");
-    game.Write("Árvores altas e um silêncio estranho...");
-    game.Button("Voltar para a vila", () => game.GoTo("Start"));
+    game.Find("Back").OnClick(() =>
+    {
+        game.GoTo("Start");
+    });
 });
 
 // Abre a janela na primeira cena. Fica sempre no fim do arquivo.

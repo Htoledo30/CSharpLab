@@ -10,7 +10,7 @@ using CSharpLab.ViewModels;
 namespace CSharpLab.Screens;
 
 /// <summary>
-/// A aba de um arquivo Screens/*.json: a tela para arrastar (Tela) ou o arquivo em si (Texto).
+/// A aba de um arquivo Screens/*.json: a tela para arrastar (Tela) ou o arquivo em si (Arquivo).
 /// As duas mostram o mesmo documento, então mudar numa aparece na outra.
 /// </summary>
 public sealed class ScreenEditorView : Grid
@@ -34,21 +34,21 @@ public sealed class ScreenEditorView : Grid
         _vm = vm;
         Model = new ScreenDesignerModel(doc);
         Stage = new ScreenStage(Model);
-        Properties = new ScreenPropertiesPanel(Model);
+        Properties = new ScreenPropertiesPanel(Model) { CodeLinks = vm };
         Palette = new PiecePalette(Model);
         SetResourceReference(BackgroundProperty, "BgEditor");
 
         RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        // Cabeçalho: nome da tela, desfazer/refazer e a troca Tela | Texto.
+        // Cabeçalho: nome da tela, desfazer/refazer e a troca Tela | Arquivo.
         var header = new DockPanel { Height = 38, LastChildFill = true };
         var headerBorder = new Border { Child = header, BorderThickness = new Thickness(0, 0, 0, 1), Padding = new Thickness(12, 0, 8, 0) };
         headerBorder.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         headerBorder.SetResourceReference(Border.BackgroundProperty, "BgSidebar");
 
         _designButton = ModeButton("Tela", "Montar a tela arrastando as peças");
-        _textButton = ModeButton("Texto", "Ver e editar o arquivo da tela (JSON)");
+        _textButton = ModeButton("Arquivo", "Ver e editar o arquivo da tela (Screens/*.json), em texto");
         _designButton.Click += (_, _) => ShowDesign();
         _textButton.Click += (_, _) => ShowText();
         var modes = new StackPanel { Orientation = Orientation.Horizontal };
@@ -117,7 +117,7 @@ public sealed class ScreenEditorView : Grid
 
     public bool IsDesignMode { get; private set; } = true;
 
-    /// <summary>O editor de texto, quando a aba Texto está aberta (para buscar, desfazer pelo menu etc.).</summary>
+    /// <summary>O editor de texto, quando o Arquivo está aberto (para buscar, desfazer pelo menu etc.).</summary>
     public CodeEditor? ActiveTextEditor => IsDesignMode ? null : _editor;
 
     private static ToggleButton ModeButton(string text, string tip)
@@ -181,7 +181,7 @@ public sealed class ScreenEditorView : Grid
         var title = new TextBlock { Text = "A tela não pode ser mostrada", FontSize = 15, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 8, 0, 0) };
         title.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
         _errorText.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondary");
-        var open = new Button { Content = "Corrigir no Texto", HorizontalAlignment = HorizontalAlignment.Left };
+        var open = new Button { Content = "Corrigir no arquivo", HorizontalAlignment = HorizontalAlignment.Left };
         open.SetResourceReference(StyleProperty, "PrimaryButton");
         open.Margin = new Thickness(0);
         open.Click += (_, _) =>
@@ -310,7 +310,7 @@ public sealed class ScreenEditorView : Grid
         }, DispatcherPriority.Input);
     }
 
-    /// <summary>Ir para uma linha (ex.: um erro em Problemas) abre a aba Texto.</summary>
+    /// <summary>Ir para uma linha (ex.: um erro em Problemas) abre o Arquivo.</summary>
     public void GoTo(int line, int column, int? offset)
     {
         ShowText();

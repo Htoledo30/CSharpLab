@@ -287,10 +287,7 @@ public sealed partial class MainViewModel
             return;
         }
         if (!await OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: true)) return;
-        // Exemplo com telas desenhadas: a primeira tela fica aberta numa aba, ao lado do código.
-        var screens = Path.Combine(created.Directory, GameScreens.Folder);
-        if (Directory.Exists(screens) && Directory.EnumerateFiles(screens, "*.json").Order(StringComparer.OrdinalIgnoreCase).FirstOrDefault() is { } screen)
-            OpenFile(screen, activate: false);
+        OpenStartScreen(created);
         OpenFile(created.ProgramPath);
         FocusEditorRequested?.Invoke();
     }
@@ -310,6 +307,7 @@ public sealed partial class MainViewModel
                 : ProjectCreator.CreateConsoleProject(request.Location, request.Name);
             Settings.LastProjectLocation = request.Location;
             await OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: false);
+            OpenStartScreen(created);
             OpenFile(created.ProgramPath);
             FocusEditorRequested?.Invoke();
         }
@@ -317,6 +315,20 @@ public sealed partial class MainViewModel
         {
             Dialogs.ShowError("Não foi possível criar o projeto", FileErrors.Describe(ex, request.Name));
         }
+    }
+
+    /// <summary>
+    /// Jogo com telas desenhadas: a tela da cena onde o jogo começa (game.Start) fica aberta numa aba,
+    /// ao lado do código. Sem game.Start, a primeira tela da pasta.
+    /// </summary>
+    private void OpenStartScreen(CreatedProject created)
+    {
+        var screens = Path.Combine(created.Directory, GameScreens.Folder);
+        if (!Directory.Exists(screens)) return;
+        var start = StartScene().Match(ReadCode(created.ProgramPath)) is { Success: true } m ? m.Groups[1].Value : null;
+        var screen = start != null ? GameScreens.PathOf(created.Directory, start)
+            : Directory.EnumerateFiles(screens, "*.json").Order(StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+        if (screen != null && File.Exists(screen)) OpenFile(screen, activate: false);
     }
 
     private string DefaultProjectLocation()

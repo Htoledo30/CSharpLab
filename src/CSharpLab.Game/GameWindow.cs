@@ -155,12 +155,19 @@ internal sealed class GameWindow : Window, IGameView
             if (_answerBox == null && element.Tag is TextBox box) _answerBox = box;
         }
 
-        // Sem a peça Mensagens, o que o game.Write escreveu aparece num aviso embaixo da tela.
+        // Sem a peça Mensagens, o que o game.Write escreveu aparece num aviso por cima da tela,
+        // num lugar que não cobre os botões.
         if (!hasMessagesPiece && messages.Count > 0)
-            _designed.Children.Add(Toast(messages));
+        {
+            var avoid = scene.Layout.Pieces
+                .Where(p => p.Visible && p.Type is PieceType.Button or PieceType.Input)
+                .Select(p => new Rect(p.X, p.Y, p.Width, p.Height))
+                .ToList();
+            _designed.Children.Add(Toast(messages, avoid));
+        }
     }
 
-    private static FrameworkElement Toast(IReadOnlyList<MessageLine> messages)
+    private static FrameworkElement Toast(IReadOnlyList<MessageLine> messages, IReadOnlyList<Rect> avoid)
     {
         var list = new StackPanel();
         foreach (var line in messages.TakeLast(4))
@@ -176,13 +183,15 @@ internal sealed class GameWindow : Window, IGameView
             Width = 620,
             IsHitTestVisible = false,
         };
-        Canvas.SetLeft(toast, (StageWidth - 620) / 2);
-        toast.Loaded += (_, _) =>
-        {
-            Canvas.SetTop(toast, StageHeight - toast.ActualHeight - 20);
-            toast.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
-        };
-        Canvas.SetTop(toast, StageHeight - 120);
+        double left = (StageWidth - 620) / 2;
+        Canvas.SetLeft(toast, left);
+        // Embaixo; se cobrir um botão, no meio; se ainda cobrir, em cima.
+        toast.Measure(new Size(620, double.PositiveInfinity));
+        double height = toast.DesiredSize.Height;
+        double[] candidates = [StageHeight - height - 20, (StageHeight - height) / 2, 20];
+        double top = candidates.FirstOrDefault(y => !avoid.Any(r => r.IntersectsWith(new Rect(left, y, 620, height))), candidates[1]);
+        Canvas.SetTop(toast, top);
+        toast.Loaded += (_, _) => toast.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
         return toast;
     }
 

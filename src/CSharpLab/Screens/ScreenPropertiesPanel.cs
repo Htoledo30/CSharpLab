@@ -8,6 +8,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using CSharpLab.GameEngine;
+using CSharpLab.ViewModels;
 using GameColor = CSharpLab.GameEngine.Color;
 using WpfColor = System.Windows.Media.Color;
 
@@ -28,6 +29,7 @@ public sealed class ScreenPropertiesPanel : Border
     private bool _updating;
     private bool _renaming;
     private TextBox? _textField;
+    private Action? _refreshCode;
 
     public ScreenPropertiesPanel(ScreenDesignerModel model)
     {
@@ -40,8 +42,26 @@ public sealed class ScreenPropertiesPanel : Border
 
         model.SelectionChanged += Build;
         model.Changed += OnModelChanged;
+        // Voltando de outra aba (onde a pessoa pode ter escrito o código da peça): confere de novo.
+        IsVisibleChanged += (_, _) =>
+        {
+            if (IsVisible) _refreshCode?.Invoke();
+        };
         Build();
     }
+
+    /// <summary>Liga o painel ao código do jogo ("Ao clicar": o que o botão faz e onde está).</summary>
+    public MainViewModel? CodeLinks
+    {
+        get => _codeLinks;
+        set
+        {
+            _codeLinks = value;
+            Build();
+        }
+    }
+
+    private MainViewModel? _codeLinks;
 
     public void Detach()
     {
@@ -63,8 +83,15 @@ public sealed class ScreenPropertiesPanel : Border
         // Renomear pelo campo Nome continua sendo a mesma peça: só atualiza os valores.
         if (_renaming && piece != null && piece.Type == _shownType) _shownName = piece.Name;
         bool samePiece = piece != null ? piece.Name == _shownName && piece.Type == _shownType : _shownName == null && _shownType == null;
-        if (samePiece && _content.Children.Count > 0) Refresh();
-        else Build();
+        if (samePiece && _content.Children.Count > 0)
+        {
+            Refresh();
+            if (_renaming) _refreshCode?.Invoke();
+        }
+        else
+        {
+            Build();
+        }
     }
 
     private void Refresh()
@@ -86,6 +113,7 @@ public sealed class ScreenPropertiesPanel : Border
     {
         _content.Children.Clear();
         _refreshers.Clear();
+        _refreshCode = null;
         _textField = null;
         var piece = _model.Selected;
         _shownName = piece?.Name;
@@ -99,6 +127,7 @@ public sealed class ScreenPropertiesPanel : Border
         if (piece == null) BuildScreen();
         else BuildPiece(piece);
         Refresh();
+        _refreshCode?.Invoke();
     }
 
     private void BuildScreen()
@@ -109,8 +138,15 @@ public sealed class ScreenPropertiesPanel : Border
         _content.Children.Add(ImagePicker(() => _model.Layout?.Background, image => _model.SetBackground(image), "Sem imagem de fundo"));
 
         _content.Children.Add(Section("NO CÓDIGO"));
-        _content.Children.Add(Muted("Esta tela aparece quando o jogo entra na cena com este nome:"));
-        _content.Children.Add(CodeBox($"game.Scene(\"{_model.SceneName}\", () =>\n{{\n    game.Find(\"Nome\")...\n}});"));
+        if (CodeLinks != null && _model.ProjectDirectory != null)
+        {
+            _content.Children.Add(SceneCodeField());
+        }
+        else
+        {
+            _content.Children.Add(Muted("Esta tela aparece quando o jogo entra na cena com este nome:"));
+            _content.Children.Add(CodeBox($"game.Scene(\"{_model.SceneName}\", () =>\n{{\n    game.Find(\"Nome\")...\n}});"));
+        }
 
         _content.Children.Add(Section("DICAS"));
         foreach (var tip in new[]
@@ -119,7 +155,7 @@ public sealed class ScreenPropertiesPanel : Border
                      "Arraste os quadradinhos dos cantos para redimensionar. Shift mantém a proporção.",
                      "As peças grudam nas outras e nas bordas. Segure Alt para soltar livre.",
                      "Setas movem 1 (Shift: 10). Ctrl+D duplica, Del apaga, Ctrl+Z desfaz.",
-                     "Para ver ou editar o arquivo, use Texto, lá em cima.",
+                     "A tela é um arquivo de texto: para ver, use Arquivo, lá em cima.",
                  })
         {
             _content.Children.Add(Bullet(tip));
@@ -160,6 +196,14 @@ public sealed class ScreenPropertiesPanel : Border
             var field = TextField(() => Current()?.Text ?? "", v => Edit(p => p.Text = v, "text"), multiline: type == PieceType.Text);
             _textField = field;
             _content.Children.Add(field);
+        }
+
+        // Botão e campo de escrita: logo depois do texto, o que eles fazem (fica no código; o painel mostra onde).
+        bool showsHandler = type is PieceType.Button or PieceType.Input && CodeLinks != null && _model.ProjectDirectory != null;
+        if (showsHandler)
+        {
+            _content.Children.Add(Section(type == PieceType.Button ? "AO CLICAR" : "AO RESPONDER"));
+            _content.Children.Add(HandlerField(type == PieceType.Button ? "OnClick" : "OnAnswer"));
         }
 
         if (type == PieceType.Bar)
@@ -224,6 +268,8 @@ public sealed class ScreenPropertiesPanel : Border
         visible.Margin = new Thickness(0, 14, 0, 0);
         _content.Children.Add(visible);
 
+        if (showsHandler) return;   // o código dele já aparece em "Ao clicar"
+
         _content.Children.Add(Section("NO CÓDIGO"));
         var code = CodeBox(ScreenDesignerModel.CodeExample(piece));
         _refreshers.Add(() =>
@@ -234,6 +280,140 @@ public sealed class ScreenPropertiesPanel : Border
     }
 
     // ------------------------------------------------------------------ campos
+
+    /// <summary>
+    /// O que o botão (ou o campo de escrita) faz: "Já faz algo — Program.cs, linha 34" com o caminho até lá,
+    /// ou "Ainda não faz nada" com um atalho que escreve a estrutura vazia na cena certa.
+    /// </summary>
+    private FrameworkElement HandlerField(string handler)
+    {
+        bool isButton = handler == "OnClick";
+        var card = new CodeStatusCard(this, isButton ? "Escrever o que ele faz" : "Escrever o que acontece");
+        PieceCode? found = null;
+        card.LinkClicked += () =>
+        {
+            if (found != null) CodeLinks?.GoToPieceCode(found);
+        };
+        card.ActionClicked += () =>
+        {
+            if (CodeLinks != null && _model.ProjectDirectory is { } dir && _shownName is { } name)
+                CodeLinks.WritePieceHandler(dir, _model.SceneName, name, handler);
+        };
+
+        _refreshCode = () =>
+        {
+            if (CodeLinks == null || _model.ProjectDirectory is not { } dir || _shownName is not { } name) return;
+            found = CodeLinks.FindPieceCode(dir, _model.SceneName, name, handler);
+            string where = found != null ? $"{System.IO.Path.GetFileName(found.File)}, linha {found.Line}" : "";
+            string snippet = isButton ? $"game.Find(\"{name}\").OnClick(() => {{ }});" : $"game.Find(\"{name}\").OnAnswer(answer => {{ }});";
+            if (found is { HasHandler: true })
+            {
+                card.Show(ok: true, isButton ? "Já faz algo" : "Já responde", where, showAction: false,
+                    isButton ? "O que acontece no clique está no código, dentro do OnClick."
+                             : "O que acontece com a resposta está no código, dentro do OnAnswer.");
+            }
+            else
+            {
+                card.Show(ok: false, isButton ? "Ainda não faz nada" : "Ainda não faz nada com a resposta",
+                    found != null ? $"Usado em {where}" : null, showAction: true,
+                    $"Escreve {snippet} na cena \"{_model.SceneName}\". O que acontece, você escreve entre as chaves.");
+            }
+        };
+        return card.Element;
+    }
+
+    /// <summary>A cena no código: "game.Scene("Fight") — Program.cs, linha 30", ou o atalho para escrever a cena.</summary>
+    private FrameworkElement SceneCodeField()
+    {
+        var card = new CodeStatusCard(this, "Escrever a cena no código");
+        PieceCode? found = null;
+        card.LinkClicked += () =>
+        {
+            if (found != null) CodeLinks?.GoToPieceCode(found);
+        };
+        card.ActionClicked += () =>
+        {
+            if (CodeLinks != null && _model.ProjectDirectory is { } dir) CodeLinks.GoToSceneCode(dir, _model.SceneName);
+        };
+        _refreshCode = () =>
+        {
+            if (CodeLinks == null || _model.ProjectDirectory is not { } dir) return;
+            found = CodeLinks.FindSceneCode(dir, _model.SceneName);
+            var scene = $"game.Scene(\"{_model.SceneName}\")";
+            if (found != null)
+                card.Show(ok: true, scene, $"{System.IO.Path.GetFileName(found.File)}, linha {found.Line}", showAction: false,
+                    "É ali que as peças desta tela ganham vida, com game.Find(\"Nome\").");
+            else
+                card.Show(ok: false, "Esta cena ainda não está no código", null, showAction: true,
+                    $"Sem {scene}, o jogo não consegue entrar nesta tela.");
+        };
+        return card.Element;
+    }
+
+    /// <summary>
+    /// Um cartãozinho de situação (✓ tudo certo / ⚠ falta algo), com um link até o código e um botão de atalho.
+    /// </summary>
+    private sealed class CodeStatusCard
+    {
+        private readonly TextBlock _icon = new() { FontSize = 13, Margin = new Thickness(0, 1, 9, 0), VerticalAlignment = VerticalAlignment.Top };
+        private readonly TextBlock _status = new() { TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold };
+        private readonly Button _link;
+        private readonly Button _action;
+        private readonly TextBlock _hint;
+
+        public event Action? LinkClicked;
+        public event Action? ActionClicked;
+
+        public CodeStatusCard(FrameworkElement owner, string actionText)
+        {
+            _icon.SetResourceReference(TextBlock.FontFamilyProperty, "IconFont");
+            _status.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
+            _link = new Button { Style = (Style)owner.FindResource("LinkButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(-6, 0, 0, -4), FontSize = 12, ToolTip = "Ir até o código" };
+            _link.Click += (_, _) => LinkClicked?.Invoke();
+            var text = new StackPanel();
+            text.Children.Add(_status);
+            text.Children.Add(_link);
+            var row = new DockPanel();
+            DockPanel.SetDock(_icon, Dock.Left);
+            row.Children.Add(_icon);
+            row.Children.Add(text);
+            var card = new Border { Child = row, Padding = new Thickness(10, 8, 10, 8), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
+            card.SetResourceReference(Border.BackgroundProperty, "BgBase");
+            card.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+
+            _action = new Button
+            {
+                Content = actionText,
+                Style = (Style)owner.FindResource("DialogButton"),
+                Margin = new Thickness(0, 8, 0, 0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                Height = 30,
+                Focusable = false,
+            };
+            _action.Click += (_, _) => ActionClicked?.Invoke();
+            _hint = Muted("");
+            _hint.Margin = new Thickness(0, 6, 0, 0);
+
+            var panel = new StackPanel();
+            panel.Children.Add(card);
+            panel.Children.Add(_action);
+            panel.Children.Add(_hint);
+            Element = panel;
+        }
+
+        public FrameworkElement Element { get; }
+
+        public void Show(bool ok, string status, string? link, bool showAction, string hint)
+        {
+            _icon.Text = ok ? "" : "";
+            _icon.SetResourceReference(TextBlock.ForegroundProperty, ok ? "SuccessBrush" : "WarningBrush");
+            _status.Text = status;
+            _link.Content = link;
+            _link.Visibility = link != null ? Visibility.Visible : Visibility.Collapsed;
+            _action.Visibility = showAction ? Visibility.Visible : Visibility.Collapsed;
+            _hint.Text = hint;
+        }
+    }
 
     private FrameworkElement NameField()
     {

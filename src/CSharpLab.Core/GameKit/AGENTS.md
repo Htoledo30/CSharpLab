@@ -2,72 +2,85 @@
 
 > Este guia é atualizado pelo CSharp Lab junto com o motor do jogo. Anotações suas vão em outro arquivo.
 
-Este é um **jogo com botões** feito no CSharp Lab: um jogo de texto em C#, numa janela com títulos, textos, barras e botões. Quem cria é iniciante em programação. Escreva código que **ele consiga ler e mudar**.
+Este é um **jogo com botões** feito no CSharp Lab: um jogo de texto em C#, numa janela com textos, barras e botões. Quem cria é iniciante em programação e está aprendendo C#. Escreva código que **ele consiga ler e mudar**, e deixe a lógica no código (não esconda o C# dele).
 
 ## Como funciona
 
-- Tudo fica em `Program.cs`, com top-level statements. O motor é a biblioteca `lib/CSharpLab.Game.dll`, e o `using CSharpLab.GameEngine;` já vem pelo `.csproj`.
-- O jogo é um conjunto de **cenas**. Cada cena é uma função que **desenha a tela inteira** com os valores atuais das variáveis.
-- **Depois de cada clique, a cena atual é desenhada de novo sozinha.** Por isso basta mudar as variáveis no botão: as barras e os textos se atualizam.
+O jogo tem duas partes:
+
+- **A tela** de cada cena: o arquivo `Screens/<Cena>.json`, que o CSharp Lab abre na aba **Tela** para arrastar as peças. Diz onde fica cada coisa, tamanho, cor e texto inicial.
+- **O código**, em `Program.cs` (top-level statements): o que muda na tela e o que cada botão faz. O motor é `lib/CSharpLab.Game.dll`, e o `using CSharpLab.GameEngine;` já vem pelo `.csproj`.
+
+Mais:
+
+- O jogo é um conjunto de **cenas**. `game.Scene("Fight", ...)` liga o código à tela `Screens/Fight.json`.
+- **Depois de cada clique, o código da cena atual roda de novo sozinho.** Por isso basta mudar as variáveis no botão: a cena põe os valores novos na tela.
 - O estado do jogo (vida, ouro, nome, inventário…) fica em **variáveis declaradas no topo**, antes das cenas.
-- `game.Write` dentro de um botão vira um **aviso destacado** que aparece depois do clique ("Você causou 7 de dano!"). Some no clique seguinte.
-- As teclas 1 a 9 apertam os botões.
+- Ao **entrar** numa cena, as peças começam como no arquivo. Depois guardam o que o código mudou, até o jogador sair da cena.
+- `game.Write` vai para a peça `Messages` da tela (sem ela, aparece como aviso por cima da tela) e some no clique seguinte.
 - Rodar: F5 no CSharp Lab (ou `dotnet run`).
 
-## API completa
+**Padrão para cena nova:** crie a tela `Screens/<Cena>.json` e a `game.Scene` com o mesmo nome, que pega as peças com `game.Find`.
 
-| Código | O que faz |
-|---|---|
-| `var game = new Game("Título");` | Cria o jogo. |
-| `game.Scene("Name", () => { ... });` | Cria uma cena (tela). Nomes em inglês: `"Start"`, `"Forest"`, `"Fight"`. |
-| `game.Title("texto");` | Título grande da cena. |
-| `game.Write("texto");` / `game.Write("texto", Color.Red);` | Parágrafo de texto, com cor opcional. |
-| `game.Button("Texto", () => { ... });` | Botão. O código roda no clique. |
-| `game.Bar("Vida", value, max, Color.Green);` | Barra (vida, mana…), mostrada à direita. |
-| `game.Ask("Pergunta?", answer => { ... });` | Campo para o jogador escrever; recebe o texto (já sem espaços nas pontas e nunca vazio). |
-| `game.Image("arquivo.png");` | Imagem da pasta `Assets/`. |
-| `game.GoTo("Name");` | Troca de cena (pode ser usado em botões e dentro de cenas). |
-| `game.CurrentScene` | Nome da cena atual. |
-| `game.Start("Start");` | Abre a janela na primeira cena. **Sempre a última linha.** |
-
-Cores (`Color`): `White`, `Gray`, `Red`, `Green`, `Blue`, `Gold`, `Purple`, `Orange`.
-
-## Regras
-
-1. **Não use `Console`** (`ReadLine`/`WriteLine`): é um jogo de janela. Use `game.Ask` e `game.Write`.
-2. `Title`, `Button`, `Bar`, `Ask` e `Image` só funcionam **dentro de uma cena**. `Scene` nunca fica dentro de outra cena.
-3. Não faça loops de jogo (`while (true)`) nem `Thread.Sleep`. O jogo anda pelos cliques.
-4. Para condições que mudam de tela, use `GoTo` dentro da cena: `if (health <= 0) game.GoTo("GameOver");`.
-5. Números aleatórios: `Random.Shared.Next(min, max + 1)`.
-6. **Nomes de código em inglês** (`health`, `gold`, `enemyHealth`). **Textos do jogo e comentários em português.**
-7. Prefira código simples de iniciante: variáveis, `if`, `switch`, listas, métodos pequenos. Classes só quando ajudarem de verdade (ex.: `class Enemy`). Evite LINQ avançado, genéricos, eventos e async.
-8. Comente o que não for óbvio, em português e com frases curtas.
-9. Imagens vão na pasta `Assets/` (png ou jpg), já copiada para o jogo pelo `.csproj`.
-
-## Telas desenhadas (aba Tela)
-
-Uma cena pode ter a tela **desenhada**: o arquivo `Screens/<Cena>.json`, com o mesmo nome da cena. O CSharp Lab abre esse arquivo na aba **Tela**, onde as peças são arrastadas, e a pessoa vê o resultado na hora. **Você pode criar e mudar telas escrevendo esse arquivo.**
-
-- Quando `Screens/Fight.json` existe, `game.Scene("Fight", ...)` usa essa tela. Sem o arquivo, a cena monta a tela sozinha (`Write`, `Button`…).
-- Numa cena desenhada, o código **não cria peças**: ele pega as peças pelo nome com `game.Find("Nome")` e muda as propriedades com `=`. `Title`, `Button`, `Bar`, `Ask` e `Image` dão erro ali.
-- Ao **entrar** na cena, as peças começam como no arquivo. Depois guardam o que o código mudou, até o jogador sair da cena. A cena roda de novo depois de cada clique, então ligue os cliques (`OnClick`) dentro dela.
-- `game.Write` numa cena desenhada vai para a peça `Messages`. Sem ela, aparece como aviso embaixo da tela.
+## O código
 
 ```csharp
+var game = new Game("A Torre");
+
+string playerName = "";
+int health = 100;
+int potions = 1;
+int enemyHealth = 30;
+
+game.Scene("Name", () =>
+{
+    game.Find("NameField").OnAnswer(answer =>
+    {
+        playerName = answer;
+        game.GoTo("Fight");
+    });
+});
+
 game.Scene("Fight", () =>
 {
+    // Quando alguém chega a 0, a cena manda para outra.
+    if (enemyHealth <= 0) game.GoTo("Victory");
+    if (health <= 0) game.GoTo("GameOver");
+
     game.Find("Story").Text = $"{playerName} encontra um goblin.";
     game.Find("PlayerHealth").Value = health;
+    game.Find("EnemyHealth").Value = enemyHealth;
     game.Find("Potion").Visible = potions > 0;
 
     game.Find("Attack").OnClick(() =>
     {
-        enemyHealth -= Random.Shared.Next(5, 11);
-        game.Write("Você acertou!");
-        if (enemyHealth <= 0) game.GoTo("Victory");
+        int damage = Random.Shared.Next(5, 11);
+        enemyHealth -= damage;
+        game.Write($"Você causou {damage} de dano!");
+    });
+
+    game.Find("Potion").OnClick(() =>
+    {
+        potions--;
+        health = Math.Min(100, health + 25);
+        game.Write("Você se sente melhor.", Color.Green);
     });
 });
+
+// (cenas Victory e GameOver, cada uma com a sua tela)
+
+game.Start("Name");
 ```
+
+| Código | O que faz |
+|---|---|
+| `var game = new Game("Título");` | Cria o jogo. |
+| `game.Scene("Name", () => { ... });` | O código de uma cena. Nomes em inglês: `"Start"`, `"Forest"`, `"Fight"` (iguais ao arquivo da tela). |
+| `game.Find("Nome")` | Pega uma peça da tela da cena pelo nome. |
+| `game.Write("texto");` / `game.Write("texto", Color.Red);` | Mensagem para o jogador, com cor opcional. |
+| `game.GoTo("Name");` | Troca de cena (em botões e dentro de cenas). |
+| `game.CurrentScene` | Nome da cena atual. |
+| `game.Start("Start");` | Abre a janela na primeira cena. **Sempre a última linha.** |
 
 | Propriedade (`game.Find("X").`) | Peças que têm |
 |---|---|
@@ -77,9 +90,11 @@ game.Scene("Fight", () =>
 | `Image` | Image |
 | `Visible`, `X`, `Y`, `Width`, `Height` | todas |
 | `OnClick(() => { })` | Button, Image |
-| `OnAnswer(answer => { })` | Input |
+| `OnAnswer(answer => { })` | Input (o texto já vem sem espaços nas pontas e nunca vazio) |
 
-### O arquivo `Screens/<Cena>.json`
+Cores (`Color`): `White`, `Gray`, `Red`, `Green`, `Blue`, `Gold`, `Purple`, `Orange`.
+
+## A tela: `Screens/<Cena>.json`
 
 Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para baixo. As peças são desenhadas na ordem da lista (a última fica por cima). Uma peça por linha.
 
@@ -110,89 +125,47 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 | `color` | Uma das cores acima |
 | `value`, `max` | Só Bar |
 | `image` | Só Image: arquivo da pasta `Assets/` |
-| `visible` | `false` para começar escondida |
+| `visible` | `false` para começar escondida (o código mostra com `.Visible = true`) |
 | `background` (no topo) | Imagem de fundo da pasta `Assets/` |
 
 Dicas para telas bonitas: deixe 40 de margem nas bordas, alinhe as peças pelas mesmas linhas (mesmo `x` ou `y`), use tamanhos parecidos para botões da mesma linha (altura 52) e uma `Box` atrás de grupos de barras.
 
-## Exemplo completo
+## Regras
+
+1. **Não use `Console`** (`ReadLine`/`WriteLine`): é um jogo de janela. Use uma peça `Input` e `game.Write`.
+2. Todo `game.Find("Nome")` precisa de uma peça com esse nome na tela da cena (o editor avisa se não tiver). Ao criar uma peça no código, crie também no `.json`.
+3. Ligue os cliques (`OnClick`, `OnAnswer`) **dentro da cena** da tela. `Scene` nunca fica dentro de outra cena.
+4. Não faça loops de jogo (`while (true)`) nem `Thread.Sleep`. O jogo anda pelos cliques.
+5. Para condições que mudam de tela, use `GoTo` dentro da cena: `if (health <= 0) game.GoTo("GameOver");`.
+6. Números aleatórios: `Random.Shared.Next(min, max + 1)`.
+7. **Nomes de código em inglês** (`health`, `gold`, `enemyHealth`). **Textos do jogo e comentários em português.**
+8. Prefira código simples de iniciante: variáveis, `if`, `switch`, listas, métodos pequenos. Classes só quando ajudarem de verdade (ex.: `class Enemy`). Evite LINQ avançado, genéricos, eventos e async.
+9. Comente o que não for óbvio, em português e com frases curtas.
+10. Imagens vão na pasta `Assets/` (png ou jpg), já copiada para o jogo pelo `.csproj`.
+
+## Cenas só com código
+
+Uma cena **sem** arquivo em `Screens/` monta a própria tela pelo código. Serve para treinar C# ou para telas bem simples. Numa cena **com** tela desenhada, estes comandos dão erro (as peças vêm da tela).
+
+| Código | O que faz |
+|---|---|
+| `game.Title("texto");` | Título grande da cena. |
+| `game.Write("texto");` | Parágrafo de texto (dentro de um botão, vira aviso destacado depois do clique). |
+| `game.Button("Texto", () => { ... });` | Botão. O código roda no clique. As teclas 1 a 9 apertam os botões. |
+| `game.Bar("Vida", value, max, Color.Green);` | Barra (vida, mana…), mostrada à direita. |
+| `game.Ask("Pergunta?", answer => { ... });` | Campo para o jogador escrever. |
+| `game.Image("arquivo.png");` | Imagem da pasta `Assets/`. |
 
 ```csharp
-var game = new Game("A Torre");
-
-string playerName = "";
-int health = 100;
-int potions = 2;
-int enemyHealth = 30;
-
-game.Scene("Name", () =>
+game.Scene("Village", () =>
 {
-    game.Title("A Torre");
-    game.Ask("Qual é o seu nome, aventureiro?", answer =>
-    {
-        playerName = answer;
-        game.GoTo("Fight");
-    });
+    game.Title("Vila");
+    game.Write($"Ouro: {gold}", Color.Gold);
+    game.Button("Procurar moedas", () => gold += 5);
+    game.Button("Ir para a floresta", () => game.GoTo("Forest"));
 });
-
-game.Scene("Fight", () =>
-{
-    // Quando alguém chega a 0, a cena manda para outra.
-    if (enemyHealth <= 0) game.GoTo("Victory");
-    if (health <= 0) game.GoTo("GameOver");
-
-    game.Title("Um goblin aparece!");
-    game.Write($"{playerName}, o goblin rosna para você.");
-    game.Bar(playerName, health, 100, Color.Green);
-    game.Bar("Goblin", enemyHealth, 30, Color.Red);
-
-    game.Button("Atacar", () =>
-    {
-        int damage = Random.Shared.Next(5, 11);
-        enemyHealth -= damage;
-        game.Write($"Você causou {damage} de dano!");
-
-        if (enemyHealth > 0)
-        {
-            int hit = Random.Shared.Next(3, 9);
-            health -= hit;
-            game.Write($"O goblin revida: -{hit} de vida.", Color.Red);
-        }
-    });
-
-    if (potions > 0)
-    {
-        game.Button($"Beber poção ({potions})", () =>
-        {
-            potions--;
-            health = Math.Min(100, health + 25);
-            game.Write("Você se sente melhor.", Color.Green);
-        });
-    }
-});
-
-game.Scene("Victory", () =>
-{
-    game.Title("Vitória!");
-    game.Write($"{playerName} venceu o goblin.", Color.Gold);
-});
-
-game.Scene("GameOver", () =>
-{
-    game.Title("Fim de jogo");
-    game.Write("Você caiu...", Color.Red);
-    game.Button("Tentar de novo", () =>
-    {
-        health = 100;
-        potions = 2;
-        enemyHealth = 30;
-        game.GoTo("Fight");
-    });
-});
-
-game.Start("Name");
 ```
 
 ## Erros
 
-Os erros do motor (`GameException`) já explicam em português o que fazer, por exemplo uma cena com nome errado ou um botão fora de uma cena. O CSharp Lab mostra a linha do erro no painel Problemas.
+Os erros do motor (`GameException`) já explicam em português o que fazer, por exemplo uma cena com nome errado ou uma peça que não existe na tela. O CSharp Lab mostra a linha do erro no painel Problemas.

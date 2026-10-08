@@ -77,9 +77,9 @@ public static class ProjectCreator
     /// e o guia do motor para IAs (AGENTS.md e CLAUDE.md).
     /// </summary>
     public static CreatedProject CreateGameProject(string parentFolder, string name, string? programText = null) =>
-        CreateProject(parentFolder, name, GameKit.CsprojContent, programText ?? GameKit.StarterProgram, dir =>
+        CreateProject(parentFolder, name, GameKit.CsprojContent, programText ?? GameKit.StarterProgram, (dir, created) =>
         {
-            var created = GameKit.CopyLibrary(dir);
+            created.AddRange(GameKit.CopyLibrary(dir));
             var assets = Path.Combine(dir, GameKit.AssetsFolder);
             Directory.CreateDirectory(assets);
             created.Add(assets);
@@ -89,11 +89,23 @@ public static class ProjectCreator
                 WriteNew(path, text);
                 created.Add(path);
             }
-            return created;
+            // O jogo inicial já vem com as telas desenhadas das cenas dele.
+            if (programText == null)
+            {
+                var screens = Path.Combine(dir, GameKit.ScreensFolder);
+                Directory.CreateDirectory(screens);
+                created.Add(screens);
+                foreach (var (file, text) in GameKit.StarterScreens)
+                {
+                    var path = Path.Combine(screens, file);
+                    WriteNew(path, text);
+                    created.Add(path);
+                }
+            }
         });
 
     private static CreatedProject CreateProject(string parentFolder, string name, Func<string, string> csprojContent, string programText,
-        Func<string, List<string>>? extras)
+        Action<string, List<string>>? extras)
     {
         name = name.Trim();
         var error = ValidateProjectName(name);
@@ -125,7 +137,8 @@ public static class ProjectCreator
             created.Add(csproj);
             WriteNew(program, programText);
             created.Add(program);
-            if (extras != null) created.AddRange(extras(dir));
+            // Os extras anotam cada arquivo assim que o criam: se algo falhar no meio, tudo é desfeito.
+            extras?.Invoke(dir, created);
             return new CreatedProject(csproj, program);
         }
         catch

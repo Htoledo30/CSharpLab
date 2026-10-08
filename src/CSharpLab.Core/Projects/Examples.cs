@@ -7,7 +7,7 @@ namespace CSharpLab.Core.Projects;
 public sealed record ExampleProject(string Id, string Title, string Description, bool IsGame = false);
 
 /// <summary>
-/// Exemplos prontos (adivinhe o número, calculadora, jogo da velha, cobrinha, batalha RPG, RPG com botões),
+/// Exemplos prontos (adivinhe o número, calculadora, jogo da velha, cobrinha, batalha RPG e os dois RPGs de janela),
 /// guardados dentro do programa e copiados para uma pasta do usuário ao abrir.
 /// </summary>
 public static class Examples
@@ -19,8 +19,8 @@ public static class Examples
         new("TicTacToe", "Jogo da velha", "Array de duas dimensões e for dentro de for"),
         new("RpgBattle", "Batalha RPG", "Classes e objetos, em dois arquivos"),
         new("Snake", "Cobrinha", "Jogo em tempo real: teclas, cores e posição na tela"),
-        new("RpgButtons", "RPG com botões", "Jogo de janela: cenas, botões, barras de vida e pergunta de nome", IsGame: true),
-        new("RpgScreens", "RPG com tela desenhada", "As telas montadas na aba Tela; o código usa game.Find", IsGame: true),
+        new("RpgScreens", "RPG com botões", "Telas desenhadas na aba Tela; o código diz o que cada botão faz", IsGame: true),
+        new("RpgButtons", "RPG só com código", "As mesmas ideias sem desenhar: game.Title, game.Button, game.Bar", IsGame: true),
     ];
 
     /// <summary>Pasta onde os exemplos são criados (Documentos\CSharp Lab\Exemplos).</summary>

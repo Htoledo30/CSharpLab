@@ -190,6 +190,83 @@ public sealed partial class MainViewModel
         if (doc != null) NavigateTo(doc, 1, 1, offset);
     }
 
+    /// <summary>
+    /// Onde o código usa a peça na cena: o lugar que liga o evento dela (OnClick/OnAnswer), se houver;
+    /// senão, o primeiro game.Find("Nome"). Null se o código não usa a peça.
+    /// </summary>
+    public PieceCode? FindPieceCode(string projectDirectory, string scene, string piece, string handler)
+    {
+        PieceCode? firstUse = null;
+        foreach (var file in CodeFiles(projectDirectory))
+        {
+            var text = FindDocument(file)?.Document.Text ?? TryRead(file);
+            if (text == null || !text.Contains(piece, StringComparison.OrdinalIgnoreCase)) continue;
+            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text);
+            foreach (var use in Core.Language.GameAssist.FindPieceUses(tree.GetRoot(), scene, piece, handler))
+            {
+                var line = tree.GetText().Lines.GetLineFromPosition(use.Start).LineNumber + 1;
+                var found = new PieceCode(file, use.Start, line, use.IsHandler);
+                if (use.IsHandler) return found;
+                firstUse ??= found;
+            }
+        }
+        return firstUse;
+    }
+
+    /// <summary>Onde está o game.Scene("Nome", …) da cena, ou null se o código ainda não tem a cena.</summary>
+    public PieceCode? FindSceneCode(string projectDirectory, string scene)
+    {
+        if (FindSceneInCode(projectDirectory, scene) is not { } found) return null;
+        var (file, offset) = found;
+        var text = FindDocument(file)?.Document.Text ?? TryRead(file) ?? "";
+        int line = 1;
+        for (int i = 0; i < offset && i < text.Length; i++)
+            if (text[i] == '\n') line++;
+        return new PieceCode(file, offset, line, HasHandler: true);
+    }
+
+    public void GoToPieceCode(PieceCode code)
+    {
+        var doc = OpenFile(code.File, activate: false);
+        if (doc == null) return;
+        // O arquivo pode ter mudado desde que o painel olhou: confere a posição.
+        int offset = code.Offset <= doc.Document.TextLength ? code.Offset : 0;
+        NavigateTo(doc, code.Line, 1, offset);
+    }
+
+    /// <summary>
+    /// Escreve game.Find("Nome").OnClick(() => { }); no fim do código da cena e põe o cursor entre as chaves:
+    /// o que a peça faz, a pessoa escreve. Sem a cena no código, oferece escrever a cena primeiro.
+    /// </summary>
+    public void WritePieceHandler(string projectDirectory, string scene, string piece, string handler)
+    {
+        var parameter = handler == "OnAnswer" ? "answer" : "()";
+        var found = FindSceneInCode(projectDirectory, scene);
+        if (found == null)
+        {
+            GoToSceneCode(projectDirectory, scene);   // pergunta se pode escrever a cena
+            found = FindSceneInCode(projectDirectory, scene);
+            if (found == null) return;
+        }
+        var (file, sceneOffset) = found.Value;
+        var doc = OpenFile(file, activate: false);
+        if (doc == null) return;
+        var text = doc.Document.Text;
+        var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text).GetRoot();
+        var newLine = TextFileIO.DetectLineEnding(text) is "LF" ? "\n" : "\r\n";
+        if (Core.Language.GameAssist.HandlerInsertion(root, scene, piece, handler, parameter, newLine) is not { } insertion)
+        {
+            NavigateTo(doc, 1, 1, sceneOffset);
+            NotifyInfo($"A cena \"{scene}\" está escrita sem chaves. Coloque o código dela entre {{ }} e escreva ali: game.Find(\"{piece}\").{handler}({parameter} => {{ }});");
+            return;
+        }
+        doc.Document.Replace(insertion.Offset, insertion.Length, insertion.Text);
+        NavigateTo(doc, 1, 1, insertion.Offset + insertion.Caret);
+        NotifyInfo(handler == "OnAnswer"
+            ? $"Pronto: escreva entre as chaves o que acontece quando o jogador responde no \"{piece}\" (ainda não salvo)."
+            : $"Pronto: escreva entre as chaves o que o botão \"{piece}\" faz (ainda não salvo).");
+    }
+
     /// <summary>Onde está o game.Scene("Nome", …): arquivo e posição (Program.cs primeiro; abas abertas valem pelo texto da aba).</summary>
     private (string File, int Offset)? FindSceneInCode(string projectDirectory, string scene)
     {
@@ -344,3 +421,7 @@ public sealed partial class MainViewModel
 /// <param name="InCode">Tem game.Scene("Nome", …) no código.</param>
 /// <param name="IsStart">É a cena do game.Start (onde o jogo começa).</param>
 public sealed record GameSceneInfo(string Name, bool HasScreen, bool InCode, bool IsStart);
+
+/// <summary>Onde o código usa uma peça (para o painel mostrar "Faz algo — Program.cs, linha 34").</summary>
+/// <param name="HasHandler">Ali o evento da peça é ligado (OnClick/OnAnswer).</param>
+public sealed record PieceCode(string File, int Offset, int Line, bool HasHandler);
