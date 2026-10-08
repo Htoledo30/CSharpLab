@@ -230,8 +230,6 @@ internal static class GameStyle
     public static string Serialize(ThemeName theme) =>
         "{" + Environment.NewLine + "  \"format\": 1," + Environment.NewLine + $"  \"theme\": \"{theme}\"" + Environment.NewLine + "}" + Environment.NewLine;
 
-    private static readonly Dictionary<string, (DateTime Stamp, ThemeName? Theme, string? Error)> Cache = new(StringComparer.OrdinalIgnoreCase);
-
     /// <summary>
     /// O tema da primeira pasta que tiver um GameStyle.json (Clássico se nenhuma tiver).
     /// <paramref name="error"/> diz o que está errado no arquivo; aí o tema volta para o Clássico.
@@ -245,17 +243,9 @@ internal static class GameStyle
             if (!File.Exists(file)) continue;
             try
             {
-                var stamp = File.GetLastWriteTimeUtc(file);
-                (ThemeName? Theme, string? Error) result;
-                lock (Cache)
-                {
-                    if (Cache.TryGetValue(file, out var cached) && cached.Stamp == stamp) result = (cached.Theme, cached.Error);
-                    else
-                    {
-                        result = Parse(File.ReadAllText(file));
-                        Cache[file] = (stamp, result.Theme, result.Error);
-                    }
-                }
+                // O arquivo é pequenininho: lido sempre de novo (guardar pela data falha quando ele muda duas
+                // vezes no mesmo instante).
+                var result = Parse(File.ReadAllText(file));
                 error = result.Error;
                 return Look.Of(result.Theme ?? ThemeName.Classic);
             }
