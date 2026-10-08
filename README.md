@@ -95,6 +95,11 @@ cima do tema. A escolha fica no arquivo `GameStyle.json`, na pasta do projeto.
 | Lista | Um cartão modelo que se repete para cada item (loja, inventário). Veja abaixo. |
 
 - Mais em **Propriedades**:
+  Num botão, **Atalho** escolhe uma tecla (Espaço, Enter, Esc, setas, letras ou números).
+  Pressionar a tecla executa o mesmo código de **Ao clicar**: serve para "Pressione Espaço para começar",
+  sem perder o clique do mouse. O botão precisa estar visível e ativo na cena atual; digitar num campo,
+  segurar a tecla ou usar Ctrl/Alt/Shift não dispara o atalho. Também pode ser definido no código:
+  `game.Find("StartGame").Shortcut = "Space";` (vazio, `""`, tira o atalho).
   Num botão, **Ao clicar** mostra se ele já faz algo e em que linha do código (clique para ir até lá). Se ainda não faz nada,
   **Escrever o que ele faz** cria o `game.Find("Nome").OnClick(() => { });` na cena certa e deixa o cursor entre as chaves:
   o que o botão faz, você escreve. O campo de escrita tem o mesmo com **Ao responder** (`OnAnswer`).

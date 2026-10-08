@@ -21,7 +21,7 @@ internal static class ScreenFile
 
     private static readonly string[] PieceKeys =
         ["type", "name", "list", "x", "y", "width", "height", "text", "size", "bold", "italic", "shadow", "scroll", "font", "align", "color", "shade",
-         "opacity", "border", "corner", "style", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "visible"];
+         "opacity", "border", "corner", "style", "shortcut", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "visible"];
 
     public static string ValidColors => string.Join(", ", Enum.GetNames<Color>());
 
@@ -163,6 +163,7 @@ internal static class ScreenFile
                 "shade" => ReadEnum<Shade>(value, label, key, v => piece.Shade = v),
                 "corner" => ReadEnum<Corner>(value, label, key, v => piece.Corner = v),
                 "style" => ReadEnum<ButtonStyle>(value, label, key, v => piece.Style = v),
+                "shortcut" => ReadShortcut(value, label, piece),
                 "align" => value.ValueKind == JsonValueKind.String && Enum.TryParse<TextAlign>(value.GetString(), true, out var align) && Enum.IsDefined(align)
                     ? Set(() => piece.Align = align)
                     : $"{label}: \"align\" precisa ser Left, Center ou Right.",
@@ -171,6 +172,17 @@ internal static class ScreenFile
             if (error != null) return (null, error);
         }
         return (piece, null);
+    }
+
+    private static string? ReadShortcut(JsonElement value, string label, Piece piece)
+    {
+        if (piece.Type != PieceType.Button)
+            return $"{label}: só botões têm \"shortcut\" (atalho de teclado).";
+        if (value.ValueKind is not (JsonValueKind.String or JsonValueKind.Null) ||
+            !ButtonShortcuts.TryNormalize(value.GetString(), out var shortcut))
+            return $"{label}: \"shortcut\" precisa ser uma tecla válida entre aspas. {ButtonShortcuts.Help}";
+        piece.Shortcut = shortcut;
+        return null;
     }
 
     /// <summary>Por que o nome não serve (ou null se serve). Mesmas regras de um nome de variável simples.</summary>
@@ -343,6 +355,7 @@ internal static class ScreenFile
         if (p.Border is { } border && Piece.Supports(p.Type, nameof(Piece.Border))) parts.Add($"\"border\": {(border ? "true" : "false")}");
         if (p.Corner is { } corner and not Corner.Round && Piece.Supports(p.Type, nameof(Piece.Corner))) parts.Add($"\"corner\": \"{corner}\"");
         if (p.Style is { } style and not ButtonStyle.Filled && Piece.Supports(p.Type, nameof(Piece.Style))) parts.Add($"\"style\": \"{style}\"");
+        if (p.Shortcut != null && Piece.Supports(p.Type, nameof(Piece.Shortcut))) parts.Add($"\"shortcut\": {Quote(p.Shortcut)}");
         if (p.Value != null && p.Type == PieceType.Bar) parts.Add($"\"value\": {p.Value.Value.ToString(CultureInfo.InvariantCulture)}");
         if (p.Max != null && p.Type == PieceType.Bar) parts.Add($"\"max\": {p.Max.Value.ToString(CultureInfo.InvariantCulture)}");
         if (p.Image != null && p.Type == PieceType.Image) parts.Add($"\"image\": {Quote(p.Image)}");

@@ -368,6 +368,11 @@ public sealed class ScreenPropertiesPanel : Border
 
         if (type == PieceType.Button)
         {
+            _content.Children.Add(Section("ATALHO"));
+            _content.Children.Add(ShortcutField(() => Current()?.Shortcut, v => Edit(p => p.Shortcut = v, "shortcut")));
+            var shortcutHelp = Muted("A tecla executa o mesmo código de Ao clicar. Só funciona com este botão visível e ativo, fora dos campos de escrita.");
+            shortcutHelp.Margin = new Thickness(0, 6, 0, 0);
+            _content.Children.Add(shortcutHelp);
             _content.Children.Add(Section("ESTILO"));
             _content.Children.Add(Segmented(
                 [(ButtonStyle.Filled, "Cheio", "Fundo colorido: a ação principal (Atacar)"),
@@ -517,6 +522,50 @@ public sealed class ScreenPropertiesPanel : Border
     }
 
     // ------------------------------------------------------------------ campos
+
+    private FrameworkElement ShortcutField(Func<string?> get, Action<string?> set)
+    {
+        var pick = new Button
+        {
+            Style = (Style)FindResource("DialogButton"),
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Height = 30,
+            Padding = new Thickness(10, 0, 10, 0),
+            Margin = new Thickness(0),
+            Focusable = false,
+        };
+        System.Windows.Automation.AutomationProperties.SetName(pick, "Atalho");
+        var menu = new ContextMenu { PlacementTarget = pick, Placement = PlacementMode.Bottom };
+        pick.ContextMenu = menu;
+        Add(menu.Items, null, "Nenhum");
+        foreach (var option in ButtonShortcuts.Options.Take(7)) Add(menu.Items, option.Key, option.Label);
+        var letters = new MenuItem { Header = "Letras" };
+        foreach (var option in ButtonShortcuts.Options.Skip(7).Take(26)) Add(letters.Items, option.Key, option.Label);
+        menu.Items.Add(letters);
+        var numbers = new MenuItem { Header = "Números" };
+        foreach (var option in ButtonShortcuts.Options.Skip(33)) Add(numbers.Items, option.Key, option.Label);
+        menu.Items.Add(numbers);
+        pick.Click += (_, _) => { menu.MinWidth = pick.ActualWidth; menu.IsOpen = true; };
+        _refreshers.Add(() =>
+        {
+            var selected = ButtonShortcuts.Options.FirstOrDefault(o => o.Key == get()).Label ?? "Nenhum";
+            pick.Content = selected + "  ▾";
+        });
+        return pick;
+
+        void Add(ItemCollection items, string? key, string label)
+        {
+            var option = new MenuItem { Header = label, Tag = key };
+            option.Click += (_, _) =>
+            {
+                _model.EndMerge();
+                set(key);
+                _model.EndMerge();
+            };
+            _refreshers.Add(() => option.IsChecked = get() == key);
+            items.Add(option);
+        }
+    }
 
     /// <summary>
     /// O que o botão (ou o campo de escrita) faz: "Já faz algo — Program.cs, linha 34" com o caminho até lá,

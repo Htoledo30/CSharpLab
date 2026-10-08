@@ -432,6 +432,30 @@ public sealed class Game
         Act(() => Write($"O botão \"{piece.Name}\" ainda não faz nada. Na cena, escreva: {find}(\"{piece.Name}\").OnClick(() => {{ ... }});", Color.Gray));
     }
 
+    /// <summary>O atalho executa o mesmo caminho do clique, apenas em botões visíveis e ativos da cena atual.</summary>
+    internal bool PressShortcut(string shortcut)
+    {
+        if (_inAction || _closed || _designed == null) return false;
+        foreach (var piece in _designed.Layout.Pieces)
+        {
+            if (!piece.Visible || !piece.Enabled) continue;
+            if (piece.List == null && Matches(piece)) return true;
+            if (piece.Type != PieceType.List) continue;
+            foreach (var card in _designed.CardsOf(piece))
+                foreach (var item in card.Items)
+                    if (Matches(item.Piece)) return true;
+        }
+        return false;
+
+        bool Matches(Piece piece)
+        {
+            if (piece.Type != PieceType.Button || !piece.Visible || !piece.Enabled ||
+                !string.Equals(piece.Shortcut, shortcut, StringComparison.OrdinalIgnoreCase)) return false;
+            ClickPiece(piece);
+            return true;
+        }
+    }
+
     /// <summary>Resposta num Campo de escrita desenhado.</summary>
     internal void AnswerPiece(Piece piece, string answer)
     {

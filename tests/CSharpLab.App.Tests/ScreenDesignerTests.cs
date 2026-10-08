@@ -554,6 +554,55 @@ public sealed class ScreenDesignerTests
         encoder.Save(file);
     });
 
+    [Fact]
+    public void Atalho_do_botao_grava_Espaco_e_desfaz_sem_perder_as_outras_propriedades() => Ui.Run(async () =>
+    {
+        var (doc, _, _) = Open();
+        using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
+        var view = new ScreenEditorView(doc, vm);
+        view.Model.Select("Continue");
+        var window = new Window { Content = view, Width = 1280, Height = 760, WindowStyle = WindowStyle.None,
+            ShowInTaskbar = false, ShowActivated = false, Left = -10000, Top = -10000 };
+        window.Show();
+        try
+        {
+            await Task.Delay(100);
+            var before = doc.Document.Text;
+            var picker = Descendants(view.Properties).OfType<System.Windows.Controls.Button>()
+                .Single(b => System.Windows.Automation.AutomationProperties.GetName(b) == "Atalho");
+            var space = picker.ContextMenu.Items.OfType<System.Windows.Controls.MenuItem>()
+                .Single(i => i.Header is string label && label == "Espaço");
+            space.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.MenuItem.ClickEvent));
+            Assert.Contains("\"shortcut\": \"Space\"", doc.Document.Text);
+            Assert.Equal("Space", view.Model.Layout!.Find("Continue")!.Shortcut);
+            Assert.Contains("Espaço", picker.Content.ToString());
+            Assert.Equal("Continuar", view.Model.Layout!.Find("Continue")!.Text);
+
+            doc.Document.UndoStack.Undo();
+            Assert.Equal(before, doc.Document.Text);
+            Assert.Null(view.Model.Layout!.Find("Continue")!.Shortcut);
+            Assert.Contains("Nenhum", picker.Content.ToString());
+            doc.Document.UndoStack.Redo();
+            Assert.Equal("Space", view.Model.Layout!.Find("Continue")!.Shortcut);
+
+            window.UpdateLayout();
+            var bitmap = new RenderTargetBitmap((int)view.ActualWidth, (int)view.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(view);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var file = File.Create(Path.Combine(Path.GetTempPath(), "csharplab-atalho.png"))) encoder.Save(file);
+
+            var none = picker.ContextMenu.Items.OfType<System.Windows.Controls.MenuItem>()
+                .Single(i => i.Header is string label && label == "Nenhum");
+            none.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.MenuItem.ClickEvent));
+            Assert.DoesNotContain("\"shortcut\"", doc.Document.Text);
+            view.Model.Select("Title");
+            Assert.DoesNotContain(Descendants(view.Properties).OfType<System.Windows.Controls.Button>(),
+                b => System.Windows.Automation.AutomationProperties.GetName(b) == "Atalho");
+        }
+        finally { window.Close(); view.Detach(); }
+    });
+
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)

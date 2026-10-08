@@ -29,6 +29,8 @@ public static class Ui
                 var app = (System.Windows.Application)Activator.CreateInstance(
                     typeof(MainViewModel).Assembly.GetType("CSharpLab.App", throwOnError: true)!)!;
                 app.GetType().GetMethod("InitializeComponent")!.Invoke(app, null);
+                // Fechar uma janela de teste não pode encerrar o app e descartar os recursos dos próximos testes.
+                app.ShutdownMode = System.Windows.ShutdownMode.OnExplicitShutdown;
                 SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(app.Dispatcher));
                 ready.Set();
                 Dispatcher.Run();

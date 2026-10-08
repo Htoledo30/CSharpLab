@@ -106,6 +106,7 @@ game.Start("Name");
 | `Font` | Text, Button, Input, Messages |
 | `Bold`, `Italic`, `Shadow`, `Scroll` | Text (`Scroll = true`: texto comprido rola em vez de ser cortado) |
 | `Style` | Button |
+| `Shortcut` | Button: tecla que executa o mesmo `OnClick` (`"Space"`, `"Enter"`, `"Escape"`, `"Up"`, `"Down"`, `"Left"`, `"Right"`, `"A"` a `"Z"` ou `"D0"` a `"D9"`; `""` tira o atalho) |
 | `Enabled` (`false`: apagado e sem clique) | Button, Input, Image |
 | `Image` | Image |
 | `Visible`, `X`, `Y`, `Width`, `Height` | todas |
@@ -118,6 +119,21 @@ Cores (`Color`): `White`, `Gray`, `Red`, `Green`, `Blue`, `Gold`, `Purple`, `Ora
 Tom (`Shade`): `Normal`, `Dark`, `Light`. Cantos (`Corner`): `Round`, `Square`, `Circle`.
 Fontes (`Font`, todas do Windows): `Normal`, `Fantasy` (títulos de fantasia), `Book` (livro antigo, pergaminho), `Hand` (escrita à mão).
 Estilo de botão (`ButtonStyle`): `Filled` (cheio, a ação principal), `Outline` (contorno, secundária), `Text` (só texto, discreta).
+
+### Atalho do botão: clicar ou pressionar Espaço
+
+Na aba Tela, selecione o botão e escolha **Atalho → Espaço**. No código, escreva o `OnClick` normalmente:
+clicar ou pressionar Espaço executa a mesma ação. Também dá para configurar a tecla pelo código, dentro da cena:
+
+```csharp
+game.Find("StartGame").Shortcut = "Space";
+game.Find("StartGame").OnClick(() => game.GoTo("Village"));
+```
+
+Só funciona na cena atual, com o botão visível e ativo. Não dispara ao digitar num campo de escrita,
+segurar a tecla, usar Ctrl/Alt/Shift ou durante uma pausa/troca de cena. Se dois botões usam a mesma tecla,
+o primeiro visível e ativo na ordem da tela responde (em listas, o primeiro cartão disponível).
+No JSON, o botão pode ter `"shortcut": "Space"`; telas antigas sem essa chave continuam funcionando.
 
 ### Lista: um cartão para cada item
 
@@ -193,6 +209,7 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 | `shade` | `Normal`, `Dark`, `Light` (tom da cor) |
 | `opacity`, `border`, `corner` | Só Box: preenchimento 0 a 100 (com cor: 25; sem cor: 100), `true`/`false`, `Round`/`Square`/`Circle` |
 | `style` | Só Button: `Filled`, `Outline`, `Text` |
+| `shortcut` | Só Button: tecla do mesmo `OnClick` (`Space`, `Enter`, `Escape`, `Up`, `Down`, `Left`, `Right`, `A` a `Z` ou `D0` a `D9`); vazio/null tira |
 | `enabled` | `false` para começar apagado e sem clique (Button, Input, Image) |
 | `cardWidth`, `cardHeight`, `gap` | Só List: tamanho de cada cartão e o espaço entre eles |
 | `value`, `max` | Só Bar |

@@ -184,6 +184,24 @@ public sealed class Item
         set => Check(nameof(Style)).Style = value == ButtonStyle.Filled ? null : value;
     }
 
+    /// <summary>
+    /// Shortcut = atalho. A tecla que executa o mesmo OnClick do botão: "Space" (Espaço), "Enter", "Escape",
+    /// "Up", "Down", "Left", "Right", "A" a "Z" ou "D0" a "D9". Vazio tira o atalho.
+    /// Só funciona na cena atual, com o botão visível e ativo, fora de campos de escrita.
+    /// </summary>
+    /// <example><code>game.Find("StartGame").Shortcut = "Space";</code></example>
+    public string Shortcut
+    {
+        get => Check(nameof(Shortcut)).Shortcut ?? "";
+        set
+        {
+            var piece = Check(nameof(Shortcut));
+            if (!ButtonShortcuts.TryNormalize(value, out var shortcut))
+                throw new GameException($"O Shortcut do botão \"{Name}\" não reconhece a tecla \"{value}\". {ButtonShortcuts.Help}");
+            piece.Shortcut = shortcut;
+        }
+    }
+
     /// <summary>Image = imagem. O arquivo (da pasta Assets) que a peça Imagem mostra.</summary>
     /// <example><code>game.Find("Enemy").Image = "dragon.png";</code></example>
     public string Image
@@ -324,6 +342,7 @@ public sealed class Item
             nameof(Bold) or nameof(Italic) or nameof(Shadow) => $"só o Texto tem {property}",
             nameof(Font) => "só Texto, Botão, Campo de escrita e Mensagens têm Font",
             nameof(Style) => "só botões têm Style",
+            nameof(Shortcut) => "só botões têm Shortcut (atalho de teclado)",
             nameof(Enabled) => "só botões, campos de escrita e imagens têm Enabled",
             _ => $"esta peça não tem {property}",
         });

@@ -330,6 +330,8 @@ public static partial class PortugueseDocs
             "game.Find(\"NameField\").OnAnswer(answer =>\n{\n    playerName = answer;\n    game.GoTo(\"Village\");\n});");
         m[item + ".Enabled"] = D("Enabled = ativo. false deixa o botão (ou o campo de escrita, ou a imagem) apagado e sem clique; true liga de novo.",
             "game.Find(\"Tower\").Enabled = hasKey;");
+        m[item + ".Shortcut"] = D("Shortcut = atalho. Uma tecla que executa o mesmo OnClick do botão: Space (Espaço), Enter, Escape, setas (Up, Down, Left, Right), A a Z ou D0 a D9. Vazio tira o atalho. Só na cena atual, com o botão visível e ativo, fora dos campos de escrita.",
+            "game.Find(\"StartGame\").Shortcut = \"Space\";\ngame.Find(\"StartGame\").OnClick(() => game.GoTo(\"Village\"));");
         m[item + ".Shade"] = D("Shade = tom. A cor mais escura (Shade.Dark) ou mais clara (Shade.Light).", "game.Find(\"BossFrame\").Shade = Shade.Dark;");
         m[item + ".Opacity"] = D("Opacity = preenchimento da Caixa, de 0 (invisível) a 100 (cheia).", "game.Find(\"Panel\").Opacity = 60;");
         m[item + ".Border"] = D("Border = borda. true mostra a borda da Caixa; false tira.", "game.Find(\"Panel\").Border = true;");

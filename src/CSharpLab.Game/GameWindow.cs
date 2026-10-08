@@ -210,16 +210,25 @@ internal sealed class GameWindow : Window, IGameView
 
     private void OnKey(object sender, KeyEventArgs e)
     {
-        if (e.OriginalSource is TextBox || _transition) return;
-        int number = e.Key switch
+        if (!e.Handled && HandleKey(e.Key, Keyboard.Modifiers, e.IsRepeat,
+                e.OriginalSource is TextBox || Keyboard.FocusedElement is TextBox))
+            e.Handled = true;
+    }
+
+    /// <summary>Uma ação por pressionamento; digitar, combinações de teclas e transições não acionam botões.</summary>
+    internal bool HandleKey(Key key, ModifierKeys modifiers, bool isRepeat, bool isTyping)
+    {
+        if (isRepeat || isTyping || _transition || modifiers != ModifierKeys.None) return false;
+        if (ButtonShortcuts.FromKey(key) is { } shortcut && _game.PressShortcut(shortcut)) return true;
+        int number = key switch
         {
-            >= Key.D1 and <= Key.D9 => e.Key - Key.D1,
-            >= Key.NumPad1 and <= Key.NumPad9 => e.Key - Key.NumPad1,
+            >= Key.D1 and <= Key.D9 => key - Key.D1,
+            >= Key.NumPad1 and <= Key.NumPad9 => key - Key.NumPad1,
             _ => -1,
         };
-        if (number < 0 || number >= _buttonItems.Count) return;
-        e.Handled = true;
+        if (number < 0 || number >= _buttonItems.Count) return false;
         _game.Act(_buttonItems[number].OnClick);
+        return true;
     }
 
     // ------------------------------------------------------------------ cena desenhada

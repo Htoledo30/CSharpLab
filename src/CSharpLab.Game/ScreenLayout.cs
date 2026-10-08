@@ -44,6 +44,9 @@ internal sealed class Piece
     /// <summary>false: o botão (ou campo, ou imagem) fica apagado e não responde.</summary>
     public bool Enabled { get; set; } = true;
 
+    /// <summary>Tecla que executa o OnClick do botão (null: só o clique).</summary>
+    public string? Shortcut { get; set; }
+
     /// <summary>
     /// Nome da Lista de que a peça faz parte (null: peça solta). Peças de lista formam o cartão modelo,
     /// repetido para cada item; X e Y delas contam a partir do canto do cartão.
@@ -86,6 +89,7 @@ internal sealed class Piece
         nameof(Color) or nameof(Shade) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages or PieceType.List),
         nameof(Opacity) or nameof(Border) or nameof(Corner) => type is PieceType.Box,
         nameof(Style) => type is PieceType.Button,
+        nameof(Shortcut) => type is PieceType.Button,
         nameof(Enabled) => type is PieceType.Button or PieceType.Input or PieceType.Image,
         nameof(Value) or nameof(Max) => type is PieceType.Bar,
         nameof(Image) => type is PieceType.Image,
