@@ -15,6 +15,10 @@ Mais:
 
 - O jogo é um conjunto de **cenas**. `game.Scene("Fight", ...)` liga o código à tela `Screens/Fight.json`.
 - **Depois de cada clique, o código da cena atual roda de novo sozinho.** Por isso basta mudar as variáveis no botão: a cena põe os valores novos na tela.
+- **Cada coisa no seu lugar** (a regra mais importante):
+  - **`game.OnEnter(() => { ... })`** prepara a visita: roda uma vez cada vez que o jogador **chega** na cena (sortear o inimigo, dar a recompensa da chegada). Voltar para a cena roda de novo; uma recompensa que só pode acontecer uma vez na aventura precisa de uma variável (`if (!gotKey) { ... gotKey = true; }`).
+  - **O resto da cena** só **mostra**: põe os valores nas peças (`.Text`, `.Value`, `.Visible`) e liga os botões. Nada de `gold += 10` ou `Random` solto aqui: se repetiria a cada clique (o editor avisa).
+  - **`OnClick` / `OnAnswer`** executam a escolha do jogador.
 - O estado do jogo (vida, ouro, nome, inventário…) fica em **variáveis declaradas no topo**, antes das cenas.
 - Ao **entrar** numa cena, as peças começam como no arquivo. Depois guardam o que o código mudou, até o jogador sair da cena.
 - `game.Write` vai para a peça `Messages` da tela: ela guarda as mensagens da visita à cena, com as do último clique destacadas e as antigas apagadas. Sem a peça `Messages`, as do clique aparecem num aviso por cima da tela.
@@ -44,6 +48,13 @@ game.Scene("Name", () =>
 
 game.Scene("Fight", () =>
 {
+    // Uma vez por visita: o inimigo chega com a vida cheia.
+    game.OnEnter(() =>
+    {
+        enemyHealth = 30;
+        game.Write("Um goblin aparece!", Color.Orange);
+    });
+
     // Quando alguém chega a 0, a cena manda para outra.
     if (enemyHealth <= 0) game.GoTo("Victory");
     if (health <= 0) game.GoTo("GameOver");
@@ -78,6 +89,7 @@ game.Start("Name");
 | `var game = new Game("Título");` | Cria o jogo. |
 | `game.Scene("Name", () => { ... });` | O código de uma cena. Nomes em inglês: `"Start"`, `"Forest"`, `"Fight"` (iguais ao arquivo da tela). |
 | `game.Find("Nome")` | Pega uma peça da tela da cena pelo nome. |
+| `game.OnEnter(() => { ... });` | **Direto dentro da cena.** Roda uma vez cada vez que o jogador chega nela (não nos cliques). O `game.Write` daqui vira mensagem nova. |
 | `game.Write("texto");` / `game.Write("texto", Color.Red);` | Mensagem para o jogador, com cor opcional. |
 | `game.GoTo("Name");` | Troca de cena (em botões e dentro de cenas). |
 | `game.CurrentScene` | Nome da cena atual. |
@@ -92,7 +104,7 @@ game.Start("Name");
 | `Color`, `Shade` | Text, Button, Bar, Box |
 | `Opacity` (0 a 100), `Border`, `Corner` | Box |
 | `Font` | Text, Button, Input, Messages |
-| `Bold`, `Italic`, `Shadow` | Text |
+| `Bold`, `Italic`, `Shadow`, `Scroll` | Text (`Scroll = true`: texto comprido rola em vez de ser cortado) |
 | `Style` | Button |
 | `Enabled` (`false`: apagado e sem clique) | Button, Input, Image |
 | `Image` | Image |
@@ -175,7 +187,7 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 | `x`, `y`, `width`, `height` | Posição e tamanho (números) |
 | `text` | Texto da peça, em português (na Lista: o texto de quando está vazia) |
 | `size` | Tamanho da letra (Text: 20; Button: 17) |
-| `bold`, `italic`, `shadow` / `align` | Só Text: `true` / `Left`, `Center`, `Right` |
+| `bold`, `italic`, `shadow`, `scroll` / `align` | Só Text: `true` / `Left`, `Center`, `Right`. `scroll`: barra de rolagem para texto comprido |
 | `font` | `Normal`, `Fantasy`, `Book`, `Hand` (Text, Button, Input, Messages) |
 | `color` | Uma das cores acima |
 | `shade` | `Normal`, `Dark`, `Light` (tom da cor) |
@@ -197,13 +209,14 @@ Peças que se repetem em várias telas (o painel de status) ficam com **os mesmo
 1. **Não use `Console`** (`ReadLine`/`WriteLine`): é um jogo de janela. Use uma peça `Input` e `game.Write`.
 2. Todo `game.Find("Nome")` precisa de uma peça com esse nome na tela da cena (o editor avisa se não tiver). Ao criar uma peça no código, crie também no `.json`.
 3. Ligue os cliques (`OnClick`, `OnAnswer`) **dentro da cena** da tela. `Scene` nunca fica dentro de outra cena.
-4. Não faça loops de jogo (`while (true)`) nem `Thread.Sleep`. O jogo anda pelos cliques; para uma pausa dentro do clique, `game.Wait(segundos)`.
-5. Para condições que mudam de tela, use `GoTo` dentro da cena: `if (health <= 0) game.GoTo("GameOver");`.
-6. Números aleatórios: `Random.Shared.Next(min, max + 1)`.
-7. **Nomes de código em inglês** (`health`, `gold`, `enemyHealth`). **Textos do jogo e comentários em português.**
-8. Prefira código simples de iniciante: variáveis, `if`, `switch`, listas, métodos pequenos. Classes só quando ajudarem de verdade (ex.: `class Enemy`). Evite LINQ avançado, genéricos, eventos e async.
-9. Comente o que não for óbvio, em português e com frases curtas.
-10. Imagens vão na pasta `Assets/` (png ou jpg), já copiada para o jogo pelo `.csproj`.
+4. **Mudança de estado nunca solta na cena** (`+=`, `++`, `.Add(...)`, sorteio com `Random`): vai no `game.OnEnter` (uma vez por visita) ou no `OnClick` (a escolha). Solta, ela se repete a cada clique.
+5. Não faça loops de jogo (`while (true)`) nem `Thread.Sleep`. O jogo anda pelos cliques; para uma pausa dentro do clique, `game.Wait(segundos)`.
+6. Para condições que mudam de tela, use `GoTo` dentro da cena: `if (health <= 0) game.GoTo("GameOver");`.
+7. Números aleatórios: `Random.Shared.Next(min, max + 1)`.
+8. **Nomes de código em inglês** (`health`, `gold`, `enemyHealth`). **Textos do jogo e comentários em português.**
+9. Prefira código simples de iniciante: variáveis, `if`, `switch`, listas, métodos pequenos. Classes só quando ajudarem de verdade (ex.: `class Enemy`). Evite LINQ avançado, genéricos, eventos e async.
+10. Comente o que não for óbvio, em português e com frases curtas.
+11. Imagens vão na pasta `Assets/` (png ou jpg), já copiada para o jogo pelo `.csproj`.
 
 ## Cenas só com código
 

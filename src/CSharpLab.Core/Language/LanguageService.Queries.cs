@@ -316,7 +316,8 @@ public sealed partial class LanguageService
                 if (gameDirectory != null)
                 {
                     var root = tree.GetRoot(ct);
-                    hints = hints.Concat(GameAssist.CheckFindNames(root, gameDirectory)).Concat(GameAssist.CheckBuildCallsInDrawnScenes(root, gameDirectory));
+                    hints = hints.Concat(GameAssist.CheckFindNames(root, gameDirectory)).Concat(GameAssist.CheckBuildCallsInDrawnScenes(root, gameDirectory))
+                        .Concat(GameAssist.CheckRepeatedChanges(root));
                 }
                 foreach (var (id, message, location) in hints)
                 {

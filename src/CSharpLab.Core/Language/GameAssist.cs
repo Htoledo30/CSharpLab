@@ -212,6 +212,64 @@ public static class GameAssist
         return new TextInsertion(from, close - from, inline, newLine.Length + separator.Length + head.Length);
     }
 
+    public const string RepeatsEveryClickId = "DICA09";
+
+    /// <summary>
+    /// Mudanças que se repetem sem querer: o código solto na cena roda de novo depois de cada clique, então
+    /// "gold += 10", "inventory.Add(...)" ou um sorteio guardado numa variável de fora acontecem várias vezes.
+    /// A dica sugere o lugar certo: game.OnEnter (uma vez por visita) ou o OnClick (a ação do botão).
+    /// </summary>
+    public static IEnumerable<(string Id, string Message, Location Location)> CheckRepeatedChanges(SyntaxNode root)
+    {
+        foreach (var scene in FindScenes(root))
+        {
+            if (root.FindNode(scene.Span) is not InvocationExpressionSyntax
+                {
+                    ArgumentList.Arguments: [_, { Expression: LambdaExpressionSyntax { Body: var body } }, ..],
+                })
+                continue;
+
+            // Só o código solto da cena: o que está dentro de outro lambda (OnClick, OnEnter, Button…) ou de
+            // uma função local roda em outra hora.
+            var direct = body.DescendantNodesAndSelf(n => n == body || n is not (AnonymousFunctionExpressionSyntax or LocalFunctionStatementSyntax)).ToList();
+            var locals = direct.OfType<VariableDeclaratorSyntax>().Select(v => v.Identifier.ValueText)
+                .Concat(direct.OfType<ForEachStatementSyntax>().Select(f => f.Identifier.ValueText))
+                .Concat(direct.OfType<SingleVariableDesignationSyntax>().Select(d => d.Identifier.ValueText))
+                .ToHashSet(StringComparer.Ordinal);
+
+            foreach (var node in direct)
+            {
+                ExpressionSyntax? target = node switch
+                {
+                    AssignmentExpressionSyntax assignment when !assignment.IsKind(SyntaxKind.SimpleAssignmentExpression) => assignment.Left,
+                    // Sortear de novo a cada clique: x = Random.Shared.Next(...) com x de fora da cena.
+                    AssignmentExpressionSyntax assignment when assignment.Right.DescendantNodesAndSelf().OfType<IdentifierNameSyntax>()
+                        .Any(i => i.Identifier.ValueText == "Random") => assignment.Left,
+                    PostfixUnaryExpressionSyntax { RawKind: (int)SyntaxKind.PostIncrementExpression or (int)SyntaxKind.PostDecrementExpression } unary => unary.Operand,
+                    PrefixUnaryExpressionSyntax { RawKind: (int)SyntaxKind.PreIncrementExpression or (int)SyntaxKind.PreDecrementExpression } unary => unary.Operand,
+                    InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Add", Expression: var list } } => list,
+                    _ => null,
+                };
+                if (target == null || RootName(target) is not { } name || locals.Contains(name)) continue;
+                yield return (RepeatsEveryClickId,
+                    $"Isto roda de novo a cada clique, porque a cena \"{scene.Name}\" é redesenhada depois de cada um. " +
+                    "Para acontecer uma vez por visita, ponha dentro de game.OnEnter(() => { ... }); se é a ação de um botão, dentro do OnClick.",
+                    node.GetLocation());
+            }
+        }
+    }
+
+    /// <summary>"gold" em gold, player.Gold ou game.Find("X").Value: o nome de onde a mudança começa.</summary>
+    private static string? RootName(ExpressionSyntax expression) => expression switch
+    {
+        IdentifierNameSyntax identifier => identifier.Identifier.ValueText,
+        MemberAccessExpressionSyntax member => RootName(member.Expression),
+        InvocationExpressionSyntax invocation => RootName(invocation.Expression),
+        ElementAccessExpressionSyntax element => RootName(element.Expression),
+        ParenthesizedExpressionSyntax parenthesized => RootName(parenthesized.Expression),
+        _ => null,
+    };
+
     public const string BuildInDrawnSceneId = "DICA08";
 
     private static readonly Dictionary<string, string> BuildMethods = new(StringComparer.Ordinal)

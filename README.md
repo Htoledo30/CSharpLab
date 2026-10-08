@@ -83,7 +83,7 @@ Para uma cena nova: **Cenas → Nova tela do jogo…**.
 | Peça | Estilos |
 | --- | --- |
 | Caixa | Tom da cor (normal, escuro, claro), preenchimento de 0 a 100%, borda, cantos redondos, retos ou círculo (retratos redondos). |
-| Texto | 4 fontes do Windows (Normal, Fantasia, Livro, À mão), negrito, itálico e sombra nas letras. |
+| Texto | 4 fontes do Windows (Normal, Fantasia, Livro, À mão), negrito, itálico, sombra nas letras e rolagem para texto comprido. |
 | Botão | Cheio, só contorno ou só texto, e **Ativo no começo** (desligado: apagado e sem clique). |
 | Mensagens | Guarda as mensagens da cena: as do último clique destacadas, as antigas apagadinhas. |
 | Lista | Um cartão modelo que se repete para cada item (loja, inventário). Veja abaixo. |
@@ -92,6 +92,10 @@ Para uma cena nova: **Cenas → Nova tela do jogo…**.
   Num botão, **Ao clicar** mostra se ele já faz algo e em que linha do código (clique para ir até lá). Se ainda não faz nada,
   **Escrever o que ele faz** cria o `game.Find("Nome").OnClick(() => { });` na cena certa e deixa o cursor entre as chaves:
   o que o botão faz, você escreve. O campo de escrita tem o mesmo com **Ao responder** (`OnAnswer`).
+- **Texto que não cabe**: um Texto cujo fim ficaria cortado no jogo (ou um botão cujo texto terminaria em "…") ganha um
+  contorno laranja com um **!** no palco. Nas Propriedades aparece quanto falta e o conserto: **Ajustar a altura ao texto**
+  (no botão, **Aumentar a largura**), ou ligar a **Rolagem** para textos compridos. O aviso some sozinho quando passa a caber,
+  até enquanto você arrasta o tamanho.
 
 ### O código
 
@@ -124,6 +128,7 @@ game.Start("Start");
 | Comando | Em português | O que faz |
 | --- | --- | --- |
 | `Scene` | cena | O código de uma tela. Roda de novo depois de cada clique, com os valores atuais das variáveis. |
+| `OnEnter` | ao entrar | Dentro da cena, roda **uma vez** cada vez que o jogador chega nela (não nos cliques): sortear o inimigo, a recompensa da chegada. |
 | `Find("Nome")` | achar | Pega uma peça da tela. Depois: `.Text`, `.Value`, `.Max`, `.Visible`, `.Enabled`, `.Color`, `.Image` e os estilos (`.Shade`, `.Font`, `.Style`…). |
 | `OnClick` | ao clicar | O código entre as chaves roda quando o jogador clica no botão. |
 | `OnAnswer` | ao responder | O mesmo, para o campo de escrita: `answer` é o que o jogador escreveu. |
@@ -137,6 +142,30 @@ game.Start("Start");
 | `Start` | começar | Abre a janela na primeira cena. Sempre na última linha. |
 
 Ao trocar de cena, a tela escurece e clareia sozinha.
+
+**Cada coisa no seu lugar.** Como a cena roda de novo depois de cada clique, o código dela tem três lugares:
+
+```csharp
+game.Scene("Fight", () =>
+{
+    game.OnEnter(() =>                       // 1. ao chegar: prepara a visita (uma vez)
+    {
+        enemyHealth = 30;
+        game.Write("Um goblin aparece!");
+    });
+
+    game.Find("EnemyHealth").Value = enemyHealth;   // 2. a cena: só mostra o que as variáveis têm
+
+    game.Find("Attack").OnClick(() =>        // 3. o clique: a escolha do jogador
+    {
+        enemyHealth -= 7;
+    });
+});
+```
+
+Um `gold += 10` ou um sorteio com `Random` solto na cena (fora do `OnEnter` e do `OnClick`) se repetiria a cada clique;
+o editor sublinha e explica. Voltar para a cena roda o `OnEnter` de novo: uma recompensa que só pode acontecer uma vez
+na aventura precisa de uma variável (`if (!gotKey) { ... gotKey = true; }`).
 
 ### Lista: um cartão para cada item
 

@@ -36,6 +36,66 @@ public sealed class ScreenDesignerTests
         return steps;
     }
 
+    /// <summary>
+    /// Texto que não cabe: aviso laranja no palco e no painel, e "Ajustar ao texto" conserta num passo só.
+    /// A aba com o aviso fica em %TEMP%\csharplab-texto-cortado.png para conferir o visual.
+    /// </summary>
+    [Fact]
+    public void Texto_que_nao_cabe_ganha_aviso_e_se_ajusta_num_passo() => Ui.Run(async () =>
+    {
+        var json = """
+            { "pieces": [
+              { "type": "Text", "name": "Story", "x": 40, "y": 40, "width": 420, "height": 40, "text": "Encostado numa árvore, um velho segura a perna machucada. Uma bolsa pesada está ao lado dele, e o vento traz o cheiro de chuva.", "size": 18 },
+              { "type": "Button", "name": "Buy", "x": 40, "y": 300, "width": 120, "height": 48, "text": "Comprar a espada de aço" },
+              { "type": "Text", "name": "Short", "x": 520, "y": 40, "width": 300, "height": 40, "text": "Cabe." }
+            ] }
+            """;
+        var (doc, _, _) = Open(json);
+        using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
+        var view = new ScreenEditorView(doc, vm);
+        var window = new Window { Content = view, Width = 1280, Height = 760, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Left = -10000, Top = -10000 };
+        window.Show();
+        try
+        {
+            string PanelText() => string.Join(" | ", Descendants(view.Properties).OfType<System.Windows.Controls.TextBlock>().Where(t => t.IsVisible).Select(t => t.Text));
+            view.Model.Select("Story");
+            await Task.Delay(200);
+            window.UpdateLayout();
+
+            Assert.True(view.Stage.ShowsOverflow("Story"));
+            Assert.True(view.Stage.ShowsOverflow("Buy"));
+            Assert.False(view.Stage.ShowsOverflow("Short"));
+            Assert.Contains("O texto não cabe", PanelText());
+            var bitmap = new RenderTargetBitmap((int)view.ActualWidth, (int)view.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(view);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var file = File.Create(Path.Combine(Path.GetTempPath(), "csharplab-texto-cortado.png"))) encoder.Save(file);
+
+            // "Ajustar a altura ao texto": cabe, o aviso some, e é um passo só no desfazer.
+            int before = doc.Document.UndoStack.CanUndo ? 1 : 0;
+            Assert.True(view.Model.FitToText("Story"));
+            window.UpdateLayout();
+            var story = view.Model.Layout!.Find("Story")!;
+            Assert.True(story.Height > 40);
+            Assert.Null(ScreenRenderer.Overflow(story));
+            Assert.False(view.Stage.ShowsOverflow("Story"));
+            Assert.DoesNotContain("O texto não cabe", PanelText());
+            Assert.False(view.Model.FitToText("Story"));   // já cabe: nada a fazer
+
+            // Botão: a largura cresce.
+            Assert.True(view.Model.FitToText("Buy"));
+            Assert.True(view.Model.Layout!.Find("Buy")!.Width > 120);
+            Assert.False(view.Stage.ShowsOverflow("Buy"));
+            Assert.Equal(before + 2, UndoSteps(doc));
+        }
+        finally
+        {
+            window.Close();
+            view.Detach();
+        }
+    });
+
     [Fact]
     public void Nova_peca_aparece_no_meio_selecionada_e_gravada() => Ui.Run(() =>
     {

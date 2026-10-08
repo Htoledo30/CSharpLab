@@ -19,6 +19,9 @@ internal sealed record MessageLine(string Text, Color? Color, bool IsNews, bool 
 /// Como desenhar: no jogo (as peças respondem a cliques) ou no editor visual (só a aparência,
 /// com textos de exemplo onde o jogo ainda vai escrever).
 /// </summary>
+/// <summary>O tamanho que a peça precisaria para o texto caber inteiro.</summary>
+internal sealed record TextFit(double Width, double Height);
+
 internal sealed class RenderContext
 {
     public bool Live { get; init; }
@@ -102,6 +105,20 @@ internal static class ScreenRenderer
 
     private static FrameworkElement TextPiece(Piece piece)
     {
+        var block = TextBlockOf(piece);
+        if (piece.Scroll == true)
+        {
+            // Texto comprido: rola (roda do mouse ou a barra fina à direita) em vez de ser cortado.
+            var scroll = Scroller(block);
+            scroll.Padding = new Thickness(0, 0, 8, 0);
+            return new Border { Child = scroll, Background = Brushes.Transparent };
+        }
+        return new Border { Child = block, ClipToBounds = piece.Shadow != true, Background = Brushes.Transparent };
+    }
+
+    /// <summary>As letras de um Texto, como o jogo desenha (o editor também usa, para medir se cabe).</summary>
+    private static TextBlock TextBlockOf(Piece piece)
+    {
         var block = Label(piece, piece.Text ?? "", piece.Color is { } c ? Theme.Brush(c, piece.Shade) : Theme.Text);
         block.FontWeight = piece.Bold == true ? FontWeights.SemiBold : FontWeights.Normal;
         block.FontStyle = piece.Italic == true ? FontStyles.Italic : FontStyles.Normal;
@@ -114,7 +131,40 @@ internal static class ScreenRenderer
         block.LineHeight = Math.Round(block.FontSize * (piece.Font == Font.Fantasy ? 1.1 : 1.4));
         if (piece.Font == Font.Fantasy) block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
         if (piece.Shadow == true) block.Effect = TextShadow;
-        return new Border { Child = block, ClipToBounds = piece.Shadow != true, Background = Brushes.Transparent };
+        return block;
+    }
+
+    /// <summary>Espaço dos lados do texto dentro do botão (o modelo do botão tem 18 de cada lado).</summary>
+    private const double ButtonPadding = 36;
+
+    /// <summary>
+    /// O texto cabe na peça? Para um Texto, a altura que ele precisa; para um Botão, a largura (o texto do
+    /// botão fica numa linha só e, sem espaço, termina em "…"). Null quando cabe, ou quando o Texto tem rolagem.
+    /// </summary>
+    public static TextFit? Overflow(Piece piece)
+    {
+        if (string.IsNullOrEmpty(piece.Text)) return null;
+        switch (piece.Type)
+        {
+            case PieceType.Text when piece.Scroll != true:
+            {
+                var block = TextBlockOf(piece);
+                block.Measure(new Size(Math.Max(1, piece.Width), double.PositiveInfinity));
+                double needed = Math.Ceiling(block.DesiredSize.Height);
+                // Folga de meia letra: o espaço entre as linhas pode passar um pouco da peça sem cortar nada.
+                return needed > piece.Height + Math.Max(2, piece.FontSize * 0.5) ? new TextFit(piece.Width, needed) : null;
+            }
+            case PieceType.Button:
+            {
+                var label = Label(piece, piece.Text);
+                label.TextWrapping = TextWrapping.NoWrap;
+                label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                double needed = Math.Ceiling(label.DesiredSize.Width + ButtonPadding + 2);
+                return needed > piece.Width + 1 ? new TextFit(needed, piece.Height) : null;
+            }
+            default:
+                return null;
+        }
     }
 
     private static FrameworkElement ButtonPiece(Piece piece, RenderContext context)

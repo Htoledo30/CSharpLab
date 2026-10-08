@@ -303,6 +303,8 @@ public static partial class PortugueseDocs
 
         m[game + ".Background"] = D("Background = fundo. A imagem de fundo da tela desenhada (pasta Assets). Mude pelo código para a mesma tela servir a lugares diferentes.",
             "game.Background = \"tower.png\";");
+        m[game + ".OnEnter"] = D("OnEnter = ao entrar. Roda uma vez cada vez que o jogador chega na cena, e não nos cliques dentro dela. Use para preparar a visita: sortear o inimigo, dar a recompensa da chegada.",
+            "game.OnEnter(() =>\n{\n    enemyHealth = 30;\n    game.Write(\"Um goblin aparece!\");\n});");
         m[game + ".Wait"] = D("Wait = esperar. Dentro de um clique, mostra a tela como está e espera um pouco (em segundos) antes de continuar: você ataca e o inimigo responde logo depois.",
             "game.Write(\"Você atacou!\");\ngame.Wait(0.6);\ngame.Write(\"O goblin revida!\", Color.Red);");
         m[game + ".WindowTitle"] = D("WindowTitle = título da janela. O nome do jogo, mostrado no alto da janela.");
@@ -337,6 +339,8 @@ public static partial class PortugueseDocs
             "game.Find(\"Title\").Font = Font.Fantasy;");
         m[item + ".Bold"] = D("Bold = negrito. true deixa as letras do Texto mais grossas.", "game.Find(\"Title\").Bold = true;");
         m[item + ".Italic"] = D("Italic = itálico. true deixa as letras do Texto inclinadas.", "game.Find(\"Letter\").Italic = true;");
+        m[item + ".Scroll"] = D("Scroll = rolagem. true dá uma barra de rolagem ao Texto: texto comprido (uma carta, a história) não é cortado, o jogador rola com a roda do mouse.",
+            "game.Find(\"Letter\").Scroll = true;");
         m[item + ".Shadow"] = D("Shadow = sombra. true põe uma sombra atrás das letras, para ler bem em cima de qualquer fundo.", "game.Find(\"Title\").Shadow = true;");
         m[item + ".Style"] = D("Style = estilo do botão: ButtonStyle.Filled (cheio), ButtonStyle.Outline (contorno) ou ButtonStyle.Text (só texto).",
             "game.Find(\"Back\").Style = ButtonStyle.Text;");

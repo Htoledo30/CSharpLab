@@ -7,8 +7,10 @@
 //   2. As variáveis do jogo (o "estado").
 //   3. Os métodos que várias cenas usam (mostrar status, lutar, subir de nível).
 //   4. As cenas, uma por tela, na ordem em que o jogador passa por elas.
-// Cada cena roda de novo depois de cada clique: ela só põe os valores atuais na tela
-// e diz o que cada botão faz.
+// Cada cena roda de novo depois de cada clique, então o código dela tem três lugares:
+//   game.OnEnter  → prepara a visita, uma vez por chegada (ex.: a luta começa com o inimigo de vida cheia);
+//   o resto       → só põe os valores atuais na tela;
+//   OnClick       → a escolha do jogador.
 
 var game = new Game("A Coroa Perdida");
 
@@ -118,14 +120,11 @@ void GainXp(int amount)
     }
 }
 
+// Escolhe o inimigo e vai para a luta. Quem prepara a luta (vida cheia, mensagem) é o OnEnter da cena "Fight".
 void StartFight(Enemy foe, string returnTo)
 {
     enemy = foe;
-    enemyHealth = foe.Health;
-    enemyStunned = false;
-    fightOver = false;
     afterFight = returnTo;
-    game.Write($"{foe.Name} aparece!", Color.Orange);
     game.GoTo("Fight");
 }
 
@@ -483,6 +482,16 @@ game.Scene("Tower", () =>
 // 9. A luta: a mesma cena para todos os inimigos.
 game.Scene("Fight", () =>
 {
+    // Uma vez por luta, na chegada: o inimigo começa com a vida cheia.
+    // (Se isto ficasse solto na cena, a vida dele voltaria a encher a cada clique!)
+    game.OnEnter(() =>
+    {
+        enemyHealth = enemy.Health;
+        enemyStunned = false;
+        fightOver = false;
+        game.Write($"{enemy.Name} aparece!", Color.Orange);
+    });
+
     ShowStatus();
     // Os "retratos": o símbolo da classe do herói e o do inimigo, cada um numa moldura redonda.
     game.Find("HeroIcon").Text = heroClass.Icon;

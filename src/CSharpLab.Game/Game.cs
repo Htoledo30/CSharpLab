@@ -29,6 +29,8 @@ public sealed class Game
     private int _highlight = -1;     // o lote destacado na peça Mensagens: o último do clique atual
     private int _actionFirstBatch;   // primeiro lote do clique atual (o aviso por cima da tela mostra o clique todo)
     private bool _closed;            // a janela fechou no meio de um game.Wait
+    private bool _arriving;          // este desenho da cena é a chegada nela: o OnEnter roda
+    private bool _inEnter;           // rodando um OnEnter
     private Screen? _building;
     private string? _current;
     private string? _pendingScene;
@@ -213,8 +215,48 @@ public sealed class Game
     public void Write(string text, Color? color = null)
     {
         text ??= "";
-        if (_building != null) _building.Items.Add(new TextItem(text, color, IsNews: false));
+        // No OnEnter, o que se escreve é novidade da chegada (como num clique), não um texto fixo da cena.
+        if (_building != null && !_inEnter) _building.Items.Add(new TextItem(text, color, IsNews: false));
         else _news.Add((text, color));
+    }
+
+    /// <summary>
+    /// OnEnter = ao entrar. O código entre as chaves roda uma vez cada vez que o jogador chega na cena,
+    /// e não nos cliques dentro dela. Use para preparar a visita: sortear um inimigo, dar a
+    /// recompensa da chegada, contar quantas vezes ele veio. O resto da cena continua rodando a cada clique.
+    /// </summary>
+    /// <param name="prepare">O que fazer ao chegar: () => { ... }</param>
+    /// <example>
+    /// <code>
+    /// game.Scene("Fight", () =>
+    /// {
+    ///     game.OnEnter(() =>
+    ///     {
+    ///         enemyHealth = 30;
+    ///         game.Write("Um goblin aparece!");
+    ///     });
+    ///     game.Find("EnemyHealth").Value = enemyHealth;
+    /// });
+    /// </code>
+    /// </example>
+    public void OnEnter(Action prepare)
+    {
+        if (_building == null || _inEnter)
+            throw new GameException(
+                "game.OnEnter fica direto dentro da cena, fora dos botões: " +
+                "game.Scene(\"Fight\", () => { game.OnEnter(() => { enemyHealth = 30; }); ... });");
+        if (prepare == null)
+            throw new GameException("O game.OnEnter precisa dizer o que fazer ao chegar. Exemplo: game.OnEnter(() => { enemyHealth = 30; });");
+        if (!_arriving) return;
+        _inEnter = true;
+        try
+        {
+            prepare();
+        }
+        finally
+        {
+            _inEnter = false;
+        }
     }
 
     /// <summary>Button = botão. Cria um botão; o código entre as chaves roda quando o jogador clica.</summary>
@@ -422,6 +464,8 @@ public sealed class Game
                 var layout = Screens.Load(_current);
                 _designed = layout != null ? new DesignedScene(_current, layout) : null;
             }
+            // Chegou agora (game.Start, GoTo ou redirecionamento): o OnEnter roda neste desenho, e só nele.
+            _arriving = _entering;
             _entering = false;
             _designed?.ClearHandlers();
             screen.Designed = _designed;
@@ -434,6 +478,7 @@ public sealed class Game
             finally
             {
                 _building = null;
+                _arriving = false;
             }
             if (_pendingScene == null) break;
             // A cena mandou ir para outra (ex.: if (health <= 0) game.GoTo("GameOver")).

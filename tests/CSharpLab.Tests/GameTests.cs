@@ -63,6 +63,68 @@ public sealed class GameEngineTests
     }
 
     [Fact]
+    public void OnEnter_roda_uma_vez_por_visita_e_nao_nos_cliques()
+    {
+        int visits = 0, gold = 0;
+        var (game, view) = Started(g =>
+        {
+            g.Scene("Start", () =>
+            {
+                g.OnEnter(() =>
+                {
+                    visits++;
+                    gold += 10;   // a recompensa da chegada não se repete a cada clique
+                    g.Write("Você chegou à vila.");
+                });
+                g.Write($"Ouro: {gold}");
+                g.Button("Esperar", () => { });
+                g.Button("Sair", () => g.GoTo("Forest"));
+            });
+            g.Scene("Forest", () => g.Button("Voltar", () => g.GoTo("Start")));
+        });
+
+        // Chegada pelo game.Start: roda, e o Write dele é novidade (destacado), não texto fixo.
+        Assert.Equal((1, 10), (visits, gold));
+        Assert.Equal(["Você chegou à vila."], view.News);
+        Assert.Contains("Ouro: 10", view.Texts);
+
+        // Clique dentro da cena: a cena é desenhada de novo, mas o OnEnter não.
+        game.Act(view.Button("Esperar").OnClick);
+        game.Act(view.Button("Esperar").OnClick);
+        Assert.Equal((1, 10), (visits, gold));
+        Assert.Empty(view.News);
+
+        // Saiu e voltou: é outra visita, então roda de novo.
+        game.Act(view.Button("Sair").OnClick);
+        game.Act(view.Button("Voltar").OnClick);
+        Assert.Equal((2, 20), (visits, gold));
+        Assert.Contains("Ouro: 20", view.Texts);
+    }
+
+    [Fact]
+    public void OnEnter_pode_mandar_para_outra_cena_e_fora_da_cena_explica_onde_usar()
+    {
+        var (game, view) = Started(g =>
+        {
+            g.Scene("Start", () =>
+            {
+                g.OnEnter(() => g.GoTo("Locked"));
+                g.Write("nunca aparece");
+            });
+            g.Scene("Locked", () =>
+            {
+                g.Write("Porta trancada.");
+                g.Button("Tentar", () => g.OnEnter(() => { }));
+            });
+        });
+        Assert.Equal("Locked", game.CurrentScene);
+        Assert.Contains("Porta trancada.", view.Texts);
+
+        var error = Assert.Throws<GameException>(() => game.Act(view.Button("Tentar").OnClick));
+        Assert.Contains("game.OnEnter fica direto dentro da cena", error.Message);
+    }
+
+    [Fact]
     public void Say_dentro_do_botao_vira_aviso_que_some_no_proximo_clique()
     {
         var (game, view) = Started(g => g.Scene("Start", () =>

@@ -157,6 +157,17 @@ public sealed class Item
         set => Check(nameof(Italic)).Italic = value ? true : null;
     }
 
+    /// <summary>
+    /// Scroll = rolagem. true dá uma barra de rolagem ao Texto, para textos compridos (uma carta, a história)
+    /// não serem cortados: o jogador rola com a roda do mouse.
+    /// </summary>
+    /// <example><code>game.Find("Letter").Scroll = true;</code></example>
+    public bool Scroll
+    {
+        get => Check(nameof(Scroll)).Scroll == true;
+        set => Check(nameof(Scroll)).Scroll = value ? true : null;
+    }
+
     /// <summary>Shadow = sombra. true põe uma sombra atrás das letras, para ler bem em cima de qualquer fundo.</summary>
     /// <example><code>game.Find("Title").Shadow = true;</code></example>
     public bool Shadow

@@ -252,6 +252,47 @@ public sealed class StylesAndListTests : IDisposable
         Assert.Contains("de 0 a 5 segundos", error.Message);
     }
 
+    /// <summary>
+    /// O game.Wait redesenha a cena no meio do clique: o OnEnter da cena nova roda uma vez só (na chegada),
+    /// nem a pausa nem o fim do clique repetem a recompensa ou a mensagem de chegada.
+    /// </summary>
+    [Fact]
+    public void OnEnter_com_Wait_nao_repete_recompensa_nem_mensagem()
+    {
+        File.WriteAllText(Path.Combine(_dir, "Screens", "Fight.json"),
+            """{ "pieces": [ { "type": "Messages", "name": "Log", "x": 0, "y": 0, "width": 400, "height": 200 }, { "type": "Text", "name": "Enemy", "x": 0, "y": 220, "width": 300, "height": 40, "text": "?" } ] }""");
+        int arrivals = 0, enemyHealth = 0;
+        var (game, view) = Started("Shop", ShopScreen, g =>
+        {
+            g.Scene("Shop", () =>
+            {
+                g.Find("Back").Enabled = true;
+                g.Find("Back").OnClick(() =>
+                {
+                    g.GoTo("Fight");
+                    g.Wait(0.5);
+                    g.Write("Ele rosna.");
+                });
+            });
+            g.Scene("Fight", () =>
+            {
+                g.OnEnter(() =>
+                {
+                    arrivals++;
+                    enemyHealth = 30;
+                    g.Write("Um lobo aparece!");
+                    g.Find("Enemy").Text = "🐺 Lobo";   // mudar a peça na chegada vale para a visita toda
+                });
+                g.Find("Log").Visible = enemyHealth > 0;
+            });
+        });
+
+        game.ClickPiece(view.Piece("Back"));
+        Assert.Equal(1, arrivals);
+        Assert.Equal(["Um lobo aparece!", "Ele rosna."], view.Last.Messages.Select(m => m.Text));
+        Assert.Equal("🐺 Lobo", view.Last.Designed!.Find("Enemy")!.Text);
+    }
+
     [Fact]
     public void Wait_com_troca_de_cena_mostra_a_cena_nova_antes_da_pausa()
     {

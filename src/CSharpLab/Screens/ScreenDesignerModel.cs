@@ -363,6 +363,22 @@ public sealed class ScreenDesignerModel : IDisposable
         Commit(layout, mergeKey);
     }
 
+    /// <summary>
+    /// "Ajustar ao texto": o Texto fica alto o bastante (ou o Botão largo o bastante) para o texto caber inteiro.
+    /// Um passo só no desfazer. False se o texto já cabia.
+    /// </summary>
+    public bool FitToText(string name)
+    {
+        if (Layout?.Find(name) is not { } piece || ScreenRenderer.Overflow(piece) is not { } fit) return false;
+        Edit(name, p =>
+        {
+            p.Height = Math.Ceiling(fit.Height);
+            // Um botão solto não passa da borda direita do palco.
+            p.Width = p.List == null ? Math.Ceiling(Math.Min(fit.Width, Math.Max(p.Width, ScreenLayout.Width - p.X))) : Math.Ceiling(fit.Width);
+        });
+        return true;
+    }
+
     public void SetBackground(string? image)
     {
         if (Layout == null) return;

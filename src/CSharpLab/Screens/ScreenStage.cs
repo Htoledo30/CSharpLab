@@ -63,6 +63,40 @@ public sealed class ScreenStage : Grid
 
     /// <summary>Marca o quadro tracejado das peças que começam escondidas.</summary>
     private static readonly object HiddenHolder = new();
+    private static readonly object OverflowTag = new();
+    private static readonly Brush OverflowBrush = Freeze(WpfColor.FromRgb(0xF2, 0x9A, 0x4E));
+
+    /// <summary>O palco está mostrando o aviso de texto cortado nesta peça? (para os testes)</summary>
+    internal bool ShowsOverflow(string name) =>
+        _elements.TryGetValue(name, out var element) && element is Grid holder &&
+        holder.Children.OfType<FrameworkElement>().Any(c => c.Tag == OverflowTag && c.Visibility == Visibility.Visible);
+
+    /// <summary>O aviso de texto cortado: contorno laranja tracejado e uma bolinha com "!" no canto de baixo.</summary>
+    private static FrameworkElement OverflowMark()
+    {
+        var mark = new Grid { Tag = OverflowTag, IsHitTestVisible = false };
+        mark.Children.Add(new Rectangle { Stroke = OverflowBrush, StrokeDashArray = [4, 3], StrokeThickness = 2 });
+        mark.Children.Add(new Border
+        {
+            Width = 24,
+            Height = 24,
+            CornerRadius = new CornerRadius(12),
+            Background = OverflowBrush,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, -34, -2),   // ao lado do canto, sem ficar embaixo da alça de redimensionar
+            Child = new TextBlock
+            {
+                Text = "!",
+                FontWeight = FontWeights.Bold,
+                FontSize = 16,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+            },
+        });
+        return mark;
+    }
 
     // Arraste em andamento
     private enum Drag { None, Pending, Moving, Resizing, Marquee }
@@ -231,13 +265,24 @@ public sealed class ScreenStage : Grid
                 Core.Settings.AppPaths.Log(ex, "Desenhando peça");
                 element = new Border { Background = Theme.Panel };
             }
-            if (!piece.Visible)
+            bool showsText = piece.Type is PieceType.Text or PieceType.Button;
+            if (!piece.Visible || showsText)
             {
-                // Escondida no começo do jogo: aparece apagada, com contorno tracejado.
-                element.Opacity = 0.35;
                 var holder = new Grid { Width = element.Width, Height = element.Height, IsHitTestVisible = false, Tag = HiddenHolder };
                 holder.Children.Add(element);
-                holder.Children.Add(new Rectangle { Stroke = HiddenBrush, StrokeDashArray = [3, 3], StrokeThickness = 1 });
+                if (!piece.Visible)
+                {
+                    // Escondida no começo do jogo: aparece apagada, com contorno tracejado.
+                    element.Opacity = 0.35;
+                    holder.Children.Add(new Rectangle { Stroke = HiddenBrush, StrokeDashArray = [3, 3], StrokeThickness = 1 });
+                }
+                if (showsText)
+                {
+                    // Texto que não cabe (seria cortado no jogo): contorno laranja e um "!" no canto.
+                    var mark = OverflowMark();
+                    mark.Visibility = ScreenRenderer.Overflow(piece) != null ? Visibility.Visible : Visibility.Collapsed;
+                    holder.Children.Add(mark);
+                }
                 element = holder;
             }
             var bounds = _model.BoundsOf(piece);
@@ -582,6 +627,15 @@ public sealed class ScreenStage : Grid
                 {
                     inner.Width = _dragCurrent.Width;
                     inner.Height = _dragCurrent.Height;
+                    // O aviso de texto cortado acompanha o tamanho enquanto arrasta: some quando passa a caber.
+                    if (holder.Children.OfType<FrameworkElement>().FirstOrDefault(c => c.Tag == OverflowTag) is { } mark &&
+                        _model.Layout?.Find(_dragName!) is { } dragged)
+                    {
+                        var sized = dragged.Clone();
+                        sized.Width = _dragCurrent.Width;
+                        sized.Height = _dragCurrent.Height;
+                        mark.Visibility = ScreenRenderer.Overflow(sized) != null ? Visibility.Visible : Visibility.Collapsed;
+                    }
                 }
             }
         }

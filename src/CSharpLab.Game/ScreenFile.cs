@@ -20,7 +20,7 @@ internal static class ScreenFile
     private static readonly JsonSerializerOptions StringOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private static readonly string[] PieceKeys =
-        ["type", "name", "list", "x", "y", "width", "height", "text", "size", "bold", "italic", "shadow", "font", "align", "color", "shade",
+        ["type", "name", "list", "x", "y", "width", "height", "text", "size", "bold", "italic", "shadow", "scroll", "font", "align", "color", "shade",
          "opacity", "border", "corner", "style", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "visible"];
 
     public static string ValidColors => string.Join(", ", Enum.GetNames<Color>());
@@ -149,6 +149,7 @@ internal static class ScreenFile
                 "bold" => Boolean(value, label, key, v => piece.Bold = v),
                 "italic" => Boolean(value, label, key, v => piece.Italic = v),
                 "shadow" => Boolean(value, label, key, v => piece.Shadow = v),
+                "scroll" => Boolean(value, label, key, v => piece.Scroll = v),
                 "border" => Boolean(value, label, key, v => piece.Border = v),
                 "visible" => Boolean(value, label, key, v => piece.Visible = v),
                 "enabled" => Boolean(value, label, key, v => piece.Enabled = v),
@@ -333,6 +334,7 @@ internal static class ScreenFile
         if (p.Bold == true && Piece.Supports(p.Type, nameof(Piece.Bold))) parts.Add("\"bold\": true");
         if (p.Italic == true && Piece.Supports(p.Type, nameof(Piece.Italic))) parts.Add("\"italic\": true");
         if (p.Shadow == true && Piece.Supports(p.Type, nameof(Piece.Shadow))) parts.Add("\"shadow\": true");
+        if (p.Scroll == true && Piece.Supports(p.Type, nameof(Piece.Scroll))) parts.Add("\"scroll\": true");
         if (p.Font is { } font and not Font.Normal && Piece.Supports(p.Type, nameof(Piece.Font))) parts.Add($"\"font\": \"{font}\"");
         if (p.Align is { } align and not TextAlign.Left && Piece.Supports(p.Type, nameof(Piece.Align))) parts.Add($"\"align\": \"{align}\"");
         if (p.Color is { } color && Piece.Supports(p.Type, nameof(Piece.Color))) parts.Add($"\"color\": \"{color}\"");

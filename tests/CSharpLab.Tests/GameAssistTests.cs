@@ -200,6 +200,36 @@ public sealed class GameAssistTests : IDisposable
     }
 
     [Fact]
+    public void Mudanca_solta_na_cena_que_se_repete_a_cada_clique_ganha_dica()
+    {
+        var code = """
+            var game = new Game("T");
+            int gold = 0;
+            int enemyHealth = 0;
+            var inventory = new List<string>();
+            game.Scene("Village", () =>
+            {
+                gold += 10;                                        // dica: repete a cada clique
+                inventory.Add("Mapa");                             // dica
+                enemyHealth = Random.Shared.Next(20, 31);          // dica: sorteia de novo a cada clique
+                game.Find("Gold").Text = $"Ouro: {gold}";          // ok: só mostra
+                int total = 0;
+                for (int i = 0; i < 3; i++) total += i;            // ok: variáveis da própria cena
+                game.OnEnter(() => { gold += 5; inventory.Add("Chave"); });   // ok: uma vez por visita
+                game.Find("Buy").OnClick(() => gold -= 3);         // ok: só no clique
+            });
+            game.Start("Village");
+            """;
+        var root = CSharpSyntaxTree.ParseText(code).GetRoot();
+        var hints = GameAssist.CheckRepeatedChanges(root).ToList();
+        Assert.All(hints, h => Assert.Equal(GameAssist.RepeatsEveryClickId, h.Id));
+        Assert.Equal(
+            ["gold += 10", "inventory.Add(\"Mapa\")", "enemyHealth = Random.Shared.Next(20, 31)"],
+            hints.Select(h => code.Substring(h.Location.SourceSpan.Start, h.Location.SourceSpan.Length)));
+        Assert.Contains("game.OnEnter", hints[0].Message);
+    }
+
+    [Fact]
     public void Sabe_se_o_botao_ja_faz_algo_no_codigo()
     {
         var root = CSharpSyntaxTree.ParseText(HandlerCode).GetRoot();

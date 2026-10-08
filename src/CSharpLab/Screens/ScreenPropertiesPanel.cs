@@ -249,6 +249,16 @@ public sealed class ScreenPropertiesPanel : Border
             var field = TextField(() => Current()?.Text ?? "", v => Edit(p => p.Text = v, "text"), multiline: type == PieceType.Text);
             _textField = field;
             _content.Children.Add(field);
+
+            // Texto que não cabe: o aviso aparece logo embaixo, com o conserto ao lado.
+            if (type is PieceType.Text or PieceType.Button) _content.Children.Add(OverflowWarning(Current));
+            if (Piece.Supports(type, nameof(Piece.Scroll)))
+            {
+                var scroll = SwitchRow("Rolagem", "Ligado: texto comprido ganha uma barra de rolagem no jogo, em vez de ser cortado.",
+                    () => Current()?.Scroll == true, v => Edit(p => p.Scroll = v ? true : null, "scroll"));
+                scroll.Margin = new Thickness(0, 10, 0, 0);
+                _content.Children.Add(scroll);
+            }
         }
 
         // Botão e campo de escrita: logo depois do texto, o que eles fazem (fica no código; o painel mostra onde).
@@ -550,6 +560,53 @@ public sealed class ScreenPropertiesPanel : Border
             _action.Visibility = showAction ? Visibility.Visible : Visibility.Collapsed;
             _hint.Text = hint;
         }
+    }
+
+    /// <summary>
+    /// "O texto não cabe": quanto falta e um botão que aumenta a peça até caber (o Texto também pode ganhar rolagem).
+    /// Some sozinho quando o texto passa a caber.
+    /// </summary>
+    private FrameworkElement OverflowWarning(Func<Piece?> current)
+    {
+        var icon = new TextBlock { Text = "!", FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var badge = new Border { Width = 20, Height = 20, CornerRadius = new CornerRadius(10), Child = icon, Margin = new Thickness(0, 1, 9, 0), VerticalAlignment = VerticalAlignment.Top };
+        badge.SetResourceReference(Border.BackgroundProperty, "WarningBrush");
+        var message = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12 };
+        message.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
+        var fit = new Button { Style = (Style)FindResource("LinkButton"), HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(-6, 2, 0, -4), FontSize = 12 };
+        var text = new StackPanel();
+        text.Children.Add(message);
+        text.Children.Add(fit);
+        var row = new DockPanel();
+        DockPanel.SetDock(badge, Dock.Left);
+        row.Children.Add(badge);
+        row.Children.Add(text);
+        var card = new Border { Child = row, Padding = new Thickness(10, 8, 10, 8), Margin = new Thickness(0, 8, 0, 0), CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
+        card.SetResourceReference(Border.BackgroundProperty, "BgBase");
+        card.SetResourceReference(Border.BorderBrushProperty, "WarningBrush");
+
+        fit.Click += (_, _) =>
+        {
+            if (_shownName != null) _model.FitToText(_shownName);
+        };
+        _refreshers.Add(() =>
+        {
+            var piece = current();
+            var overflow = piece != null ? ScreenRenderer.Overflow(piece) : null;
+            card.Visibility = overflow != null ? Visibility.Visible : Visibility.Collapsed;
+            if (piece == null || overflow == null) return;
+            if (piece.Type == PieceType.Button)
+            {
+                message.Text = $"O texto não cabe no botão: no jogo ele termina em \"…\". Faltam {Math.Ceiling(overflow.Width - piece.Width)} de largura.";
+                fit.Content = "Aumentar a largura até caber";
+            }
+            else
+            {
+                message.Text = $"O texto não cabe: no jogo, o fim dele fica cortado. Faltam {Math.Ceiling(overflow.Height - piece.Height)} de altura.";
+                fit.Content = "Ajustar a altura ao texto";
+            }
+        });
+        return card;
     }
 
     private FrameworkElement NameField()

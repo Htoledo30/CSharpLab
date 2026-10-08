@@ -55,6 +55,31 @@ public sealed class ExamplesTests : IDisposable
         Assert.Equal("// meu código", File.ReadAllText(again.ProgramPath));
     }
 
+    /// <summary>Nenhuma tela dos exemplos (nem do jogo novo) mostra o aviso de texto cortado.</summary>
+    [Fact]
+    public void Telas_dos_exemplos_nao_tem_texto_cortado()
+    {
+        var problems = new List<string>();
+        var thread = new Thread(() =>
+        {
+            var screens = Examples.All.Where(e => e.IsGame)
+                .SelectMany(e => Examples.FilesOf(e).Where(f => f.Key.StartsWith("Screens/", StringComparison.Ordinal)).Select(f => (Name: e.Id + "/" + f.Key, Text: f.Value)))
+                .Concat(GameKit.StarterScreens.Select(s => (Name: "jogo novo/" + s.Key, Text: s.Value)));
+            foreach (var (name, text) in screens)
+            {
+                foreach (var piece in CSharpLab.GameEngine.ScreenFile.Parse(text).Layout!.Pieces)
+                {
+                    if (CSharpLab.GameEngine.ScreenRenderer.Overflow(piece) is { } fit)
+                        problems.Add($"{name} {piece.Name}: {piece.Width}x{piece.Height}, precisa de {fit.Width}x{fit.Height}");
+                }
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        Assert.Empty(problems);
+    }
+
     [Fact]
     public void Exemplos_tem_codigo_em_ingles_e_comentarios_em_portugues()
     {

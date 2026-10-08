@@ -33,6 +33,8 @@ internal sealed class Piece
     public Font? Font { get; set; }
     public bool? Italic { get; set; }
     public bool? Shadow { get; set; }
+    /// <summary>Texto comprido: em vez de cortar o que não cabe, a peça ganha uma barra de rolagem.</summary>
+    public bool? Scroll { get; set; }
     public Shade? Shade { get; set; }
     /// <summary>Preenchimento da Caixa, de 0 (invisível) a 100 (cheia).</summary>
     public int? Opacity { get; set; }
@@ -79,7 +81,7 @@ internal sealed class Piece
     {
         nameof(Text) => type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.List,
         nameof(Size) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages,
-        nameof(Bold) or nameof(Align) or nameof(Italic) or nameof(Shadow) => type is PieceType.Text,
+        nameof(Bold) or nameof(Align) or nameof(Italic) or nameof(Shadow) or nameof(Scroll) => type is PieceType.Text,
         nameof(Font) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages,
         nameof(Color) or nameof(Shade) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages or PieceType.List),
         nameof(Opacity) or nameof(Border) or nameof(Corner) => type is PieceType.Box,

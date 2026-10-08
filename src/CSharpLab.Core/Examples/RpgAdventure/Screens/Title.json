@@ -18,7 +18,7 @@
     { "type": "Text", "name": "Subtitle", "x": 40, "y": 222, "width": 880, "height": 34, "text": "Um RPG de escolhas, lutas e um enigma na escuridão.", "size": 19, "italic": true, "font": "Book", "align": "Center", "color": "Gray" },
     { "type": "Box", "name": "Card", "x": 240, "y": 276, "width": 480, "height": 136, "border": true },
     { "type": "Input", "name": "NameField", "x": 272, "y": 296, "width": 416, "height": 96, "text": "Qual é o seu nome, aventureiro?", "size": 18, "font": "Book" },
-    { "type": "Text", "name": "Forest", "x": 0, "y": 428, "width": 960, "height": 90, "text": "🌲 🌲🌲   🌳  🌲     🏰     🌲  🌳   🌲🌲 🌲", "size": 56, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Forest", "x": 0, "y": 428, "width": 960, "height": 90, "text": "🌲 🌲  🌳  🌲   🏰   🌲  🌳  🌲 🌲", "size": 56, "align": "Center", "color": "Gray" },
     { "type": "Box", "name": "Ground", "x": 16, "y": 508, "width": 928, "height": 16, "color": "Gray" }
   ]
 }
