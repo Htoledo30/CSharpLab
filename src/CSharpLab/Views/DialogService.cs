@@ -137,9 +137,9 @@ public sealed class DialogService : IDialogService
         return dialog.ShowDialog(Owner()) == true ? dialog.FileName : null;
     }
 
-    public NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation, bool offerGame = false)
+    public NewProjectRequest? AskNewProject(string title, string? explanation, string defaultName, string defaultLocation, bool offerGame = false, bool preferGame = false)
     {
-        var dialog = new NewProjectDialog(title, explanation, defaultName, defaultLocation, this, offerGame);
+        var dialog = new NewProjectDialog(title, explanation, defaultName, defaultLocation, this, offerGame, preferGame);
         return dialog.ShowDialog() == true ? dialog.Request : null;
     }
 
@@ -191,7 +191,7 @@ public sealed class NewProjectDialog : DialogWindow
     private readonly TextBlock _preview;
     private readonly TextBlock _error;
 
-    public NewProjectDialog(string title, string? explanation, string defaultName, string defaultLocation, DialogService dialogs, bool offerGame = false) : base(title)
+    public NewProjectDialog(string title, string? explanation, string defaultName, string defaultLocation, DialogService dialogs, bool offerGame = false, bool preferGame = false) : base(title)
     {
         Width = 520;
         var panel = new StackPanel();
@@ -202,8 +202,9 @@ public sealed class NewProjectDialog : DialogWindow
         if (offerGame)
         {
             panel.Children.Add(Label("Tipo"));
-            var console = KindOption("Programa console", "Texto no terminal: Console.WriteLine, ReadLine, jogos de terminal.", isChecked: true);
-            _game = KindOption("Jogo com botões", "Janela com botões, barras de vida e telas que você desenha arrastando.", isChecked: false);
+            var console = KindOption("Programa console", "Texto no terminal: Console.WriteLine, ReadLine, jogos de terminal.", isChecked: !preferGame);
+            _game = KindOption("Jogo com botões", "Janela com botões, barras de vida e telas que você desenha arrastando.", isChecked: preferGame);
+            if (preferGame && _name.Text.Trim() == defaultName) _name.Text = DefaultGameName;
             panel.Children.Add(console);
             panel.Children.Add(_game);
             // O nome padrão acompanha o tipo, enquanto a pessoa não escolher outro.

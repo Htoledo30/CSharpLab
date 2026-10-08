@@ -187,6 +187,16 @@
                         <MenuItem Header="Mostrar terminal e problemas" InputGestureText="Ctrl+J" Command="{Binding TogglePanelCommand}" />
                         <MenuItem Header="Expandir terminal" InputGestureText="Ctrl+Shift+J" Command="{Binding TogglePanelMaximizedCommand}" />
                     </MenuItem>
+                    <MenuItem Header="Aj_uda">
+                        <MenuItem Click="OnFirstGameGuide" AutomationProperties.Name="Seu primeiro jogo em 5 minutos">
+                            <MenuItem.Header>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock Text="Seu primeiro jogo em 5 minutos" />
+                                    <TextBlock Text="Um guia curto que fica ao lado enquanto você faz" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                </StackPanel>
+                            </MenuItem.Header>
+                        </MenuItem>
+                    </MenuItem>
                 </Menu>
 
                 <TextBlock Grid.Column="2" Text="{Binding WindowTitle}" Foreground="{StaticResource TextMuted}" FontSize="12"

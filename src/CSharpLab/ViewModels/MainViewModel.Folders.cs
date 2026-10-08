@@ -293,11 +293,17 @@ public sealed partial class MainViewModel
     }
 
     [RelayCommand]
-    private async Task NewProject()
+    private Task NewProject() => CreateNewProject(preferGame: false);
+
+    /// <summary>Novo projeto já com "Jogo com botões" escolhido (do guia do primeiro jogo).</summary>
+    [RelayCommand]
+    private Task NewGame() => CreateNewProject(preferGame: true);
+
+    private async Task CreateNewProject(bool preferGame)
     {
         var request = Dialogs.AskNewProject("Novo projeto",
             "Um projeto é uma pasta com seus arquivos .cs e um arquivo .csproj. É ele que o botão Executar compila e roda.",
-            "MeuProjeto", DefaultProjectLocation(), offerGame: true);
+            "MeuProjeto", DefaultProjectLocation(), offerGame: true, preferGame: preferGame);
         if (request == null) return;
         if (!ConfirmCloseAll(Documents)) return;
         try

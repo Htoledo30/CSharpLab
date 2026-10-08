@@ -308,6 +308,26 @@ public partial class MainWindow : Window
     private void OnCopy(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Copy);
     private void OnPaste(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Paste);
 
+    // ================================================================ guia
+
+    private Views.GuideWindow? _guide;
+
+    private void OnFirstGameGuide(object sender, RoutedEventArgs e) => ShowGuide();
+
+    /// <summary>Abre o guia do primeiro jogo ao lado (ou traz para a frente, se já estiver aberto).</summary>
+    public void ShowGuide()
+    {
+        if (_guide is { IsLoaded: true })
+        {
+            _guide.Activate();
+            return;
+        }
+        _guide = new Views.GuideWindow(_vm);
+        _guide.PlaceBeside(this);
+        _guide.Closed += (_, _) => _guide = null;
+        _guide.Show();
+    }
+
     // ================================================================ cenas do jogo
 
     private void OnScenesButton(object sender, RoutedEventArgs e)

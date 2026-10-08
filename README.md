@@ -51,6 +51,7 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | Fazer jogos no console | `Ctrl+Shift+J` expande o terminal para quase a tela toda. |
 | Organizar o código | `Ctrl+Shift+F` formata o arquivo (desfaz com `Ctrl+Z`). |
 | Estudar com exemplos | **Arquivo → Exemplos para estudar**: adivinhe o número, calculadora, jogo da velha, batalha RPG, cobrinha e dois RPGs de janela (com telas desenhadas e só com código). Código em inglês, comentários em português. Ficam em `Documentos\CSharp Lab\Exemplos` e suas mudanças nunca são apagadas. |
+| Fazer o primeiro jogo | **Ajuda → Seu primeiro jogo em 5 minutos**: cinco passos que ficam numa janelinha ao lado enquanto você faz (criar, jogar, mudar a tela, um botão que faz algo, uma cena nova). |
 
 Executar um rascunho pede uma única vez o nome e a pasta de um projeto novo; o código vira o `Program.cs` dele.
 

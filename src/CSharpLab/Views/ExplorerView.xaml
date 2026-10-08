@@ -113,6 +113,8 @@
                             Command="{Binding OpenFolderDialogCommand}" />
                     <Button x:Name="ExamplesButton" Style="{StaticResource LinkButton}" Content="Exemplos para estudar…" HorizontalAlignment="Left"
                             Margin="-6,2,0,0" ToolTip="Jogos e programas prontos, com explicações em português" Click="OnExamplesClick" />
+                    <Button Style="{StaticResource LinkButton}" Content="Seu primeiro jogo em 5 minutos" HorizontalAlignment="Left"
+                            Margin="-6,2,0,0" ToolTip="Um guia curto que fica ao lado enquanto você faz" Click="OnGuideClick" />
 
                     <!-- Recentes: um clique abre de novo -->
                     <TextBlock Text="RECENTES" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" Margin="0,22,0,6"

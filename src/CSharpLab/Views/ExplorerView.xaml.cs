@@ -13,6 +13,8 @@ public partial class ExplorerView : UserControl
 
     private MainViewModel? Vm => DataContext as MainViewModel;
 
+    private void OnGuideClick(object sender, RoutedEventArgs e) => (Window.GetWindow(this) as MainWindow)?.ShowGuide();
+
     /// <summary>A lista de exemplos, como em Arquivo → Exemplos para estudar.</summary>
     private void OnExamplesClick(object sender, RoutedEventArgs e)
     {
