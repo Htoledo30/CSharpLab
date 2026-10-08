@@ -52,7 +52,7 @@ internal sealed class GameWindow : Window, IGameView
         _game = game;
         Title = game.WindowTitle;
         Background = Theme.Background;
-        FontFamily = Theme.DefaultFont;
+        FontFamily = Theme.BodyFamily;
         UseLayoutRounding = true;
         SizeToContent = SizeToContent.WidthAndHeight;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -310,7 +310,7 @@ internal sealed class GameWindow : Window, IGameView
             list.Children.Add(ScreenRenderer.MessageView(line, 17));
         var toast = new Border
         {
-            Background = Theme.Freeze(System.Windows.Media.Color.FromArgb(0xEE, 0x21, 0x24, 0x2C)),
+            Background = Theme.Freeze(Theme.WithAlpha(Theme.PanelColor, 0xEE)),
             BorderBrush = Theme.PanelBorder,
             BorderThickness = new Thickness(1),
             CornerRadius = new CornerRadius(10),

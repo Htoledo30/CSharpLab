@@ -82,6 +82,7 @@ public static class GameKit
             "  <ItemGroup>",
             $"    <None Include=\"{AssetsFolder}\\**\" CopyToOutputDirectory=\"PreserveNewest\" />",
             $"    <None Include=\"{ScreensFolder}\\**\" CopyToOutputDirectory=\"PreserveNewest\" />",
+            "    <None Include=\"GameStyle.json\" CopyToOutputDirectory=\"PreserveNewest\" Condition=\"Exists('GameStyle.json')\" />",
             "  </ItemGroup>",
             "",
             "</Project>",

@@ -37,6 +37,58 @@ public sealed class ScreenDesignerTests
     }
 
     /// <summary>
+    /// Tema do jogo: o painel da tela mostra os quatro, escolher um grava o GameStyle.json e o palco muda na hora.
+    /// A aba com o tema Fantasia fica em %TEMP%\csharplab-aba-tema.png para conferir o visual.
+    /// </summary>
+    [Fact]
+    public void Escolher_tema_grava_o_arquivo_e_o_palco_muda() => Ui.Run(async () =>
+    {
+        var (doc, _, dir) = Open();
+        using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
+        var view = new ScreenEditorView(doc, vm);
+        var window = new Window { Content = view, Width = 1280, Height = 760, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Left = -10000, Top = -10000 };
+        window.Show();
+        try
+        {
+            await Task.Delay(200);
+            window.UpdateLayout();
+            string PanelText() => string.Join(" | ", Descendants(view.Properties).OfType<System.Windows.Controls.TextBlock>().Where(t => t.IsVisible).Select(t => t.Text));
+            Assert.Contains("TEMA DO JOGO", PanelText());
+            foreach (var name in new[] { "Clássico", "Fantasia", "Livro", "Moderno" }) Assert.Contains(name, PanelText());
+            Assert.Equal(ThemeName.Classic, view.Model.Look.Name);
+
+            Assert.Null(view.Model.SetTheme(ThemeName.Fantasy));
+            window.UpdateLayout();
+            var file = Path.Combine(dir, GameStyle.FileName);
+            Assert.Equal(ThemeName.Fantasy, GameStyle.Parse(File.ReadAllText(file)).Theme);
+            Assert.Equal(ThemeName.Fantasy, view.Model.Look.Name);
+            Assert.Same(Look.Fantasy.BackgroundBrush, Theme.Background);   // o palco já desenha com o tema novo
+
+            var bitmap = new RenderTargetBitmap((int)view.ActualWidth, (int)view.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(view);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using (var png = File.Create(Path.Combine(Path.GetTempPath(), "csharplab-aba-tema.png"))) encoder.Save(png);
+
+            // Arquivo com erro: a tela usa o Clássico e o painel explica.
+            File.WriteAllText(file, """{ "theme": "Pirata" }""");
+            File.SetLastWriteTimeUtc(file, DateTime.UtcNow.AddSeconds(5));
+            view.Model.Select(null);
+            view.Model.Refresh();
+            view.Stage.InvalidateVisual();
+            view.Model.ApplyTheme();
+            Assert.Equal(ThemeName.Classic, view.Model.Look.Name);
+            Assert.Contains("Pirata", view.Model.ThemeError);
+        }
+        finally
+        {
+            window.Close();
+            view.Detach();
+            Theme.Current = Look.Classic;
+        }
+    });
+
+    /// <summary>
     /// Texto que não cabe: aviso laranja no palco e no painel, e "Ajustar ao texto" conserta num passo só.
     /// A aba com o aviso fica em %TEMP%\csharplab-texto-cortado.png para conferir o visual.
     /// </summary>

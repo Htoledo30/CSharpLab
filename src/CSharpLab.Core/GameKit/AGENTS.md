@@ -204,6 +204,19 @@ Dicas para telas bonitas: deixe 40 de margem nas bordas, alinhe as peças pelas 
 Títulos com `"font": "Fantasy"` e `"shadow": true`; a ação principal com botão cheio e as secundárias com `Outline` ou `Text`; retratos com uma `Box` `"corner": "Circle"` atrás de um Texto com emoji grande.
 Peças que se repetem em várias telas (o painel de status) ficam com **os mesmos nomes** em todas, para um método só preencher qualquer uma.
 
+### O tema do jogo: `GameStyle.json`
+
+Na pasta do projeto, o tema vale para todas as telas: `{ "format": 1, "theme": "Fantasy" }`. Sem o arquivo, o tema é `Classic`.
+
+| Tema | Visual |
+|---|---|
+| `Classic` | Escuro e limpo (o padrão). |
+| `Fantasy` | Noite púrpura, caixas com borda de bronze, títulos em letra de conto de fadas, textos de livro. |
+| `Book` | **Claro**: papel e tinta escura; as cores ficam mais escuras para ler no papel. |
+| `Modern` | Quase preto, cores vivas, cantos bem redondos. |
+
+O tema dá o padrão (fundo, painéis, as 8 cores, cantos, fontes de título/texto/botão); o que a peça escolhe (`color`, `font`, `shade`…) vale mais. Um título é um Text com `size` 28 ou mais. Textos só com símbolos/emoji ficam na letra normal. Para mudar o visual do jogo inteiro, prefira trocar o tema a pintar peça por peça.
+
 ## Regras
 
 1. **Não use `Console`** (`ReadLine`/`WriteLine`): é um jogo de janela. Use uma peça `Input` e `game.Write`.

@@ -92,7 +92,7 @@ public sealed partial class ExplorerNode : ObservableObject
     {
         // Só os nomes especiais olham o disco (para saber se a pasta é de um jogo).
         var name = Name.ToLowerInvariant();
-        if (FullPath.Length == 0 || Parent == null || name is not ("lib" or "screens" or "assets" or "agents.md" or "claude.md")) return null;
+        if (FullPath.Length == 0 || Parent == null || name is not ("lib" or "screens" or "assets" or "agents.md" or "claude.md" or "gamestyle.json")) return null;
         var folder = Path.GetDirectoryName(FullPath) ?? "";
         if (!File.Exists(Path.Combine(folder, "lib", Core.Projects.GameKit.LibraryName + ".dll"))) return null;
         return (IsDirectory, name) switch
@@ -101,6 +101,7 @@ public sealed partial class ExplorerNode : ObservableObject
             (true, "screens") => "As telas desenhadas: cada arquivo é uma cena e abre na aba Tela.",
             (true, "assets") => "As imagens do jogo (.png, .jpg). Use nas peças Imagem ou em game.Image(\"arquivo.png\").",
             (false, "agents.md") => "Guia do motor para IAs (Codex e outras). Pode ignorar.",
+            (false, "gamestyle.json") => "O tema do jogo (Clássico, Fantasia, Livro ou Moderno). Escolha na aba Tela, sem nenhuma peça selecionada.",
             (false, "claude.md") => "Guia do motor para o Claude (aponta para o AGENTS.md). Pode ignorar.",
             _ => null,
         };

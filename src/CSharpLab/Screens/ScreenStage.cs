@@ -169,6 +169,9 @@ public sealed class ScreenStage : Grid
 
         SizeChanged += (_, _) => Fit();
         model.Changed += Rebuild;
+        model.ThemeChanged += Rebuild;
+        // Outra aba pode ter trocado o tema do jogo: ao voltar para esta, desenha de novo.
+        IsVisibleChanged += OnVisibleChanged;
         model.SelectionChanged += UpdateOverlay;
         Rebuild();
     }
@@ -178,9 +181,16 @@ public sealed class ScreenStage : Grid
 
     public double Zoom => _zoom;
 
+    private void OnVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+    {
+        if (IsVisible) Rebuild();
+    }
+
     public void Detach()
     {
         _model.Changed -= Rebuild;
+        _model.ThemeChanged -= Rebuild;
+        IsVisibleChanged -= OnVisibleChanged;
         _model.SelectionChanged -= UpdateOverlay;
     }
 
@@ -250,6 +260,9 @@ public sealed class ScreenStage : Grid
             return;
         }
         if (_model.ProjectDirectory != null) Theme.ImageRoots = [_model.ProjectDirectory];
+        // O tema do jogo (GameStyle.json): o palco desenha com as cores e fontes dele, igual ao jogo.
+        _model.ApplyTheme();
+        _stage.Background = Theme.Background;
 
         if (ScreenRenderer.Background(layout) is { } bg) _background.Children.Add(bg);
         var context = new RenderContext { Live = false, Members = list => layout.MembersOf(list.Name) };

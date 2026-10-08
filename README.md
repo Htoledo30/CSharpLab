@@ -71,6 +71,12 @@ O jogo tem duas partes, cada uma no seu lugar:
 Cada cena tem a sua tela em `Screens/<Cena>.json`. Abra pelo botão **Cenas** (ao lado do **Executar**) ou pelo explorador.
 Para uma cena nova: **Cenas → Nova tela do jogo…**.
 
+**Tema do jogo**: com nenhuma peça selecionada, o painel da direita mostra os quatro temas, com uma miniatura de cada:
+**Clássico** (escuro e limpo), **Fantasia** (noite púrpura, bordas de bronze, títulos de conto de fadas), **Livro**
+(papel claro e tinta escura) e **Moderno** (quase preto, cores vivas, cantos redondos). Um clique muda o jogo inteiro:
+fundo, painéis, as 8 cores, cantos e fontes. O que você escolher numa peça (cor, fonte, tom…) continua valendo por
+cima do tema. A escolha fica no arquivo `GameStyle.json`, na pasta do projeto.
+
 - **Peças** à esquerda: Texto, Botão, Barra, Imagem, Caixa, Campo de escrita, Mensagens e Lista. Clique para pôr no meio ou arraste até o lugar.
 - **Palco** no meio: arraste para mover, puxe os quadradinhos para mudar o tamanho (Shift mantém a proporção).
   As peças grudam nas bordas e nos centros das outras, com linhas-guia (Alt solta livre).

@@ -44,6 +44,7 @@ public sealed class ScreenPropertiesPanel : Border
         Child = new ScrollViewer { Content = _content, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
 
         model.SelectionChanged += Build;
+        model.ThemeChanged += OnThemeChanged;
         model.Changed += OnModelChanged;
         // Voltando de outra aba (onde a pessoa pode ter escrito o código da peça): confere de novo.
         IsVisibleChanged += (_, _) =>
@@ -69,6 +70,7 @@ public sealed class ScreenPropertiesPanel : Border
     public void Detach()
     {
         _model.SelectionChanged -= Build;
+        _model.ThemeChanged -= OnThemeChanged;
         _model.Changed -= OnModelChanged;
     }
 
@@ -138,9 +140,104 @@ public sealed class ScreenPropertiesPanel : Border
         _refreshCode?.Invoke();
     }
 
+    /// <summary>
+    /// Os quatro temas, cada um com uma miniatura (fundo, painel, título e botão do tema). Um clique escolhe
+    /// o tema do jogo inteiro (GameStyle.json).
+    /// </summary>
+    private FrameworkElement ThemePicker()
+    {
+        var panel = new StackPanel();
+        var grid = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -6, 0) };
+        foreach (var look in Look.All)
+        {
+            var preview = new Grid { Height = 62 };
+            preview.Children.Add(new Border { Background = look.BackgroundBrush, CornerRadius = new CornerRadius(5) });
+            var sample = new StackPanel { Margin = new Thickness(8, 3, 8, 4) };
+            sample.Children.Add(new TextBlock
+            {
+                Text = "Aa",
+                FontFamily = Theme.FontOf(look.TitleFont),
+                FontSize = 17 * Theme.FontScale(look.TitleFont),
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(look.Text),
+            });
+            sample.Children.Add(new Border
+            {
+                Width = 46,
+                Height = 10,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                CornerRadius = new CornerRadius(Math.Min(look.ButtonRadius, 5)),
+                Background = new SolidColorBrush(look.ButtonDefault),
+                Margin = new Thickness(0, 2, 0, 0),
+            });
+            preview.Children.Add(new Border
+            {
+                Margin = new Thickness(8),
+                Background = new SolidColorBrush(look.Panel),
+                BorderBrush = new SolidColorBrush(look.PanelBorder),
+                BorderThickness = new Thickness(look.PanelBorders ? 1 : 0),
+                CornerRadius = new CornerRadius(Math.Min(look.PanelRadius, 8)),
+                Child = sample,
+            });
+
+            var name = new TextBlock { Text = look.Title, FontSize = 12, Margin = new Thickness(2, 4, 0, 0) };
+            name.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
+            var content = new StackPanel();
+            content.Children.Add(preview);
+            content.Children.Add(name);
+
+            bool chosen = _model.Look.Name == look.Name;
+            var tile = new Border
+            {
+                Child = content,
+                Padding = new Thickness(4),
+                Margin = new Thickness(0, 0, 6, 6),
+                CornerRadius = new CornerRadius(7),
+                BorderThickness = new Thickness(2),
+                Background = Brushes.Transparent,
+                Cursor = Cursors.Hand,
+                ToolTip = look.Description,
+            };
+            if (chosen) tile.SetResourceReference(Border.BorderBrushProperty, "Accent");
+            else tile.BorderBrush = Brushes.Transparent;
+            tile.MouseEnter += (_, _) => { if (!chosen) tile.SetResourceReference(Border.BackgroundProperty, "BgHover"); };
+            tile.MouseLeave += (_, _) => tile.Background = Brushes.Transparent;
+            var theme = look.Name;
+            tile.MouseLeftButtonUp += (_, _) =>
+            {
+                if (theme == _model.Look.Name) return;
+                if (_model.SetTheme(theme) is { } problem) MessageBox.Show(Window.GetWindow(this)!, problem, "Tema do jogo", MessageBoxButton.OK, MessageBoxImage.Warning);
+            };
+            System.Windows.Automation.AutomationProperties.SetName(tile, "Tema " + look.Title);
+            grid.Children.Add(tile);
+        }
+        panel.Children.Add(grid);
+
+        var hint = Muted("Vale para todas as telas do jogo. O que você escolher numa peça (cor, fonte…) continua valendo.");
+        hint.Margin = new Thickness(0, 2, 0, 0);
+        panel.Children.Add(hint);
+        if (_model.ThemeError is { } error)
+        {
+            var problem = Muted(error + " Por enquanto, a tela usa o Clássico.");
+            problem.SetResourceReference(TextBlock.ForegroundProperty, "WarningBrush");
+            problem.Margin = new Thickness(0, 6, 0, 0);
+            panel.Children.Add(problem);
+        }
+        return panel;
+    }
+
+    /// <summary>O tema mudou: as cores e fontes do painel (bolinhas de cor, letras) acompanham.</summary>
+    private void OnThemeChanged() => Build();
+
     private void BuildScreen()
     {
         _content.Children.Add(Title("Tela", $"cena \"{_model.SceneName}\""));
+
+        if (_model.ProjectDirectory != null)
+        {
+            _content.Children.Add(Section("TEMA DO JOGO"));
+            _content.Children.Add(ThemePicker());
+        }
 
         _content.Children.Add(Section("FUNDO"));
         _content.Children.Add(ImagePicker(() => _model.Layout?.Background, image => _model.SetBackground(image), "Sem imagem de fundo"));

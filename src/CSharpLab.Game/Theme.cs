@@ -15,14 +15,61 @@ namespace CSharpLab.GameEngine;
 /// </summary>
 internal static class Theme
 {
-    public static readonly Brush Background = Freeze(WpfColor.FromRgb(0x17, 0x19, 0x1F));
-    public static readonly WpfColor PanelColor = WpfColor.FromRgb(0x21, 0x24, 0x2C);
-    public static readonly Brush Panel = Freeze(PanelColor);
-    public static readonly Brush PanelBorder = Freeze(WpfColor.FromRgb(0x2E, 0x32, 0x3C));
-    public static readonly Brush Track = Freeze(WpfColor.FromRgb(0x2E, 0x32, 0x3C));
-    public static readonly Brush Text = Freeze(WpfColor.FromRgb(0xDD, 0xE1, 0xE8));
-    public static readonly Brush Muted = Freeze(WpfColor.FromRgb(0x8C, 0x93, 0xA0));
+    /// <summary>
+    /// O tema em uso (GameStyle.json). Cada thread tem o seu: a janela do jogo, a aba Tela do editor e
+    /// cada teste desenham com o tema que carregaram, sem atrapalhar uns aos outros.
+    /// </summary>
+    [ThreadStatic] private static Look? _current;
+
+    public static Look Current
+    {
+        get => _current ?? Look.Classic;
+        set => _current = value;
+    }
+
+    /// <summary>Usa o tema do GameStyle.json da primeira pasta que tiver um (Clássico se não tiver). Retorna o erro do arquivo, se houver.</summary>
+    public static string? UseProject(IEnumerable<string> folders)
+    {
+        Current = GameStyle.Load(folders, out var error);
+        return error;
+    }
+
+    public static Brush Background => Current.BackgroundBrush;
+    public static WpfColor PanelColor => Current.Panel;
+    public static Brush Panel => Solid(Current.Panel);
+    public static Brush PanelBorder => Solid(Current.PanelBorder);
+    public static Brush Track => Solid(Current.Track);
+    public static Brush Text => Solid(Current.Text);
+    public static Brush Muted => Solid(Current.Muted);
+    /// <summary>Cantos das caixas, das Mensagens e dos painéis.</summary>
+    public static double PanelRadius => Current.PanelRadius;
+
     public static readonly FontFamily DefaultFont = new("Segoe UI");
+
+    /// <summary>A letra dos textos sem fonte escolhida (rótulos das barras, avisos, "OK"…), conforme o tema.</summary>
+    public static FontFamily BodyFamily => FontOf(Current.BodyFont);
+
+    /// <summary>
+    /// A fonte de uma peça: a que ela escolheu, ou a do tema (títulos, textos e botões podem ter fontes diferentes).
+    /// Um título é um Texto com letra 28 ou maior.
+    /// </summary>
+    public static Font FontFor(Piece piece)
+    {
+        if (piece.Font is { } chosen) return chosen;
+        // Só símbolos e emoji (um retrato 🐺, estrelas ✦): ficam na letra normal, que desenha todos do tamanho certo.
+        if (!(piece.Text ?? "").Any(char.IsLetterOrDigit)) return GameEngine.Font.Normal;
+        return (piece.Type, piece.FontSize) switch
+        {
+            (PieceType.Text, >= 28) => Current.TitleFont,
+            (PieceType.Button, _) => Current.ButtonFont,
+            _ => Current.BodyFont,
+        };
+    }
+
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<WpfColor, Brush> SolidBrushes = new();
+
+    /// <summary>Pincel de uma cor só, guardado para reaproveitar.</summary>
+    private static Brush Solid(WpfColor color) => SolidBrushes.GetOrAdd(color, Freeze);
 
     // As fontes do Font: todas vêm com o Windows. Símbolos e emoji que faltam nelas vêm da Segoe UI.
     private static readonly Dictionary<Font, FontFamily> Fonts = new()
@@ -38,30 +85,19 @@ internal static class Theme
     /// <summary>A Gabriola desenha letras pequenas para o tamanho: ela ganha um pouco mais, para todas parecerem do mesmo tamanho.</summary>
     public static double FontScale(Font? font) => font == GameEngine.Font.Fantasy ? 1.3 : 1;
 
-    private static readonly Dictionary<Color, WpfColor> Colors = new()
-    {
-        [Color.White] = WpfColor.FromRgb(0xDD, 0xE1, 0xE8),
-        [Color.Gray] = WpfColor.FromRgb(0x8C, 0x93, 0xA0),
-        [Color.Red] = WpfColor.FromRgb(0xF2, 0x6B, 0x6B),
-        [Color.Green] = WpfColor.FromRgb(0x5C, 0xCB, 0x7A),
-        [Color.Blue] = WpfColor.FromRgb(0x5E, 0xA8, 0xFF),
-        [Color.Gold] = WpfColor.FromRgb(0xF2, 0xC1, 0x4E),
-        [Color.Purple] = WpfColor.FromRgb(0xB4, 0x8C, 0xFF),
-        [Color.Orange] = WpfColor.FromRgb(0xF2, 0x9A, 0x4E),
-    };
+    /// <summary>As 8 cores do jogo no tema atual.</summary>
+    private static IReadOnlyDictionary<Color, WpfColor> Colors => Current.Colors;
 
-    /// <summary>Cor dos botões quando a tela não escolhe outra.</summary>
-    private static readonly WpfColor ButtonBlue = WpfColor.FromRgb(0x3D, 0x7B, 0xE8);
-
-    private static readonly Dictionary<Color, Brush> Brushes = Colors.ToDictionary(p => p.Key, p => Freeze(p.Value));
+    /// <summary>Cor dos botões quando a tela não escolhe outra (depende do tema).</summary>
+    private static WpfColor ButtonBlue => Current.ButtonDefault;
 
     public static WpfColor Rgb(Color color) => Colors[color];
 
     public static WpfColor Rgb(Color color, Shade? shade) => Tone(Colors[color], shade);
 
-    public static Brush Brush(Color color) => Brushes[color];
+    public static Brush Brush(Color color) => Solid(Colors[color]);
 
-    public static Brush Brush(Color color, Shade? shade) => shade is null or Shade.Normal ? Brushes[color] : Freeze(Rgb(color, shade));
+    public static Brush Brush(Color color, Shade? shade) => Solid(Rgb(color, shade));
 
     /// <summary>Tom da cor: escuro ou claro (Normal deixa como está).</summary>
     public static WpfColor Tone(WpfColor c, Shade? shade) => shade switch
@@ -76,11 +112,8 @@ internal static class Theme
     /// <summary>Cor clara o bastante para pedir letra escura em cima.</summary>
     public static bool IsLight(WpfColor c) => (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255 > 0.66;
 
-    private static readonly Dictionary<Color, Brush> NewsBacks = Colors.ToDictionary(
-        p => p.Key, p => Freeze(WpfColor.FromArgb(0x2C, p.Value.R, p.Value.G, p.Value.B)));
-
     /// <summary>Fundo da mensagem nova (game.Write depois de um clique): a cor dela bem clarinha (dourado se não tiver cor).</summary>
-    public static Brush NewsBack(Color? color) => NewsBacks[color ?? Color.Gold];
+    public static Brush NewsBack(Color? color) => Solid(WithAlpha(Colors[color ?? Color.Gold], 0x2C));
 
     /// <summary>Fundo de botão: azul padrão, ou a cor escolhida um pouco mais escura (o texto branco continua legível).</summary>
     public static WpfColor ButtonColor(Color? color, Shade? shade = null) =>
@@ -114,10 +147,10 @@ internal static class Theme
                 System.Windows.Media.Brushes.Transparent, 0,
                 IsLight(back) ? Freeze(WpfColor.FromRgb(0x17, 0x19, 0x1F)) : System.Windows.Media.Brushes.White);
         }
-        // Contorno e só texto: a cor fica na letra (e na borda), um pouco mais clara para ler bem no fundo escuro.
-        var accent = color is { } c and not Color.White
-            ? Tone(Lighten(Colors[c], 0.12), shade)
-            : Tone(Lighten(ButtonBlue, 0.35), shade);
+        // Contorno e só texto: a cor fica na letra (e na borda), um pouco mais clara para ler bem no fundo escuro
+        // (num tema claro, um pouco mais escura).
+        var baseColor = color is { } c and not Color.White ? Colors[c] : ButtonBlue;
+        var accent = Tone(Current.IsLight ? Darken(baseColor, 0.85) : Lighten(baseColor, color is { } and not Color.White ? 0.12 : 0.35), shade);
         var outline = style == ButtonStyle.Outline;
         return new ButtonLook(System.Windows.Media.Brushes.Transparent,
             Freeze(WithAlpha(accent, (byte)(outline ? 0x24 : 0x1C))),
@@ -144,8 +177,13 @@ internal static class Theme
         };
         button.SetValue(HoverProperty, look.Hover);
         button.SetValue(PressedProperty, look.Pressed);
+        button.SetValue(RadiusProperty, new CornerRadius(Current.ButtonRadius));
         return button;
     }
+
+    /// <summary>Cantos do botão (cada tema tem os seus).</summary>
+    private static readonly DependencyProperty RadiusProperty =
+        DependencyProperty.RegisterAttached("Radius", typeof(CornerRadius), typeof(Theme), new PropertyMetadata(new CornerRadius(8)));
 
     private static readonly DependencyProperty HoverProperty =
         DependencyProperty.RegisterAttached("Hover", typeof(Brush), typeof(Theme), new PropertyMetadata(null));
@@ -161,7 +199,7 @@ internal static class Theme
         border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
         border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
         border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
+        border.SetValue(Border.CornerRadiusProperty, new Binding { Path = new PropertyPath(RadiusProperty), RelativeSource = RelativeSource.TemplatedParent });
         border.SetValue(Border.PaddingProperty, new Thickness(18, 8, 18, 8));
         var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
         presenter.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);

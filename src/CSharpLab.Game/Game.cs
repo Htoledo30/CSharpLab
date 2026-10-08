@@ -360,18 +360,25 @@ public sealed class Game
         if (_scenes.Count == 0)
             throw new GameException("O jogo não tem nenhuma cena. Crie uma antes do Start: game.Scene(\"Start\", () => { game.Write(\"Olá!\"); });");
         _current = FindScene(firstScene);
+        // O tema do jogo (GameStyle.json). Um arquivo com erro para aqui, com a explicação.
+        _look = GameStyle.Load(Screens.Roots, out var styleError);
+        if (styleError != null) throw new GameException(styleError);
         _started = true;
         _entering = true;
         if (view != null)
         {
+            Theme.Current = _look;
             _view = view;
             Redraw();
         }
     }
 
+    private Look _look = Look.Classic;
+
     private void RunWindow()
     {
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
+        Theme.Current = _look;   // a janela tem a thread dela: o tema vai junto
         var window = new GameWindow(this);
         window.Closed += (_, _) => Close();   // um game.Wait em andamento para junto
         _view = window;

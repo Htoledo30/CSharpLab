@@ -87,18 +87,22 @@ internal static class ScreenRenderer
     private static TextBlock Label(Piece piece, string text, Brush? foreground = null) => new()
     {
         Text = text,
-        FontFamily = Theme.FontOf(piece.Font),
-        FontSize = piece.FontSize * Theme.FontScale(piece.Font),
+        FontFamily = Theme.FontOf(Theme.FontFor(piece)),
+        FontSize = piece.FontSize * Theme.FontScale(Theme.FontFor(piece)),
         TextWrapping = TextWrapping.Wrap,
         Foreground = foreground ?? Theme.Text,
     };
 
     /// <summary>Sombra escura atrás das letras: o texto fica legível em cima de qualquer fundo.</summary>
-    private static readonly DropShadowEffect TextShadow = CreateShadow();
+    /// <summary>Num tema claro (Livro), a sombra é clara: um brilho de papel atrás da tinta, em vez de uma mancha escura.</summary>
+    private static DropShadowEffect TextShadow => Theme.Current.IsLight ? LightShadow : DarkShadow;
 
-    private static DropShadowEffect CreateShadow()
+    private static readonly DropShadowEffect DarkShadow = CreateShadow(Colors.Black, 0.9);
+    private static readonly DropShadowEffect LightShadow = CreateShadow(Colors.White, 0.8);
+
+    private static DropShadowEffect CreateShadow(System.Windows.Media.Color color, double opacity)
     {
-        var shadow = new DropShadowEffect { Color = Colors.Black, ShadowDepth = 2, BlurRadius = 6, Opacity = 0.9, Direction = 300 };
+        var shadow = new DropShadowEffect { Color = color, ShadowDepth = 2, BlurRadius = 6, Opacity = opacity, Direction = 300 };
         shadow.Freeze();
         return shadow;
     }
@@ -128,8 +132,9 @@ internal static class ScreenRenderer
             TextAlign.Right => TextAlignment.Right,
             _ => TextAlignment.Left,
         };
-        block.LineHeight = Math.Round(block.FontSize * (piece.Font == Font.Fantasy ? 1.1 : 1.4));
-        if (piece.Font == Font.Fantasy) block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
+        bool fantasy = Theme.FontFor(piece) == Font.Fantasy;
+        block.LineHeight = Math.Round(block.FontSize * (fantasy ? 1.1 : 1.4));
+        if (fantasy) block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
         if (piece.Shadow == true) block.Effect = TextShadow;
         return block;
     }
@@ -187,13 +192,13 @@ internal static class ScreenRenderer
         var size = Math.Min(piece.FontSize, 16);
 
         var header = new DockPanel { Margin = new Thickness(0, 0, 0, 5), LastChildFill = true };
-        var amount = new TextBlock { Text = $"{value} / {max}", FontFamily = Theme.DefaultFont, FontSize = size - 1, Foreground = Theme.Muted };
+        var amount = new TextBlock { Text = $"{value} / {max}", FontFamily = Theme.BodyFamily, FontSize = size - 1, Foreground = Theme.Muted };
         DockPanel.SetDock(amount, Dock.Right);
         header.Children.Add(amount);
         header.Children.Add(new TextBlock
         {
             Text = piece.Text ?? "",
-            FontFamily = Theme.DefaultFont,
+            FontFamily = Theme.BodyFamily,
             FontSize = size,
             FontWeight = FontWeights.SemiBold,
             Foreground = Theme.Text,
@@ -252,7 +257,7 @@ internal static class ScreenRenderer
             frame.Children.Add(new TextBlock
             {
                 Text = hint,
-                FontFamily = Theme.DefaultFont,
+                FontFamily = Theme.BodyFamily,
                 FontSize = 13,
                 Foreground = Theme.Muted,
                 TextAlignment = TextAlignment.Center,
@@ -285,11 +290,12 @@ internal static class ScreenRenderer
         var rgb = piece.Color is { } color ? Theme.Rgb(color, piece.Shade) : Theme.Tone(Theme.PanelColor, piece.Shade);
         var fill = Theme.Freeze(Theme.WithAlpha(rgb, (byte)Math.Round(piece.BoxOpacity * 2.55)));
         Brush? stroke = null;
-        if (piece.HasBorder)
+        // Sem escolher, a borda segue o tema (no Fantasia e no Livro, as caixas sem cor têm borda).
+        if (piece.Border ?? (piece.Color != null || Theme.Current.PanelBorders))
         {
             // Borda bem visível: a própria cor numa caixa clarinha, um pouco mais clara numa caixa cheia.
             stroke = piece.Color == null
-                ? Theme.Freeze(Theme.Lighten(rgb, 0.12))
+                ? Theme.PanelBorder
                 : Theme.Freeze(piece.BoxOpacity <= 50 ? Theme.WithAlpha(rgb, 0xA0) : Theme.Lighten(rgb, 0.3));
         }
 
@@ -304,7 +310,7 @@ internal static class ScreenRenderer
             Background = fill,
             BorderBrush = stroke,
             BorderThickness = new Thickness(stroke != null ? 1 : 0),
-            CornerRadius = new CornerRadius(piece.Corner == Corner.Square ? 0 : 10),
+            CornerRadius = new CornerRadius(piece.Corner == Corner.Square ? 0 : Theme.PanelRadius),
         };
     }
 
@@ -316,8 +322,8 @@ internal static class ScreenRenderer
 
         var box = new TextBox
         {
-            FontFamily = Theme.FontOf(piece.Font),
-            FontSize = (piece.FontSize + 1) * Theme.FontScale(piece.Font),
+            FontFamily = Theme.FontOf(Theme.FontFor(piece)),
+            FontSize = (piece.FontSize + 1) * Theme.FontScale(Theme.FontFor(piece)),
             Padding = new Thickness(8, 5, 8, 5),
             Background = Theme.Panel,
             Foreground = Theme.Text,
@@ -326,7 +332,7 @@ internal static class ScreenRenderer
             VerticalContentAlignment = VerticalAlignment.Center,
             IsEnabled = piece.Enabled,
         };
-        var okLabel = new TextBlock { Text = "OK", FontFamily = Theme.DefaultFont, FontSize = piece.FontSize, Foreground = Brushes.White };
+        var okLabel = new TextBlock { Text = "OK", FontFamily = Theme.BodyFamily, FontSize = piece.FontSize, Foreground = Brushes.White };
         var ok = Theme.MakeButton(okLabel);
         ok.Margin = new Thickness(10, 0, 0, 0);
         ok.IsEnabled = piece.Enabled;
@@ -377,7 +383,7 @@ internal static class ScreenRenderer
                 new("Exemplo: Você causou 7 de dano!", null, true),
             ];
         foreach (var line in lines)
-            list.Children.Add(MessageView(line, piece.FontSize, piece.Font));
+            list.Children.Add(MessageView(line, piece.FontSize, Theme.FontFor(piece)));
 
         // As mais novas ficam embaixo e à vista; as antigas, rolando para cima.
         var scroll = Scroller(list);
@@ -392,7 +398,14 @@ internal static class ScreenRenderer
             scroll.VerticalScrollBarVisibility = ScrollBarVisibility.Hidden;
             scroll.Loaded += (_, _) => scroll.ScrollToEnd();
         }
-        return new Border { Background = Theme.Panel, CornerRadius = new CornerRadius(10), Child = scroll };
+        return new Border
+        {
+            Background = Theme.Panel,
+            CornerRadius = new CornerRadius(Theme.PanelRadius),
+            BorderBrush = Theme.PanelBorder,
+            BorderThickness = new Thickness(Theme.Current.PanelBorders ? 1 : 0),
+            Child = scroll,
+        };
     }
 
     /// <summary>Uma mensagem: normal, destacada (do último clique) ou apagada (de cliques anteriores).</summary>
@@ -447,7 +460,7 @@ internal static class ScreenRenderer
                 root.Children.Add(new TextBlock
                 {
                     Text = piece.Text,
-                    FontFamily = Theme.DefaultFont,
+                    FontFamily = Theme.BodyFamily,
                     FontSize = 16,
                     FontStyle = FontStyles.Italic,
                     Foreground = Theme.Muted,
@@ -531,7 +544,7 @@ internal static class ScreenRenderer
             var hint = new TextBlock
             {
                 Text = "Cartão modelo\nPonha aqui dentro as peças de cada item (nome, preço, botão…)",
-                FontFamily = Theme.DefaultFont,
+                FontFamily = Theme.BodyFamily,
                 FontSize = 13,
                 Foreground = Theme.Muted,
                 TextAlignment = TextAlignment.Center,

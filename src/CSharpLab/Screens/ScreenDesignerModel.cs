@@ -1,5 +1,6 @@
 using System.IO;
 using System.Windows;
+using CSharpLab.Core.Files;
 using CSharpLab.GameEngine;
 using CSharpLab.ViewModels;
 
@@ -68,6 +69,50 @@ public sealed class ScreenDesignerModel : IDisposable
     public event Action? Changed;
 
     public event Action? SelectionChanged;
+
+    /// <summary>O tema do jogo mudou (GameStyle.json): a tela é desenhada de novo com ele.</summary>
+    public event Action? ThemeChanged;
+
+    /// <summary>O tema do jogo (do GameStyle.json da pasta do projeto; Clássico se não tiver).</summary>
+    internal Look Look { get; private set; } = Look.Classic;
+
+    /// <summary>O que está errado no GameStyle.json (aí a tela usa o Clássico), ou null.</summary>
+    public string? ThemeError { get; private set; }
+
+    /// <summary>Carrega o tema do projeto e passa a desenhar com ele (o palco chama antes de cada desenho).</summary>
+    internal void ApplyTheme()
+    {
+        if (ProjectDirectory == null)
+        {
+            Theme.Current = Look.Classic;
+            ThemeError = null;
+        }
+        else
+        {
+            ThemeError = Theme.UseProject([ProjectDirectory]);
+        }
+        Look = Theme.Current;
+    }
+
+    /// <summary>
+    /// Escolhe o tema do jogo inteiro: grava o GameStyle.json na pasta do projeto e desenha de novo.
+    /// Retorna o problema (em português) se não deu para gravar.
+    /// </summary>
+    internal string? SetTheme(ThemeName theme)
+    {
+        if (ProjectDirectory == null) return "Esta tela não está dentro de um projeto de jogo.";
+        try
+        {
+            TextFileIO.Save(Path.Combine(ProjectDirectory, GameStyle.FileName), GameStyle.Serialize(theme), TextFileIO.Utf8NoBom);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return $"Não deu para gravar o {GameStyle.FileName}: {ex.Message}";
+        }
+        ApplyTheme();
+        ThemeChanged?.Invoke();
+        return null;
+    }
 
     /// <summary>Uma peça mudou de nome (antigo, novo): o código que usa o nome antigo pode ser atualizado.</summary>
     public event Action<string, string>? Renamed;
