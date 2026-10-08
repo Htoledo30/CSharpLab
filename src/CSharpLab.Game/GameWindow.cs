@@ -3,6 +3,8 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using WpfImage = System.Windows.Controls.Image;
 
@@ -12,6 +14,7 @@ namespace CSharpLab.GameEngine;
 /// A janela do jogo: palco fixo de 960×540 que cresce e diminui com a janela (sem distorcer).
 /// Cena automática: título em cima, textos no meio, barras à direita e botões embaixo (teclas 1 a 9 apertam os botões).
 /// Cena desenhada: as peças da aba Tela, cada uma no seu lugar.
+/// Ao trocar de cena, a tela escurece e clareia sozinha.
 /// </summary>
 internal sealed class GameWindow : Window, IGameView
 {
@@ -34,12 +37,22 @@ internal sealed class GameWindow : Window, IGameView
 
     private TextBox? _answerBox;
 
+    // Troca de cena: a tela antiga (uma foto dela) escurece, e a nova aparece clareando.
+    private readonly Grid _root;
+    private readonly WpfImage _snapshot = new() { Width = StageWidth, Height = StageHeight, Visibility = Visibility.Collapsed, IsHitTestVisible = false };
+    private readonly Rectangle _curtain = new() { Fill = Brushes.Black, Opacity = 0, IsHitTestVisible = false };
+    private string? _shownScene;
+    private bool _transition;
+
+    /// <summary>Rolagem de cada Lista da cena atual (volta para o topo só ao entrar de novo na cena).</summary>
+    private readonly Dictionary<string, double> _scrollOffsets = new(StringComparer.OrdinalIgnoreCase);
+
     public GameWindow(Game game)
     {
         _game = game;
         Title = game.WindowTitle;
         Background = Theme.Background;
-        FontFamily = Theme.Font;
+        FontFamily = Theme.DefaultFont;
         UseLayoutRounding = true;
         SizeToContent = SizeToContent.WidthAndHeight;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
@@ -76,9 +89,11 @@ internal sealed class GameWindow : Window, IGameView
         stage.Children.Add(_buttons);
         _auto = new Border { Padding = new Thickness(36, 28, 36, 28), Child = stage };
 
-        var root = new Grid { Width = StageWidth, Height = StageHeight };
+        var root = _root = new Grid { Width = StageWidth, Height = StageHeight, Background = Theme.Background };
         root.Children.Add(_auto);
         root.Children.Add(_designed);
+        root.Children.Add(_snapshot);
+        root.Children.Add(_curtain);
         Content = new Viewbox { Stretch = Stretch.Uniform, Child = root };
 
         // Abre com 960×540 e depois deixa o jogador redimensionar à vontade.
@@ -89,6 +104,14 @@ internal sealed class GameWindow : Window, IGameView
     public void Show(Screen screen)
     {
         _answerBox = null;
+        bool newScene = screen.SceneName != null && !string.Equals(screen.SceneName, _shownScene, StringComparison.OrdinalIgnoreCase);
+        if (newScene)
+        {
+            _scrollOffsets.Clear();
+            if (_shownScene != null && IsLoaded) BeginTransition();
+        }
+        _shownScene = screen.SceneName ?? _shownScene;
+
         if (screen.Designed != null)
         {
             _auto.Visibility = Visibility.Collapsed;
@@ -110,9 +133,84 @@ internal sealed class GameWindow : Window, IGameView
             Dispatcher.BeginInvoke(() => Keyboard.Focus(this), DispatcherPriority.Input);
     }
 
+    /// <summary>
+    /// game.Wait: a tela fica como está por um tempinho (sem cliques do jogador) e depois o clique continua.
+    /// Os desenhos e animações continuam rodando durante a pausa.
+    /// </summary>
+    public void Pause(double seconds)
+    {
+        if (seconds <= 0 || !IsLoaded) return;
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher) { Interval = TimeSpan.FromSeconds(seconds) };
+        void Stop(object? sender, EventArgs e)
+        {
+            timer.Stop();
+            frame.Continue = false;
+        }
+        timer.Tick += Stop;
+        Closed += Stop;
+        timer.Start();
+        try
+        {
+            Dispatcher.PushFrame(frame);
+        }
+        finally
+        {
+            Closed -= Stop;
+            timer.Stop();
+        }
+    }
+
+    // ------------------------------------------------------------------ troca de cena
+
+    private const double FadeOut = 130, FadeIn = 210;
+
+    /// <summary>A foto da tela antiga fica por cima e escurece; depois a cortina sai e a tela nova aparece.</summary>
+    private void BeginTransition()
+    {
+        EndTransition();
+        RenderTargetBitmap shot;
+        try
+        {
+            shot = new RenderTargetBitmap((int)StageWidth, (int)StageHeight, 96, 96, PixelFormats.Pbgra32);
+            shot.Render(_root);
+            shot.Freeze();
+        }
+        catch (Exception)
+        {
+            return; // sem foto, a troca acontece sem o escurecer
+        }
+        _snapshot.Source = shot;
+        _snapshot.Visibility = Visibility.Visible;
+        _transition = true;
+        _curtain.IsHitTestVisible = true;   // nada de cliques no meio da troca
+
+        var dark = new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(FadeOut));
+        dark.Completed += (_, _) =>
+        {
+            if (!_transition) return;
+            _snapshot.Visibility = Visibility.Collapsed;
+            _snapshot.Source = null;
+            var light = new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(FadeIn));
+            light.Completed += (_, _) => EndTransition();
+            _curtain.BeginAnimation(OpacityProperty, light);
+        };
+        _curtain.BeginAnimation(OpacityProperty, dark);
+    }
+
+    private void EndTransition()
+    {
+        _transition = false;
+        _curtain.BeginAnimation(OpacityProperty, null);
+        _curtain.Opacity = 0;
+        _curtain.IsHitTestVisible = false;
+        _snapshot.Visibility = Visibility.Collapsed;
+        _snapshot.Source = null;
+    }
+
     private void OnKey(object sender, KeyEventArgs e)
     {
-        if (e.OriginalSource is TextBox) return;
+        if (e.OriginalSource is TextBox || _transition) return;
         int number = e.Key switch
         {
             >= Key.D1 and <= Key.D9 => e.Key - Key.D1,
@@ -130,6 +228,7 @@ internal sealed class GameWindow : Window, IGameView
     {
         var scene = screen.Designed!;
         var messages = screen.Messages;
+        var elements = new Dictionary<Piece, FrameworkElement>(ReferenceEqualityComparer.Instance);
         var context = new RenderContext
         {
             Live = true,
@@ -137,6 +236,9 @@ internal sealed class GameWindow : Window, IGameView
             Answer = _game.AnswerPiece,
             Messages = messages,
             IsClickable = _game.IsClickable,
+            Cards = _game.CardsOf,
+            Created = (piece, element) => elements[piece] = element,
+            ScrollOffsets = _scrollOffsets,
         };
 
         _designed.Children.Clear();
@@ -146,7 +248,8 @@ internal sealed class GameWindow : Window, IGameView
         bool hasMessagesPiece = false;
         foreach (var piece in scene.Layout.Pieces)
         {
-            if (!piece.Visible) continue;
+            // As peças do cartão modelo aparecem dentro dos cartões da Lista.
+            if (!piece.Visible || piece.List != null) continue;
             hasMessagesPiece |= piece.Type == PieceType.Messages;
             var element = ScreenRenderer.Create(piece, context);
             Canvas.SetLeft(element, piece.X);
@@ -157,14 +260,47 @@ internal sealed class GameWindow : Window, IGameView
 
         // Sem a peça Mensagens, o que o game.Write escreveu aparece num aviso por cima da tela,
         // num lugar que não cobre os botões.
-        if (!hasMessagesPiece && messages.Count > 0)
+        var toast = screen.Toast ?? messages;
+        if (!hasMessagesPiece && toast.Count > 0)
         {
             var avoid = scene.Layout.Pieces
-                .Where(p => p.Visible && p.Type is PieceType.Button or PieceType.Input)
+                .Where(p => p.Visible && p.List == null && p.Type is PieceType.Button or PieceType.Input)
                 .Select(p => new Rect(p.X, p.Y, p.Width, p.Height))
                 .ToList();
-            _designed.Children.Add(Toast(messages, avoid));
+            _designed.Children.Add(Toast(toast, avoid));
         }
+
+        foreach (var (piece, effect) in screen.Effects)
+        {
+            if (elements.TryGetValue(piece, out var element)) Play(element, effect);
+        }
+    }
+
+    /// <summary>Tremer (vai e volta para os lados) ou piscar (some e volta duas vezes).</summary>
+    private static void Play(FrameworkElement element, Effect effect)
+    {
+        if (effect == GameEngine.Effect.Shake)
+        {
+            var move = new TranslateTransform();
+            element.RenderTransform = move;
+            var shake = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(420) };
+            double[] steps = [0, -9, 9, -7, 7, -4, 4, -2, 0];
+            for (int i = 0; i < steps.Length; i++)
+                shake.KeyFrames.Add(new LinearDoubleKeyFrame(steps[i], KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(420.0 * i / (steps.Length - 1)))));
+            element.Loaded += (_, _) => move.BeginAnimation(TranslateTransform.XProperty, shake);
+            return;
+        }
+        var flash = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(460) };
+        double[] values = [1, 0.15, 1, 0.15, 1];
+        for (int i = 0; i < values.Length; i++)
+            flash.KeyFrames.Add(new LinearDoubleKeyFrame(values[i], KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(460.0 * i / (values.Length - 1)))));
+        var opacity = element.Opacity;
+        flash.Completed += (_, _) =>
+        {
+            element.BeginAnimation(OpacityProperty, null);
+            element.Opacity = opacity;
+        };
+        element.Loaded += (_, _) => element.BeginAnimation(OpacityProperty, flash);
     }
 
     private static FrameworkElement Toast(IReadOnlyList<MessageLine> messages, IReadOnlyList<Rect> avoid)

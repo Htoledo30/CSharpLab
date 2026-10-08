@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Star1", "x": 60, "y": 40, "width": 40, "height": 40, "text": "✦", "size": 16, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Star2", "x": 150, "y": 110, "width": 40, "height": 40, "text": "✧", "size": 22, "align": "Center", "color": "White" },
+    { "type": "Text", "name": "Star3", "x": 250, "y": 30, "width": 40, "height": 40, "text": "·", "size": 28, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Star4", "x": 330, "y": 150, "width": 40, "height": 40, "text": "✦", "size": 12, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Star5", "x": 620, "y": 120, "width": 40, "height": 40, "text": "✧", "size": 18, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Star6", "x": 700, "y": 40, "width": 40, "height": 40, "text": "✦", "size": 14, "align": "Center", "color": "White" },
+    { "type": "Text", "name": "Star7", "x": 860, "y": 140, "width": 40, "height": 40, "text": "✦", "size": 20, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Star8", "x": 900, "y": 60, "width": 40, "height": 40, "text": "·", "size": 28, "align": "Center", "color": "White" },
+    { "type": "Text", "name": "Star9", "x": 100, "y": 230, "width": 40, "height": 40, "text": "✧", "size": 14, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Star10", "x": 860, "y": 260, "width": 40, "height": 40, "text": "✧", "size": 16, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Moon", "x": 780, "y": 36, "width": 90, "height": 90, "text": "☾", "size": 64, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Crown", "x": 400, "y": 36, "width": 160, "height": 96, "text": "👑", "size": 70, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Title", "x": 40, "y": 128, "width": 880, "height": 76, "text": "A Coroa Perdida", "size": 46, "shadow": true, "font": "Fantasy", "align": "Center", "color": "Gold" },
+    { "type": "Box", "name": "Line", "x": 380, "y": 210, "width": 200, "height": 2, "color": "Gold" },
+    { "type": "Text", "name": "Subtitle", "x": 40, "y": 222, "width": 880, "height": 34, "text": "Um RPG de escolhas, lutas e um enigma na escuridão.", "size": 19, "italic": true, "font": "Book", "align": "Center", "color": "Gray" },
+    { "type": "Box", "name": "Card", "x": 240, "y": 276, "width": 480, "height": 136, "border": true },
+    { "type": "Input", "name": "NameField", "x": 272, "y": 296, "width": 416, "height": 96, "text": "Qual é o seu nome, aventureiro?", "size": 18, "font": "Book" },
+    { "type": "Text", "name": "Forest", "x": 0, "y": 428, "width": 960, "height": 90, "text": "🌲 🌲🌲   🌳  🌲     🏰     🌲  🌳   🌲🌲 🌲", "size": 56, "align": "Center", "color": "Gray" },
+    { "type": "Box", "name": "Ground", "x": 16, "y": 508, "width": 928, "height": 16, "color": "Gray" }
+  ]
+}

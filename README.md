@@ -50,7 +50,7 @@ Uma cópia antiga que ainda não tem esse recurso precisa receber esta versão m
 | Consertar um erro | Com o cursor no sublinhado, `Ctrl+.` mostra correções (ex.: adicionar o `using` que falta). |
 | Fazer jogos no console | `Ctrl+Shift+J` expande o terminal para quase a tela toda. |
 | Organizar o código | `Ctrl+Shift+F` formata o arquivo (desfaz com `Ctrl+Z`). |
-| Estudar com exemplos | **Arquivo → Exemplos para estudar**: adivinhe o número, calculadora, jogo da velha, batalha RPG, cobrinha e dois RPGs de janela (com telas desenhadas e só com código). Código em inglês, comentários em português. Ficam em `Documentos\CSharp Lab\Exemplos` e suas mudanças nunca são apagadas. |
+| Estudar com exemplos | **Arquivo → Exemplos para estudar**: adivinhe o número, calculadora, jogo da velha, batalha RPG, cobrinha e três RPGs de janela: com telas desenhadas, só com código e o completo **A Coroa Perdida** (classes, loja, níveis, escolhas, enigma e chefe final). Código em inglês, comentários em português. Ficam em `Documentos\CSharp Lab\Exemplos` e suas mudanças nunca são apagadas. |
 | Fazer o primeiro jogo | **Ajuda → Seu primeiro jogo em 5 minutos**: cinco passos que ficam numa janelinha ao lado enquanto você faz (criar, jogar, mudar a tela, um botão que faz algo, uma cena nova). |
 
 Executar um rascunho pede uma única vez o nome e a pasta de um projeto novo; o código vira o `Program.cs` dele.
@@ -71,11 +71,24 @@ O jogo tem duas partes, cada uma no seu lugar:
 Cada cena tem a sua tela em `Screens/<Cena>.json`. Abra pelo botão **Cenas** (ao lado do **Executar**) ou pelo explorador.
 Para uma cena nova: **Cenas → Nova tela do jogo…**.
 
-- **Peças** à esquerda: Texto, Botão, Barra, Imagem, Caixa, Campo de escrita e Mensagens. Clique para pôr no meio ou arraste até o lugar.
+- **Peças** à esquerda: Texto, Botão, Barra, Imagem, Caixa, Campo de escrita, Mensagens e Lista. Clique para pôr no meio ou arraste até o lugar.
 - **Palco** no meio: arraste para mover, puxe os quadradinhos para mudar o tamanho (Shift mantém a proporção).
   As peças grudam nas bordas e nos centros das outras, com linhas-guia (Alt solta livre).
   Setas movem 1 (Shift: 10), `Ctrl+D` duplica, `Del` apaga, `Ctrl+Z` desfaz, Tab passa para a próxima peça, botão direito tem mais opções.
-- **Propriedades** à direita: nome, texto, letra, cor, imagem, posição e tamanho.
+- **Várias peças**: Shift+clique ou arraste um retângulo no fundo do palco (`Ctrl+A` pega todas). Elas andam, duplicam e apagam juntas.
+- **Copiar e colar entre telas**: `Ctrl+C` numa tela e `Ctrl+V` em outra cola no mesmo lugar e com os mesmos nomes
+  (copie o painel de status da Vila e cole na Floresta: o mesmo código serve às duas).
+- **Propriedades** à direita: nome, texto, letra, cor, imagem, posição e tamanho, e os estilos de cada peça:
+
+| Peça | Estilos |
+| --- | --- |
+| Caixa | Tom da cor (normal, escuro, claro), preenchimento de 0 a 100%, borda, cantos redondos, retos ou círculo (retratos redondos). |
+| Texto | 4 fontes do Windows (Normal, Fantasia, Livro, À mão), negrito, itálico e sombra nas letras. |
+| Botão | Cheio, só contorno ou só texto, e **Ativo no começo** (desligado: apagado e sem clique). |
+| Mensagens | Guarda as mensagens da cena: as do último clique destacadas, as antigas apagadinhas. |
+| Lista | Um cartão modelo que se repete para cada item (loja, inventário). Veja abaixo. |
+
+- Mais em **Propriedades**:
   Num botão, **Ao clicar** mostra se ele já faz algo e em que linha do código (clique para ir até lá). Se ainda não faz nada,
   **Escrever o que ele faz** cria o `game.Find("Nome").OnClick(() => { });` na cena certa e deixa o cursor entre as chaves:
   o que o botão faz, você escreve. O campo de escrita tem o mesmo com **Ao responder** (`OnAnswer`).
@@ -111,12 +124,37 @@ game.Start("Start");
 | Comando | Em português | O que faz |
 | --- | --- | --- |
 | `Scene` | cena | O código de uma tela. Roda de novo depois de cada clique, com os valores atuais das variáveis. |
-| `Find("Nome")` | achar | Pega uma peça da tela. Depois: `.Text`, `.Value`, `.Max`, `.Visible`, `.Color`, `.Image`. |
+| `Find("Nome")` | achar | Pega uma peça da tela. Depois: `.Text`, `.Value`, `.Max`, `.Visible`, `.Enabled`, `.Color`, `.Image` e os estilos (`.Shade`, `.Font`, `.Style`…). |
 | `OnClick` | ao clicar | O código entre as chaves roda quando o jogador clica no botão. |
 | `OnAnswer` | ao responder | O mesmo, para o campo de escrita: `answer` é o que o jogador escreveu. |
 | `Write` | escrever | Uma mensagem para o jogador (aparece na peça Mensagens). |
 | `GoTo` | ir para | Troca de cena. |
+| `Enabled` | ativo | `game.Find("Tower").Enabled = hasKey;` deixa o botão apagado e sem clique enquanto for `false`. |
+| `Show` | mostrar | Enche uma Lista: um cartão para cada item (veja abaixo). |
+| `Wait` | esperar | Dentro de um clique, uma pausa curta: `game.Wait(0.6);` mostra o seu golpe e o inimigo responde logo depois. |
+| `Shake` / `Flash` | tremer / piscar | `game.Find("EnemyIcon").Shake();` treme a peça; `.Flash();` faz piscar. Bom ao levar dano. |
+| `Background` | fundo | A imagem de fundo da tela (pasta `Assets`), para a mesma tela servir a lugares diferentes: `game.Background = "tower.png";`. |
 | `Start` | começar | Abre a janela na primeira cena. Sempre na última linha. |
+
+Ao trocar de cena, a tela escurece e clareia sozinha.
+
+### Lista: um cartão para cada item
+
+Ponha uma **Lista** na tela e desenhe dentro do primeiro cartão (o tracejado) as peças de um item: ícone, nome, preço,
+botão. Na aba Tela os outros cartões aparecem apagadinhos, como prévia. No código, entregue a lista e diga o que vai
+em cada cartão:
+
+```csharp
+game.Find("Weapons").Show(weapons, (card, weapon) =>
+{
+    card.Find("Name").Text = weapon.Name;
+    card.Find("Price").Text = $"💰 {weapon.Price}";
+    card.Find("Buy").OnClick(() => Buy(weapon));
+});
+```
+
+Com 3 armas aparecem 3 cartões; com 7, aparecem 7, com rolagem se não couber. Nas propriedades da Lista: tamanho do
+cartão, espaço entre eles e o texto de quando ela está vazia. A loja e a escolha de classe de **A Coroa Perdida** usam Listas.
 
 O autocomplete e o mouse em cima de cada comando mostram a tradução e um exemplo. Ao digitar `game.Find("`, o editor
 sugere os nomes das peças daquela tela; um nome que não existe ganha uma dica antes de rodar, e renomear uma peça na Tela

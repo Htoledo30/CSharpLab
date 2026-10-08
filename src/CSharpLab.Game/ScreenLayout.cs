@@ -1,8 +1,10 @@
+using System.Windows;
+
 namespace CSharpLab.GameEngine;
 
 // Uma tela desenhada na aba Tela (arquivo Screens/<Cena>.json). O jogo e o editor visual usam este modelo.
 
-internal enum PieceType { Text, Button, Bar, Image, Box, Input, Messages }
+internal enum PieceType { Text, Button, Bar, Image, Box, Input, Messages, List }
 
 internal enum TextAlign { Left, Center, Right }
 
@@ -27,6 +29,30 @@ internal sealed class Piece
     public string? Image { get; set; }
     public bool Visible { get; set; } = true;
 
+    // Estilos (null: o normal de cada peça).
+    public Font? Font { get; set; }
+    public bool? Italic { get; set; }
+    public bool? Shadow { get; set; }
+    public Shade? Shade { get; set; }
+    /// <summary>Preenchimento da Caixa, de 0 (invisível) a 100 (cheia).</summary>
+    public int? Opacity { get; set; }
+    public bool? Border { get; set; }
+    public Corner? Corner { get; set; }
+    public ButtonStyle? Style { get; set; }
+    /// <summary>false: o botão (ou campo, ou imagem) fica apagado e não responde.</summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Nome da Lista de que a peça faz parte (null: peça solta). Peças de lista formam o cartão modelo,
+    /// repetido para cada item; X e Y delas contam a partir do canto do cartão.
+    /// </summary>
+    public string? List { get; set; }
+
+    // Só a Lista: tamanho de cada cartão e o espaço entre eles.
+    public double? CardWidth { get; set; }
+    public double? CardHeight { get; set; }
+    public double? Gap { get; set; }
+
     public Piece Clone() => (Piece)MemberwiseClone();
 
     // Valores que valem quando o arquivo não diz nada.
@@ -40,15 +66,29 @@ internal sealed class Piece
     public int BarValue => Value ?? 100;
     public int BarMax => Max is > 0 ? Max.Value : 100;
 
+    /// <summary>Caixa sem cor: fundo cheio, sem borda. Com cor: a cor bem clarinha, com borda.</summary>
+    public int BoxOpacity => Math.Clamp(Opacity ?? (Color != null ? 25 : 100), 0, 100);
+    public bool HasBorder => Border ?? Color != null;
+
+    public double CardW => CardWidth is > 0 ? CardWidth.Value : 180;
+    public double CardH => CardHeight is > 0 ? CardHeight.Value : 220;
+    public double CardGap => Gap is >= 0 ? Gap.Value : 16;
+
     /// <summary>O que cada tipo de peça aceita, para o código e o editor mostrarem só o que faz sentido.</summary>
     public static bool Supports(PieceType type, string property) => property switch
     {
-        nameof(Text) => type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input,
+        nameof(Text) => type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.List,
         nameof(Size) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages,
-        nameof(Bold) or nameof(Align) => type is PieceType.Text,
-        nameof(Color) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages),
+        nameof(Bold) or nameof(Align) or nameof(Italic) or nameof(Shadow) => type is PieceType.Text,
+        nameof(Font) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages,
+        nameof(Color) or nameof(Shade) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages or PieceType.List),
+        nameof(Opacity) or nameof(Border) or nameof(Corner) => type is PieceType.Box,
+        nameof(Style) => type is PieceType.Button,
+        nameof(Enabled) => type is PieceType.Button or PieceType.Input or PieceType.Image,
         nameof(Value) or nameof(Max) => type is PieceType.Bar,
         nameof(Image) => type is PieceType.Image,
+        nameof(CardWidth) or nameof(CardHeight) or nameof(Gap) => type is PieceType.List,
+        nameof(List) => type is not (PieceType.List or PieceType.Messages),
         _ => true,
     };
 
@@ -79,6 +119,9 @@ internal sealed class Piece
             case PieceType.Messages:
                 (piece.Width, piece.Height) = (520, 180);
                 break;
+            case PieceType.List:
+                (piece.Width, piece.Height, piece.CardWidth, piece.CardHeight, piece.Gap) = (592, 240, 180, 240, 16);
+                break;
         }
         return piece;
     }
@@ -93,6 +136,7 @@ internal sealed class Piece
         PieceType.Box => "Caixa",
         PieceType.Input => "Campo de escrita",
         PieceType.Messages => "Mensagens",
+        PieceType.List => "Lista",
         _ => type.ToString(),
     };
 }
@@ -109,6 +153,28 @@ internal sealed class ScreenLayout
     public ScreenLayout Clone() => new() { Background = Background, Pieces = Pieces.Select(p => p.Clone()).ToList() };
 
     public Piece? Find(string name) => Pieces.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>As peças do cartão modelo da Lista, na ordem de desenho.</summary>
+    public IReadOnlyList<Piece> MembersOf(string listName) =>
+        Pieces.Where(p => p.List != null && string.Equals(p.List, listName, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    /// <summary>A Lista de que a peça faz parte (null: peça solta).</summary>
+    public Piece? ListOf(Piece piece) => piece.List != null ? Find(piece.List) : null;
+
+    /// <summary>
+    /// Onde cada cartão fica dentro da Lista: da esquerda para a direita, e outra fileira quando não cabe mais.
+    /// O mesmo cálculo no jogo e no editor.
+    /// </summary>
+    public static (int Columns, double Height) CardGrid(Piece list, int count)
+    {
+        double w = list.CardW, gap = list.CardGap;
+        int columns = Math.Max(1, (int)Math.Floor((list.Width + gap + 0.5) / (w + gap)));
+        int rows = count == 0 ? 0 : (count + columns - 1) / columns;
+        return (columns, rows == 0 ? 0 : rows * (list.CardH + gap) - gap);
+    }
+
+    public static Point CardPosition(Piece list, int index, int columns) =>
+        new(index % columns * (list.CardW + list.CardGap), index / columns * (list.CardH + list.CardGap));
 
     /// <summary>Nome livre como "Button1", "Button2"… (o editor sugere e a pessoa pode trocar).</summary>
     public string NewName(PieceType type)

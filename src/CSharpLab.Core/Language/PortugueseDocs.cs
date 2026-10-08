@@ -301,6 +301,12 @@ public static partial class PortugueseDocs
         m[game + ".Find"] = D("Find = encontrar. Pega uma peça desenhada na aba Tela pelo nome, para mudar ela pelo código com =.",
             "game.Find(\"Story\").Text = \"Um goblin aparece!\";\ngame.Find(\"Attack\").OnClick(() => enemyHealth -= 10);");
 
+        m[game + ".Background"] = D("Background = fundo. A imagem de fundo da tela desenhada (pasta Assets). Mude pelo código para a mesma tela servir a lugares diferentes.",
+            "game.Background = \"tower.png\";");
+        m[game + ".Wait"] = D("Wait = esperar. Dentro de um clique, mostra a tela como está e espera um pouco (em segundos) antes de continuar: você ataca e o inimigo responde logo depois.",
+            "game.Write(\"Você atacou!\");\ngame.Wait(0.6);\ngame.Write(\"O goblin revida!\", Color.Red);");
+        m[game + ".WindowTitle"] = D("WindowTitle = título da janela. O nome do jogo, mostrado no alto da janela.");
+
         const string item = "CSharpLab.GameEngine.Item";
         m[item] = D("Item = peça. Uma peça desenhada na aba Tela (texto, botão, barra, imagem…). Mude as propriedades dela com =.",
             "var story = game.Find(\"Story\");\nstory.Text = \"Olá!\";\nstory.Color = Color.Gold;");
@@ -320,7 +326,64 @@ public static partial class PortugueseDocs
             "game.Find(\"Attack\").OnClick(() =>\n{\n    enemyHealth -= 10;\n    game.Write(\"Você acertou!\");\n});");
         m[item + ".OnAnswer"] = D("OnAnswer = ao responder. Recebe o que o jogador escreveu no Campo de escrita.",
             "game.Find(\"NameField\").OnAnswer(answer =>\n{\n    playerName = answer;\n    game.GoTo(\"Village\");\n});");
-        m["CSharpLab.GameEngine.Color"] = D("Color = cor: White, Gray, Red, Green, Blue, Gold, Purple, Orange.", "game.Write(\"Cuidado!\", Color.Red);");
-        m["CSharpLab.GameEngine.GameException"] = D("Erro do motor do jogo. A mensagem explica em português o que fazer.");
+        m[item + ".Enabled"] = D("Enabled = ativo. false deixa o botão (ou o campo de escrita, ou a imagem) apagado e sem clique; true liga de novo.",
+            "game.Find(\"Tower\").Enabled = hasKey;");
+        m[item + ".Shade"] = D("Shade = tom. A cor mais escura (Shade.Dark) ou mais clara (Shade.Light).", "game.Find(\"BossFrame\").Shade = Shade.Dark;");
+        m[item + ".Opacity"] = D("Opacity = preenchimento da Caixa, de 0 (invisível) a 100 (cheia).", "game.Find(\"Panel\").Opacity = 60;");
+        m[item + ".Border"] = D("Border = borda. true mostra a borda da Caixa; false tira.", "game.Find(\"Panel\").Border = true;");
+        m[item + ".Corner"] = D("Corner = canto. Os cantos da Caixa: Corner.Round (redondos), Corner.Square (retos) ou Corner.Circle (círculo).",
+            "game.Find(\"Portrait\").Corner = Corner.Circle;");
+        m[item + ".Font"] = D("Font = fonte, o desenho das letras: Font.Normal, Font.Fantasy (fantasia), Font.Book (livro antigo) ou Font.Hand (à mão).",
+            "game.Find(\"Title\").Font = Font.Fantasy;");
+        m[item + ".Bold"] = D("Bold = negrito. true deixa as letras do Texto mais grossas.", "game.Find(\"Title\").Bold = true;");
+        m[item + ".Italic"] = D("Italic = itálico. true deixa as letras do Texto inclinadas.", "game.Find(\"Letter\").Italic = true;");
+        m[item + ".Shadow"] = D("Shadow = sombra. true põe uma sombra atrás das letras, para ler bem em cima de qualquer fundo.", "game.Find(\"Title\").Shadow = true;");
+        m[item + ".Style"] = D("Style = estilo do botão: ButtonStyle.Filled (cheio), ButtonStyle.Outline (contorno) ou ButtonStyle.Text (só texto).",
+            "game.Find(\"Back\").Style = ButtonStyle.Text;");
+        m[item + ".Show"] = D("Show = mostrar. Enche a Lista com um cartão para cada item; entre as chaves, você diz o que vai em cada cartão.",
+            "game.Find(\"Weapons\").Show(weapons, (card, weapon) =>\n{\n    card.Find(\"Name\").Text = weapon.Name;\n    card.Find(\"Buy\").OnClick(() => Buy(weapon));\n});");
+        m[item + ".Shake"] = D("Shake = tremer. A peça treme um pouquinho (bom para quem levou um golpe).", "game.Find(\"EnemyIcon\").Shake();");
+        m[item + ".Flash"] = D("Flash = piscar. A peça pisca rapidinho (bom para dano, cura ou algo que mudou).", "game.Find(\"PlayerHealth\").Flash();");
+        m[item + ".ToString"] = D("Mostra o nome e o tipo da peça, como \"Attack (Botão)\".");
+
+        const string card = "CSharpLab.GameEngine.Card";
+        m[card] = D("Card = cartão. Um cartão da Lista: uma cópia do cartão modelo para cada item. Chega pronto dentro do Show.",
+            "game.Find(\"Weapons\").Show(weapons, (card, weapon) =>\n{\n    card.Find(\"Name\").Text = weapon.Name;\n});");
+        m[card + ".Find"] = D("Find = encontrar. Pega uma peça deste cartão pelo nome (o mesmo da peça no cartão modelo).",
+            "card.Find(\"Price\").Text = $\"💰 {weapon.Price}\";");
+        m[card + ".Index"] = D("Index = posição do cartão na lista: o primeiro é 0, o segundo é 1…", "card.Find(\"Number\").Text = $\"{card.Index + 1}.\";");
+        m[card + ".ToString"] = D("Mostra a lista e o número do cartão, como \"Weapons, cartão 2\".");
+
+        const string engine = "CSharpLab.GameEngine.";
+        m[engine + "Color"] = D("Color = cor: White, Gray, Red, Green, Blue, Gold, Purple, Orange.", "game.Write(\"Cuidado!\", Color.Red);");
+        foreach (var (name, text) in new[]
+                 {
+                     ("White", "branco"), ("Gray", "cinza"), ("Red", "vermelho"), ("Green", "verde"),
+                     ("Blue", "azul"), ("Gold", "dourado"), ("Purple", "roxo"), ("Orange", "laranja"),
+                 })
+            m[engine + "Color." + name] = D($"{name} = {text}.");
+
+        m[engine + "Shade"] = D("Shade = tom: Shade.Normal, Shade.Dark (escuro) ou Shade.Light (claro).", "game.Find(\"BossFrame\").Shade = Shade.Dark;");
+        m[engine + "Shade.Normal"] = D("Normal: a cor como ela é.");
+        m[engine + "Shade.Dark"] = D("Dark = escuro: vermelho escuro, azul escuro… Bom para molduras e fundos.");
+        m[engine + "Shade.Light"] = D("Light = claro: a cor mais clarinha.");
+
+        m[engine + "Corner"] = D("Corner = canto da Caixa: Corner.Round (redondos), Corner.Square (retos) ou Corner.Circle (círculo).", "game.Find(\"Portrait\").Corner = Corner.Circle;");
+        m[engine + "Corner.Round"] = D("Round = redondo: cantos arredondados (o normal).");
+        m[engine + "Corner.Square"] = D("Square = quadrado: cantos retos, em ângulo.");
+        m[engine + "Corner.Circle"] = D("Circle = círculo: numa caixa quadrada vira um círculo (retratos redondos).");
+
+        m[engine + "Font"] = D("Font = fonte, o desenho das letras. Todas vêm com o Windows.", "game.Find(\"Title\").Font = Font.Fantasy;");
+        m[engine + "Font.Normal"] = D("Normal: a letra limpa e fácil de ler.");
+        m[engine + "Font.Fantasy"] = D("Fantasy = fantasia: letra caprichada, de conto de fadas. Boa para títulos.");
+        m[engine + "Font.Book"] = D("Book = livro: letra de livro antigo, boa para pergaminhos e histórias.");
+        m[engine + "Font.Hand"] = D("Hand = mão: parece escrita com caneta. Boa para bilhetes e diários.");
+
+        m[engine + "ButtonStyle"] = D("ButtonStyle = estilo do botão: Filled (cheio), Outline (contorno) ou Text (só texto).", "game.Find(\"Back\").Style = ButtonStyle.Outline;");
+        m[engine + "ButtonStyle.Filled"] = D("Filled = cheio: fundo colorido. Para a ação principal (Atacar).");
+        m[engine + "ButtonStyle.Outline"] = D("Outline = contorno: só a borda colorida. Para ações secundárias.");
+        m[engine + "ButtonStyle.Text"] = D("Text = texto: sem fundo nem borda. Para ações discretas (Voltar).");
+
+        m[engine + "GameException"] = D("Erro do motor do jogo. A mensagem explica em português o que fazer.");
     }
 }

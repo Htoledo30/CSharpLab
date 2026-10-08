@@ -78,6 +78,37 @@ public sealed class GameAssistTests : IDisposable
     }
 
     [Fact]
+    public void Peca_do_cartao_da_lista_pede_card_Find_dentro_do_Show()
+    {
+        File.WriteAllText(Path.Combine(_dir, "Screens", "Shop.json"), """
+            { "pieces": [
+              { "type": "List", "name": "Goods" },
+              { "type": "Text", "name": "Price", "list": "Goods" },
+              { "type": "Text", "name": "Gold" }
+            ] }
+            """);
+        const string code = """
+            var game = new Game("T");
+            game.Scene("Shop", () =>
+            {
+                game.Find("Price").Text = "x";
+                game.Find("Goods").Show(new[] { 1, 2 }, (card, item) =>
+                {
+                    card.Find("Price").Text = "ok";
+                    card.Find("Gold").Text = "errado";
+                    game.Find("Gold").Text = "certo";
+                });
+            });
+            game.Start("Shop");
+            """;
+        var root = CSharpSyntaxTree.ParseText(code).GetRoot();
+        var hints = GameAssist.CheckFindNames(root, _dir).Select(h => h.Message).ToList();
+        Assert.Equal(2, hints.Count);
+        Assert.Contains(hints, h => h.Contains("\"Price\" é do cartão da lista \"Goods\"") && h.Contains("card.Find(\"Price\")"));
+        Assert.Contains(hints, h => h.Contains("\"Gold\" não está no cartão da lista"));
+    }
+
+    [Fact]
     public void Tela_aberta_sem_salvar_vale_pelo_texto_da_aba()
     {
         var path = GameScreens.PathOf(_dir, "Fight");

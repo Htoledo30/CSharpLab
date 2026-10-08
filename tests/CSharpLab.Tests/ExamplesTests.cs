@@ -27,6 +27,22 @@ public sealed class ExamplesTests : IDisposable
         Assert.Empty(result.Diagnostics.Where(d => d.Severity == BuildSeverity.Warning).Select(d => $"{d.Id} {d.FilePath}:{d.Line} {d.Message}"));
     }
 
+    /// <summary>Aberto no editor, o exemplo não mostra nada no painel Problemas (nem erro, nem aviso, nem dica).</summary>
+    [Theory]
+    [MemberData(nameof(Ids))]
+    public async Task Exemplo_aberto_no_editor_nao_tem_problemas(string id)
+    {
+        var example = Examples.All.Single(e => e.Id == id);
+        var created = Examples.Create(example, _dir);
+        var model = await ProjectEvaluator.EvaluateAsync(created.ProjectPath, allowRestore: true, CancellationToken.None);
+        using var ls = new CSharpLab.Core.Language.LanguageService();
+        ls.LoadProject(model);
+        foreach (var file in Directory.EnumerateFiles(created.Directory, "*.cs"))
+            ls.OpenDocument(CSharpLab.Core.Language.LanguageService.KeyFor(file), file, Microsoft.CodeAnalysis.Text.SourceText.From(File.ReadAllText(file)), 1);
+        var snapshot = await ls.GetDiagnosticsAsync(CancellationToken.None);
+        Assert.Empty(snapshot.Diagnostics.Select(d => $"{d.Id} {Path.GetFileName(d.FilePath)}:{d.Line} {d.Message}"));
+    }
+
     [Fact]
     public void Exemplo_ja_existente_e_reaberto_sem_apagar_mudancas()
     {

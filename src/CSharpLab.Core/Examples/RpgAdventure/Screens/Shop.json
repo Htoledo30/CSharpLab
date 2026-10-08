@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Box", "name": "PortraitBox", "x": 32, "y": 24, "width": 140, "height": 140, "color": "Gold", "shade": "Dark", "opacity": 100, "border": true, "corner": "Circle" },
+    { "type": "Text", "name": "Portrait", "x": 32, "y": 34, "width": 140, "height": 120, "text": "🧔", "size": 84, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Pointer", "x": 172, "y": 70, "width": 24, "height": 40, "text": "◀", "size": 22, "color": "Gray" },
+    { "type": "Box", "name": "Speech", "x": 192, "y": 24, "width": 736, "height": 140, "border": true },
+    { "type": "Text", "name": "Title", "x": 214, "y": 36, "width": 690, "height": 40, "text": "Loja do Bartolo", "size": 28, "shadow": true, "font": "Fantasy", "color": "Gold" },
+    { "type": "Text", "name": "Story", "x": 214, "y": 80, "width": 690, "height": 74, "text": "\"Ouro na mesa, aventureiro, e o que é meu vira seu! Poção cura, espada corta, amuleto brilha.\"", "size": 17, "font": "Book" },
+    { "type": "List", "name": "Goods", "x": 32, "y": 180, "width": 896, "height": 266, "text": "A loja está vazia.", "cardWidth": 212, "cardHeight": 266, "gap": 16 },
+    { "type": "Box", "name": "CardBack", "list": "Goods", "x": 0, "y": 0, "width": 212, "height": 266, "color": "Green", "shade": "Dark", "opacity": 40, "border": true },
+    { "type": "Text", "name": "Icon", "list": "Goods", "x": 0, "y": 10, "width": 212, "height": 70, "text": "🧪", "size": 48, "align": "Center", "color": "Green" },
+    { "type": "Text", "name": "Name", "list": "Goods", "x": 10, "y": 82, "width": 192, "height": 30, "text": "Poção de vida", "size": 18, "bold": true, "align": "Center" },
+    { "type": "Text", "name": "About", "list": "Goods", "x": 12, "y": 114, "width": 188, "height": 44, "text": "Cura 35 de vida.", "size": 13, "font": "Book", "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Price", "list": "Goods", "x": 10, "y": 162, "width": 192, "height": 30, "text": "💰 8", "size": 18, "align": "Center", "color": "Gold" },
+    { "type": "Button", "name": "Buy", "list": "Goods", "x": 16, "y": 204, "width": 180, "height": 46, "text": "Comprar", "size": 16, "color": "Green" },
+    { "type": "Box", "name": "Wallet", "x": 32, "y": 460, "width": 300, "height": 64, "border": true },
+    { "type": "Text", "name": "Gold", "x": 52, "y": 476, "width": 130, "height": 34, "text": "💰 15", "size": 20, "color": "Gold" },
+    { "type": "Text", "name": "Potions", "x": 182, "y": 476, "width": 130, "height": 34, "text": "🧪 1", "size": 20, "align": "Right", "color": "Green" },
+    { "type": "Messages", "name": "Log", "x": 348, "y": 460, "width": 420, "height": 64, "size": 15 },
+    { "type": "Button", "name": "Back", "x": 784, "y": 460, "width": 144, "height": 64, "text": "↩ Vila", "style": "Text" }
+  ]
+}

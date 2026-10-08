@@ -20,11 +20,18 @@ internal static class ScreenFile
     private static readonly JsonSerializerOptions StringOptions = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private static readonly string[] PieceKeys =
-        ["type", "name", "x", "y", "width", "height", "text", "size", "bold", "align", "color", "value", "max", "image", "visible"];
+        ["type", "name", "list", "x", "y", "width", "height", "text", "size", "bold", "italic", "shadow", "font", "align", "color", "shade",
+         "opacity", "border", "corner", "style", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "visible"];
 
     public static string ValidColors => string.Join(", ", Enum.GetNames<Color>());
 
     public static string ValidTypes => string.Join(", ", Enum.GetNames<PieceType>());
+
+    private static string Names<T>() where T : struct, Enum
+    {
+        var names = Enum.GetNames<T>();
+        return string.Join(", ", names[..^1]) + " ou " + names[^1];
+    }
 
     // ------------------------------------------------------------------ leitura
 
@@ -81,6 +88,8 @@ internal static class ScreenFile
                                 return Fail($"Duas peças se chamam \"{piece.Name}\". Cada peça precisa de um nome diferente.", LineOfLast(json, $"\"{piece.Name}\""));
                             layout.Pieces.Add(piece);
                         }
+                        if (CheckLists(layout) is { } listError)
+                            return Fail(listError.Message, LineOf(json, $"\"{listError.Piece}\""));
                         break;
                     default:
                         warnings.Add($"\"{property.Name}\" não é usado pela tela e foi ignorado.");
@@ -138,8 +147,21 @@ internal static class ScreenFile
                 "text" => Text(value, label, key, v => piece.Text = v),
                 "image" => Text(value, label, key, v => piece.Image = v),
                 "bold" => Boolean(value, label, key, v => piece.Bold = v),
+                "italic" => Boolean(value, label, key, v => piece.Italic = v),
+                "shadow" => Boolean(value, label, key, v => piece.Shadow = v),
+                "border" => Boolean(value, label, key, v => piece.Border = v),
                 "visible" => Boolean(value, label, key, v => piece.Visible = v),
+                "enabled" => Boolean(value, label, key, v => piece.Enabled = v),
+                "opacity" => Integer(value, label, key, v => piece.Opacity = v, range: (0, 100)),
+                "cardwidth" => Number(value, label, key, v => piece.CardWidth = v, positive: true),
+                "cardheight" => Number(value, label, key, v => piece.CardHeight = v, positive: true),
+                "gap" => Number(value, label, key, v => piece.Gap = Math.Max(0, v)),
+                "list" => Text(value, label, key, v => piece.List = string.IsNullOrWhiteSpace(v) ? null : v.Trim()),
                 "color" => ReadColor(value, label, v => piece.Color = v),
+                "font" => ReadEnum<Font>(value, label, key, v => piece.Font = v),
+                "shade" => ReadEnum<Shade>(value, label, key, v => piece.Shade = v),
+                "corner" => ReadEnum<Corner>(value, label, key, v => piece.Corner = v),
+                "style" => ReadEnum<ButtonStyle>(value, label, key, v => piece.Style = v),
                 "align" => value.ValueKind == JsonValueKind.String && Enum.TryParse<TextAlign>(value.GetString(), true, out var align) && Enum.IsDefined(align)
                     ? Set(() => piece.Align = align)
                     : $"{label}: \"align\" precisa ser Left, Center ou Right.",
@@ -175,12 +197,46 @@ internal static class ScreenFile
         return null;
     }
 
-    private static string? Integer(JsonElement value, string label, string key, Action<int> apply, bool positive = false)
+    private static string? Integer(JsonElement value, string label, string key, Action<int> apply, bool positive = false, (int Min, int Max)? range = null)
     {
         if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out var number))
             return $"{label}: \"{key}\" precisa ser um número inteiro, sem aspas.";
         if (positive && number <= 0) return $"{label}: \"{key}\" precisa ser maior que 0.";
+        if (range is { } r && (number < r.Min || number > r.Max)) return $"{label}: \"{key}\" vai de {r.Min} a {r.Max}.";
         apply(number);
+        return null;
+    }
+
+    private static string? ReadEnum<T>(JsonElement value, string label, string key, Action<T?> apply) where T : struct, Enum
+    {
+        if (value.ValueKind == JsonValueKind.Null)
+        {
+            apply(null);
+            return null;
+        }
+        if (value.ValueKind == JsonValueKind.String && Enum.TryParse<T>(value.GetString(), true, out var parsed) && Enum.IsDefined(parsed))
+        {
+            apply(parsed);
+            return null;
+        }
+        return $"{label}: \"{key}\" precisa ser {Names<T>()}.";
+    }
+
+    /// <summary>Cada peça com "list" precisa apontar para uma Lista da tela (e Lista não fica dentro de Lista).</summary>
+    private static (string Message, string Piece)? CheckLists(ScreenLayout layout)
+    {
+        foreach (var piece in layout.Pieces)
+        {
+            if (piece.List == null) continue;
+            if (!Piece.Supports(piece.Type, nameof(Piece.List)))
+                return ($"A peça \"{piece.Name}\" ({Piece.Describe(piece.Type)}) não pode ficar dentro de uma Lista. Tire o \"list\" dela.", piece.Name);
+            var list = layout.Find(piece.List);
+            if (list == null)
+                return ($"A peça \"{piece.Name}\" diz \"list\": \"{piece.List}\", mas a tela não tem uma Lista com esse nome.", piece.Name);
+            if (list.Type != PieceType.List)
+                return ($"A peça \"{piece.Name}\" diz \"list\": \"{piece.List}\", mas \"{list.Name}\" é {Piece.Describe(list.Type)}, não Lista.", piece.Name);
+            piece.List = list.Name;
+        }
         return null;
     }
 
@@ -263,19 +319,38 @@ internal static class ScreenFile
         {
             $"\"type\": \"{p.Type}\"",
             $"\"name\": {Quote(p.Name)}",
+        };
+        if (p.List != null && Piece.Supports(p.Type, nameof(Piece.List))) parts.Add($"\"list\": {Quote(p.List)}");
+        parts.AddRange(
+        [
             $"\"x\": {Round(p.X)}",
             $"\"y\": {Round(p.Y)}",
             $"\"width\": {Round(p.Width)}",
             $"\"height\": {Round(p.Height)}",
-        };
+        ]);
         if (p.Text != null && Piece.Supports(p.Type, nameof(Piece.Text))) parts.Add($"\"text\": {Quote(p.Text)}");
         if (p.Size != null && Piece.Supports(p.Type, nameof(Piece.Size))) parts.Add($"\"size\": {Round(p.Size.Value)}");
         if (p.Bold == true && Piece.Supports(p.Type, nameof(Piece.Bold))) parts.Add("\"bold\": true");
+        if (p.Italic == true && Piece.Supports(p.Type, nameof(Piece.Italic))) parts.Add("\"italic\": true");
+        if (p.Shadow == true && Piece.Supports(p.Type, nameof(Piece.Shadow))) parts.Add("\"shadow\": true");
+        if (p.Font is { } font and not Font.Normal && Piece.Supports(p.Type, nameof(Piece.Font))) parts.Add($"\"font\": \"{font}\"");
         if (p.Align is { } align and not TextAlign.Left && Piece.Supports(p.Type, nameof(Piece.Align))) parts.Add($"\"align\": \"{align}\"");
         if (p.Color is { } color && Piece.Supports(p.Type, nameof(Piece.Color))) parts.Add($"\"color\": \"{color}\"");
+        if (p.Shade is { } shade and not Shade.Normal && Piece.Supports(p.Type, nameof(Piece.Shade))) parts.Add($"\"shade\": \"{shade}\"");
+        if (p.Opacity is { } opacity && Piece.Supports(p.Type, nameof(Piece.Opacity))) parts.Add($"\"opacity\": {opacity.ToString(CultureInfo.InvariantCulture)}");
+        if (p.Border is { } border && Piece.Supports(p.Type, nameof(Piece.Border))) parts.Add($"\"border\": {(border ? "true" : "false")}");
+        if (p.Corner is { } corner and not Corner.Round && Piece.Supports(p.Type, nameof(Piece.Corner))) parts.Add($"\"corner\": \"{corner}\"");
+        if (p.Style is { } style and not ButtonStyle.Filled && Piece.Supports(p.Type, nameof(Piece.Style))) parts.Add($"\"style\": \"{style}\"");
         if (p.Value != null && p.Type == PieceType.Bar) parts.Add($"\"value\": {p.Value.Value.ToString(CultureInfo.InvariantCulture)}");
         if (p.Max != null && p.Type == PieceType.Bar) parts.Add($"\"max\": {p.Max.Value.ToString(CultureInfo.InvariantCulture)}");
         if (p.Image != null && p.Type == PieceType.Image) parts.Add($"\"image\": {Quote(p.Image)}");
+        if (p.Type == PieceType.List)
+        {
+            parts.Add($"\"cardWidth\": {Round(p.CardW)}");
+            parts.Add($"\"cardHeight\": {Round(p.CardH)}");
+            parts.Add($"\"gap\": {Round(p.CardGap)}");
+        }
+        if (!p.Enabled && Piece.Supports(p.Type, nameof(Piece.Enabled))) parts.Add("\"enabled\": false");
         if (!p.Visible) parts.Add("\"visible\": false");
         return "{ " + string.Join(", ", parts) + " }";
     }

@@ -287,7 +287,28 @@ public static class GameAssist
                 }
                 continue;
             }
-            if (pieces.Any(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase))) continue;
+            if (pieces.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) is { } found)
+            {
+                // Peças do cartão de uma Lista mudam dentro do Show (card.Find); as outras, com game.Find.
+                var show = EnclosingShow(call);
+                bool byCard = show?.CardParameter is { } cardName &&
+                              call.Expression is MemberAccessExpressionSyntax { Expression: IdentifierNameSyntax { Identifier.ValueText: var receiver } } &&
+                              receiver == cardName;
+                if (found.List != null && !byCard)
+                {
+                    yield return (UnknownPieceId,
+                        $"A peça \"{found.Name}\" é do cartão da lista \"{found.List}\", que se repete para cada item. " +
+                        $"Mude ela dentro do Show: {SceneReceiver(root, scene) ?? "game"}.Find(\"{found.List}\").Show(items, (card, item) => {{ card.Find(\"{found.Name}\")... }});",
+                        literal.GetLocation());
+                }
+                else if (found.List == null && byCard)
+                {
+                    yield return (UnknownPieceId,
+                        $"\"{found.Name}\" não está no cartão da lista: o card.Find só acha as peças do cartão. Para as outras peças da tela, use game.Find.",
+                        literal.GetLocation());
+                }
+                continue;
+            }
 
             var guess = pieces.Select(p => p.Name)
                 .Where(n => Distance(n.ToLowerInvariant(), name.ToLowerInvariant()) <= 2)
@@ -299,6 +320,38 @@ public static class GameAssist
                 $"A peça \"{name}\" não existe na tela \"{scene}\".{hint}{list}",
                 literal.GetLocation());
         }
+    }
+
+    /// <summary>
+    /// O Show em volta do código: game.Find("Weapons").Show(items, (card, item) => { … }), com o nome do
+    /// primeiro parâmetro (o cartão). Null se o código não está dentro de um Show.
+    /// </summary>
+    private static (string? CardParameter, InvocationExpressionSyntax Call)? EnclosingShow(SyntaxNode node)
+    {
+        for (var current = node.Parent; current != null; current = current.Parent)
+        {
+            if (current is not LambdaExpressionSyntax lambda ||
+                lambda.Parent is not ArgumentSyntax { Parent: ArgumentListSyntax { Parent: InvocationExpressionSyntax call } } ||
+                call.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Show" })
+                continue;
+            string? card = lambda switch
+            {
+                ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters: [var first, ..] } => first.Identifier.ValueText,
+                SimpleLambdaExpressionSyntax simple => simple.Parameter.Identifier.ValueText,
+                _ => null,
+            };
+            return (card, call);
+        }
+        return null;
+    }
+
+    /// <summary>O nome da variável do jogo na cena (o "game" de game.Scene).</summary>
+    private static string? SceneReceiver(SyntaxNode root, string scene)
+    {
+        var call = FindScenes(root).FirstOrDefault(s => string.Equals(s.Name, scene, StringComparison.OrdinalIgnoreCase));
+        return call != null && root.FindNode(call.Span) is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Expression: var game } }
+            ? game.ToString()
+            : null;
     }
 
     internal static int Distance(string a, string b)

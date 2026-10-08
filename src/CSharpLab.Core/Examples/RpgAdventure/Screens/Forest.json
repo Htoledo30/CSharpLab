@@ -1,0 +1,22 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "TreesBack", "x": 0, "y": 6, "width": 960, "height": 80, "text": "🌲🌲 🌲🌲🌲 🌲 🌲🌲🌲 🌲🌲 🌲🌲🌲 🌲", "size": 48, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "TreesFront", "x": 0, "y": 56, "width": 960, "height": 120, "text": "🌲  🌳   🌲 🌲    🌳  🌲   🌲 🌳", "size": 80, "align": "Center", "color": "Green" },
+    { "type": "Text", "name": "Fireflies", "x": 0, "y": 150, "width": 960, "height": 30, "text": "·   ✦        ·     ✧       ·   ✦      ·        ✧    ·", "size": 18, "align": "Center", "color": "Gold" },
+    { "type": "Box", "name": "Journal", "x": 32, "y": 192, "width": 600, "height": 164, "color": "Green", "shade": "Dark", "opacity": 40, "border": true },
+    { "type": "Text", "name": "Title", "x": 52, "y": 204, "width": 560, "height": 40, "text": "🌲 Floresta Sombria", "size": 28, "shadow": true, "font": "Fantasy", "color": "Green" },
+    { "type": "Text", "name": "Story", "x": 52, "y": 250, "width": 560, "height": 96, "text": "As árvores fecham o céu. Há trilhas, ervas que curam... e olhos brilhando no escuro.", "size": 17, "font": "Book" },
+    { "type": "Messages", "name": "Log", "x": 648, "y": 192, "width": 280, "height": 164, "size": 15 },
+    { "type": "Button", "name": "Explore", "x": 32, "y": 370, "width": 292, "height": 54, "text": "🐾 Seguir a trilha" },
+    { "type": "Button", "name": "Herbs", "x": 340, "y": 370, "width": 292, "height": 54, "text": "🌿 Procurar ervas", "color": "Green", "style": "Outline" },
+    { "type": "Button", "name": "Back", "x": 648, "y": 370, "width": 280, "height": 54, "text": "↩ Voltar à vila", "style": "Text" },
+    { "type": "Box", "name": "StatusBar", "x": 16, "y": 448, "width": 928, "height": 72, "border": true },
+    { "type": "Text", "name": "PlayerInfo", "x": 36, "y": 458, "width": 220, "height": 54, "text": "Herói · Classe · Nível 1", "size": 15, "bold": true },
+    { "type": "Bar", "name": "Health", "x": 268, "y": 460, "width": 200, "height": 48, "text": "♥ Vida", "color": "Green", "value": 100, "max": 100 },
+    { "type": "Bar", "name": "Mana", "x": 484, "y": 460, "width": 170, "height": 48, "text": "✦ Mana", "color": "Blue", "value": 30, "max": 30 },
+    { "type": "Bar", "name": "Xp", "x": 670, "y": 460, "width": 150, "height": 48, "text": "★ XP", "color": "Purple", "value": 0, "max": 30 },
+    { "type": "Text", "name": "Gold", "x": 836, "y": 458, "width": 100, "height": 26, "text": "💰 15", "size": 17, "color": "Gold" },
+    { "type": "Text", "name": "Potions", "x": 836, "y": 486, "width": 100, "height": 26, "text": "🧪 1", "size": 17, "color": "Green" }
+  ]
+}

@@ -7,7 +7,7 @@ namespace CSharpLab.Core.Projects;
 public sealed record ExampleProject(string Id, string Title, string Description, bool IsGame = false);
 
 /// <summary>
-/// Exemplos prontos (adivinhe o número, calculadora, jogo da velha, cobrinha, batalha RPG e os dois RPGs de janela),
+/// Exemplos prontos (adivinhe o número, calculadora, jogo da velha, cobrinha, batalha RPG e os RPGs de janela),
 /// guardados dentro do programa e copiados para uma pasta do usuário ao abrir.
 /// </summary>
 public static class Examples
@@ -20,6 +20,7 @@ public static class Examples
         new("RpgBattle", "Batalha RPG", "Classes e objetos, em dois arquivos"),
         new("Snake", "Cobrinha", "Jogo em tempo real: teclas, cores e posição na tela"),
         new("RpgScreens", "RPG com botões", "Telas desenhadas na aba Tela; o código diz o que cada botão faz", IsGame: true),
+        new("RpgAdventure", "RPG completo: A Coroa Perdida", "Classes, loja, níveis, eventos com escolhas, um enigma e o chefe final", IsGame: true),
         new("RpgButtons", "RPG só com código", "As mesmas ideias sem desenhar: game.Title, game.Button, game.Bar", IsGame: true),
     ];
 
@@ -36,7 +37,8 @@ public static class Examples
         var assembly = typeof(Examples).Assembly;
         var prefix = $"CSharpLab.Core.Examples.{example.Id}.";
         var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var resource in assembly.GetManifestResourceNames().Where(n => n.StartsWith(prefix, StringComparison.Ordinal)))
+        foreach (var resource in assembly.GetManifestResourceNames()
+                     .Where(n => n.StartsWith(prefix, StringComparison.Ordinal) && !n.EndsWith(".png", StringComparison.OrdinalIgnoreCase)))
         {
             using var stream = assembly.GetManifestResourceStream(resource)!;
             using var reader = new StreamReader(stream);
@@ -72,6 +74,28 @@ public static class Examples
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, text, Files.TextFileIO.Utf8NoBom);
         }
+        foreach (var (name, bytes) in ImagesOf(example))
+        {
+            var path = Path.Combine(created.Directory, GameKit.AssetsFolder, name);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, bytes);
+        }
         return created;
+    }
+
+    /// <summary>As imagens do exemplo (vão para a pasta Assets do jogo): nome do arquivo → bytes.</summary>
+    public static IReadOnlyDictionary<string, byte[]> ImagesOf(ExampleProject example)
+    {
+        var assembly = typeof(Examples).Assembly;
+        var prefix = $"CSharpLab.Core.Examples.{example.Id}.{GameKit.AssetsFolder}.";
+        var images = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var resource in assembly.GetManifestResourceNames().Where(n => n.StartsWith(prefix, StringComparison.Ordinal)))
+        {
+            using var stream = assembly.GetManifestResourceStream(resource)!;
+            using var memory = new MemoryStream();
+            stream.CopyTo(memory);
+            images[resource[prefix.Length..]] = memory.ToArray();
+        }
+        return images;
     }
 }

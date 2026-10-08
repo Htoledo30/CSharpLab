@@ -24,6 +24,11 @@ public sealed class Game
 
     private readonly Dictionary<string, Action> _scenes = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<(string Text, Color? Color)> _news = [];
+    private int _flushed;            // quantas mensagens do _news já foram para o histórico da cena
+    private int _batch;              // cada clique (ou game.Wait) que escreveu algo é um lote de mensagens
+    private int _highlight = -1;     // o lote destacado na peça Mensagens: o último do clique atual
+    private int _actionFirstBatch;   // primeiro lote do clique atual (o aviso por cima da tela mostra o clique todo)
+    private bool _closed;            // a janela fechou no meio de um game.Wait
     private Screen? _building;
     private string? _current;
     private string? _pendingScene;
@@ -116,15 +121,84 @@ public sealed class Game
             $"Crie a tela em Arquivo → Nova tela… (o arquivo {ScreenLibrary.Folder}/{_current}.json) ou use game.Write e game.Button.");
         name = name?.Trim() ?? "";
         if (scene.Find(name) is { } item) return item;
+        if (scene.CardPiece(name) is { } member)
+            throw new GameException(
+                $"A peça \"{member.Name}\" faz parte do cartão da lista \"{member.List}\", que se repete para cada item. " +
+                $"Mude ela dentro do Show: game.Find(\"{member.List}\").Show(items, (card, item) => {{ card.Find(\"{member.Name}\").Text = ...; }});");
 
-        var names = scene.Layout.Pieces.Select(p => p.Name).ToList();
-        var guess = names.Where(n => Distance(n.ToLowerInvariant(), name.ToLowerInvariant()) <= 2).OrderBy(n => Distance(n, name)).FirstOrDefault();
+        var names = scene.Layout.Pieces.Where(p => p.List == null).Select(p => p.Name).ToList();
+        var guess = Guess(names, name);
         var hint = guess != null ? $" Você quis dizer \"{guess}\"?" : "";
         var list = names.Count > 0 ? $" Peças da tela: {string.Join(", ", names.Select(n => $"\"{n}\""))}." : " A tela ainda não tem peças.";
         throw new GameException(name.Length == 0
             ? $"Faltou o nome da peça no game.Find.{list}"
             : $"A peça \"{name}\" não existe na tela \"{scene.SceneName}\".{hint}{list}");
     }
+
+    /// <summary>
+    /// Background = fundo. A imagem de fundo da tela desenhada (da pasta Assets). Começa com a escolhida
+    /// na aba Tela; mude pelo código para a mesma tela servir a lugares diferentes.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// game.Scene("Fight", () =>
+    /// {
+    ///     game.Background = enemy.IsBoss ? "tower.png" : "forest.png";
+    /// });
+    /// </code>
+    /// </example>
+    public string? Background
+    {
+        get => _designed?.Layout.Background;
+        set
+        {
+            var scene = _designed ?? throw new GameException(
+                "game.Background é o fundo de uma tela desenhada. Esta cena não tem tela: crie em Arquivo → Nova tela do jogo….");
+            scene.Layout.Background = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        }
+    }
+
+    /// <summary>
+    /// Wait = esperar. Dentro de um clique, mostra a tela como está e espera um pouco antes de continuar:
+    /// você ataca, a tela mostra o golpe e o inimigo responde logo depois. O jogador não clica durante a pausa.
+    /// </summary>
+    /// <param name="seconds">Quanto esperar, em segundos (até 5). Exemplo: 0.6.</param>
+    /// <example>
+    /// <code>
+    /// game.Find("Attack").OnClick(() =>
+    /// {
+    ///     enemyHealth -= 7;
+    ///     game.Write("Você causou 7 de dano!");
+    ///     game.Wait(0.6);
+    ///     health -= 4;
+    ///     game.Write("O goblin revida: -4 de vida.", Color.Red);
+    /// });
+    /// </code>
+    /// </example>
+    public void Wait(double seconds)
+    {
+        if (!_started || _building != null || !_inAction)
+            throw new GameException(
+                "game.Wait funciona dentro de um clique (OnClick, OnAnswer ou game.Button), para fazer uma pausa no meio dele: " +
+                "game.Find(\"Attack\").OnClick(() => { ...; game.Wait(0.6); ... });");
+        if (double.IsNaN(seconds) || seconds < 0 || seconds > MaxWait)
+            throw new GameException($"game.Wait espera de 0 a {MaxWait} segundos (veio {seconds}). Para meio segundo: game.Wait(0.5);");
+        // Mostra o que o clique já fez (inclusive a troca de cena) antes da pausa.
+        if (_pendingScene != null)
+        {
+            _current = _pendingScene;
+            _pendingScene = null;
+            _entering = true;
+        }
+        Redraw();
+        _view?.Pause(seconds);
+        if (_closed) throw new GameClosedException();
+    }
+
+    private const double MaxWait = 5;
+
+    /// <summary>A janela fechou durante um game.Wait: o resto do clique não roda.</summary>
+    private sealed class GameClosedException : Exception;
 
     /// <summary>Title = título. Texto grande no alto da cena.</summary>
     /// <param name="text">Exemplo: "Capítulo 1".</param>
@@ -210,6 +284,11 @@ public sealed class Game
     /// <param name="firstScene">A cena que aparece primeiro. Exemplo: "Start".</param>
     public void Start(string firstScene)
     {
+        if (StartForTests is { } play)
+        {
+            play(this, firstScene);
+            return;
+        }
         Begin(firstScene);
         if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
         {
@@ -224,6 +303,12 @@ public sealed class Game
     }
 
     // ------------------------------------------------------------------ por dentro
+
+    /// <summary>
+    /// Para os testes jogarem um programa de verdade sem abrir janela: no lugar da janela, o Start
+    /// entrega o jogo para o teste (que chama <see cref="Begin"/> com uma tela falsa).
+    /// </summary>
+    internal static Action<Game, string>? StartForTests { get; set; }
 
     /// <summary>Confere tudo antes de abrir a janela, para o erro apontar a linha do Start.</summary>
     internal void Begin(string firstScene, IGameView? view = null)
@@ -246,6 +331,7 @@ public sealed class Game
     {
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
         var window = new GameWindow(this);
+        window.Closed += (_, _) => Close();   // um game.Wait em andamento para junto
         _view = window;
         Redraw();
         app.Run(window);
@@ -254,12 +340,21 @@ public sealed class Game
     /// <summary>O jogador clicou num botão ou respondeu uma pergunta: roda o código dele e redesenha.</summary>
     internal void Act(Action action)
     {
+        // Durante um game.Wait (ou a troca de cena), cliques e teclas esperam o clique atual terminar.
+        if (_inAction || _closed) return;
         _news.Clear();
+        _flushed = 0;
+        _highlight = -1;
+        _actionFirstBatch = _batch + 1;
         _pendingScene = null;
         _inAction = true;
         try
         {
             action();
+        }
+        catch (GameClosedException)
+        {
+            return;
         }
         finally
         {
@@ -274,32 +369,44 @@ public sealed class Game
         Redraw();
     }
 
-    /// <summary>Clique numa peça desenhada: roda o OnClick dela, ou explica que ele ainda falta.</summary>
+    /// <summary>Clique numa peça desenhada (solta ou de um cartão): roda o OnClick dela, ou explica que ele ainda falta.</summary>
     internal void ClickPiece(Piece piece)
     {
-        var item = _designed?.Find(piece.Name);
+        if (!piece.Enabled) return;
+        var item = ItemFor(piece);
         if (item?.Click is { } click)
         {
             Act(click);
             return;
         }
-        Act(() => Write($"O botão \"{piece.Name}\" ainda não faz nada. Na cena, escreva: game.Find(\"{piece.Name}\").OnClick(() => {{ ... }});", Color.Gray));
+        var find = item?.CardOf != null ? "card.Find" : "game.Find";
+        Act(() => Write($"O botão \"{piece.Name}\" ainda não faz nada. Na cena, escreva: {find}(\"{piece.Name}\").OnClick(() => {{ ... }});", Color.Gray));
     }
 
     /// <summary>Resposta num Campo de escrita desenhado.</summary>
     internal void AnswerPiece(Piece piece, string answer)
     {
-        var item = _designed?.Find(piece.Name);
+        if (!piece.Enabled) return;
+        var item = ItemFor(piece);
         if (item?.Answer is { } onAnswer)
         {
             Act(() => onAnswer(answer));
             return;
         }
-        Act(() => Write($"O campo \"{piece.Name}\" ainda não faz nada com a resposta. Na cena, escreva: game.Find(\"{piece.Name}\").OnAnswer(answer => {{ ... }});", Color.Gray));
+        var find = item?.CardOf != null ? "card.Find" : "game.Find";
+        Act(() => Write($"O campo \"{piece.Name}\" ainda não faz nada com a resposta. Na cena, escreva: {find}(\"{piece.Name}\").OnAnswer(answer => {{ ... }});", Color.Gray));
     }
 
     /// <summary>A peça tem OnClick no código (só essas ganham a mãozinha do mouse, no caso das imagens).</summary>
-    internal bool IsClickable(Piece piece) => _designed?.Find(piece.Name)?.Click != null;
+    internal bool IsClickable(Piece piece) => ItemFor(piece)?.Click != null;
+
+    /// <summary>Os cartões que o Show pôs na Lista (para desenhar).</summary>
+    internal IReadOnlyList<Card> CardsOf(Piece list) => _designed?.CardsOf(list) ?? [];
+
+    private Item? ItemFor(Piece piece) => _designed?.ItemFor(piece) ?? _designed?.Find(piece.Name);
+
+    /// <summary>A janela fechou: um game.Wait em andamento para, e nada mais roda.</summary>
+    internal void Close() => _closed = true;
 
     private void Redraw()
     {
@@ -337,8 +444,29 @@ public sealed class Game
             if (visited.Count >= MaxRedirects)
                 throw new GameException($"As cenas ficam mandando uma para a outra sem parar ({string.Join(" → ", visited.Distinct())}). Confira os game.GoTo dentro das cenas.");
         }
-        foreach (var (text, color) in _news)
-            screen.Items.Add(new TextItem(text, color, IsNews: true));
+        screen.SceneName = _current;
+        if (_designed is { } designed)
+        {
+            // As mensagens novas entram no histórico da cena (cada clique ou game.Wait é um lote).
+            if (_flushed < _news.Count)
+            {
+                _batch++;
+                _highlight = _batch;
+                designed.AddHistory(_news.Skip(_flushed), _batch);
+                _flushed = _news.Count;
+            }
+            var lines = screen.Items.OfType<TextItem>().Select(t => new MessageLine(t.Text, t.Color, false)).ToList();
+            foreach (var (line, batch) in designed.History)
+                lines.Add(line with { IsNews = batch == _highlight, IsOld = batch != _highlight });
+            screen.Messages = lines;
+            screen.Toast = designed.History.Where(h => h.Batch >= _actionFirstBatch).Select(h => h.Line with { IsNews = true }).ToList();
+            screen.Effects.AddRange(designed.TakeEffects());
+        }
+        else
+        {
+            foreach (var (text, color) in _news)
+                screen.Items.Add(new TextItem(text, color, IsNews: true));
+        }
         _view.Show(screen);
     }
 
@@ -359,12 +487,18 @@ public sealed class Game
         if (_scenes.ContainsKey(name))
             return _scenes.Keys.First(k => string.Equals(k, name, StringComparison.OrdinalIgnoreCase));
         var known = string.Join(", ", _scenes.Keys.Select(k => $"\"{k}\""));
-        var guess = _scenes.Keys.Where(k => Distance(k.ToLowerInvariant(), name.ToLowerInvariant()) <= 2).OrderBy(k => Distance(k, name)).FirstOrDefault();
+        var guess = Guess(_scenes.Keys, name);
         var hint = guess != null ? $" Você quis dizer \"{guess}\"?" : "";
         return name.Length == 0
             ? throw new GameException($"Faltou o nome da cena. Cenas do jogo: {known}.")
             : throw new GameException($"A cena \"{name}\" não existe.{hint} Cenas do jogo: {known}.");
     }
+
+    /// <summary>O nome parecido (até 2 letras diferentes), para o "Você quis dizer…?".</summary>
+    internal static string? Guess(IEnumerable<string> names, string name) =>
+        names.Where(n => Distance(n.ToLowerInvariant(), name.ToLowerInvariant()) <= 2)
+            .OrderBy(n => Distance(n.ToLowerInvariant(), name.ToLowerInvariant()))
+            .FirstOrDefault();
 
     /// <summary>Quantas letras mudam de um nome para o outro (para sugerir o nome certo).</summary>
     private static int Distance(string a, string b)

@@ -3,8 +3,8 @@ using System.Text.Json;
 
 namespace CSharpLab.Core.Projects;
 
-/// <summary>Uma peça de uma tela desenhada, como o editor de código precisa dela (nome e tipo).</summary>
-public sealed record ScreenPiece(string Name, string Type);
+/// <summary>Uma peça de uma tela desenhada, como o editor de código precisa dela (nome, tipo e a Lista de que faz parte).</summary>
+public sealed record ScreenPiece(string Name, string Type, string? List = null);
 
 /// <summary>
 /// Lê os nomes das peças das telas desenhadas (Screens/&lt;Cena&gt;.json), para o editor sugerir e conferir
@@ -72,14 +72,16 @@ public static class GameScreens
             foreach (var piece in pieces.EnumerateArray())
             {
                 if (piece.ValueKind != JsonValueKind.Object) continue;
-                string? name = null, type = null;
+                string? name = null, type = null, owner = null;
                 foreach (var p in piece.EnumerateObject())
                 {
                     if (p.Value.ValueKind != JsonValueKind.String) continue;
                     if (string.Equals(p.Name, "name", StringComparison.OrdinalIgnoreCase)) name = p.Value.GetString();
                     else if (string.Equals(p.Name, "type", StringComparison.OrdinalIgnoreCase)) type = p.Value.GetString();
+                    else if (string.Equals(p.Name, "list", StringComparison.OrdinalIgnoreCase)) owner = p.Value.GetString();
                 }
-                if (!string.IsNullOrWhiteSpace(name)) list.Add(new ScreenPiece(name.Trim(), type ?? ""));
+                if (!string.IsNullOrWhiteSpace(name))
+                    list.Add(new ScreenPiece(name.Trim(), type ?? "", string.IsNullOrWhiteSpace(owner) ? null : owner.Trim()));
             }
             return list;
         }
@@ -99,6 +101,7 @@ public static class GameScreens
         "box" => "Caixa",
         "input" => "Campo de escrita",
         "messages" => "Mensagens",
+        "list" => "Lista",
         _ => type,
     };
 }

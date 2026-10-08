@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Moon", "x": 770, "y": 24, "width": 120, "height": 110, "text": "🌕", "size": 80, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Bats", "x": 560, "y": 60, "width": 200, "height": 50, "text": "🦇    🦇", "size": 30, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Castle", "x": 330, "y": 10, "width": 300, "height": 236, "text": "🏰", "size": 170, "align": "Center", "color": "Gray" },
+    { "type": "Box", "name": "Banner", "x": 200, "y": 250, "width": 560, "height": 116, "color": "Red", "shade": "Dark", "opacity": 70, "border": true },
+    { "type": "Text", "name": "Title", "x": 220, "y": 262, "width": 520, "height": 44, "text": "Torre do Rei Goblin", "size": 30, "shadow": true, "font": "Fantasy", "align": "Center", "color": "Red" },
+    { "type": "Text", "name": "Story", "x": 220, "y": 308, "width": 520, "height": 52, "text": "Degraus que rangem levam ao salão do trono. O Rei Goblin espera, com a coroa na cabeça.", "size": 16, "font": "Book", "align": "Center" },
+    { "type": "Button", "name": "Challenge", "x": 290, "y": 384, "width": 380, "height": 58, "text": "⚔ Enfrentar o Rei Goblin", "size": 19, "color": "Red" },
+    { "type": "Button", "name": "Back", "x": 380, "y": 456, "width": 200, "height": 46, "text": "↩ Voltar à vila", "style": "Text" },
+    { "type": "Box", "name": "StatusCard", "x": 16, "y": 16, "width": 200, "height": 252, "border": true },
+    { "type": "Text", "name": "PlayerInfo", "x": 28, "y": 26, "width": 176, "height": 44, "text": "Herói · Classe · Nível 1", "size": 14, "bold": true },
+    { "type": "Bar", "name": "Health", "x": 28, "y": 72, "width": 176, "height": 44, "text": "♥ Vida", "color": "Green", "value": 100, "max": 100 },
+    { "type": "Bar", "name": "Mana", "x": 28, "y": 120, "width": 176, "height": 44, "text": "✦ Mana", "color": "Blue", "value": 30, "max": 30 },
+    { "type": "Bar", "name": "Xp", "x": 28, "y": 168, "width": 176, "height": 44, "text": "★ XP", "color": "Purple", "value": 0, "max": 30 },
+    { "type": "Text", "name": "Gold", "x": 28, "y": 222, "width": 88, "height": 28, "text": "💰 15", "size": 16, "color": "Gold" },
+    { "type": "Text", "name": "Potions", "x": 116, "y": 222, "width": 88, "height": 28, "text": "🧪 1", "size": 16, "align": "Right", "color": "Green" }
+  ]
+}

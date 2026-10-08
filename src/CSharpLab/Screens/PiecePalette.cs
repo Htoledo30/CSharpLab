@@ -30,7 +30,8 @@ public sealed class PiecePalette : Border
         (PieceType.Image, "Uma imagem da pasta Assets do projeto."),
         (PieceType.Box, "Um fundo colorido para agrupar outras peças."),
         (PieceType.Input, "Uma pergunta com campo para o jogador escrever: OnAnswer(answer => { });"),
-        (PieceType.Messages, "Onde aparecem os textos do game.Write."),
+        (PieceType.Messages, "Onde aparecem os textos do game.Write, com as mensagens antigas apagadinhas."),
+        (PieceType.List, "Um cartão que se repete para cada item (loja, inventário): game.Find(\"Nome\").Show(items, (card, item) => { });"),
     ];
 
     public PiecePalette(ScreenDesignerModel model)
@@ -185,6 +186,12 @@ public sealed class PiecePalette : Border
             case PieceType.Input:
                 Add(new Rectangle { Width = 22, Height = 12, RadiusX = 2, RadiusY = 2, Fill = B(0x21, 0x24, 0x2C), Stroke = muted, StrokeThickness = 1 }, 0, 2);
                 Add(new Rectangle { Width = 1.4, Height = 7, Fill = light }, 4, 4.5);
+                break;
+            case PieceType.List:
+                // Três cartõezinhos lado a lado: o primeiro é o modelo.
+                Add(new Rectangle { Width = 6, Height = 14, RadiusX = 1.5, RadiusY = 1.5, Stroke = B(0x7C, 0x8C, 0xF8), StrokeThickness = 1, StrokeDashArray = [2, 1.5] }, 0.5, 1);
+                Add(new Rectangle { Width = 6, Height = 14, RadiusX = 1.5, RadiusY = 1.5, Fill = B(0x7C, 0x8C, 0xF8, 0x60) }, 8, 1);
+                Add(new Rectangle { Width = 6, Height = 14, RadiusX = 1.5, RadiusY = 1.5, Fill = B(0x7C, 0x8C, 0xF8, 0x60) }, 15.5, 1);
                 break;
             case PieceType.Messages:
                 Add(new Rectangle { Width = 20, Height = 15, RadiusX = 3, RadiusY = 3, Fill = B(0x21, 0x24, 0x2C), Stroke = muted, StrokeThickness = 1 }, 1, 0.5);

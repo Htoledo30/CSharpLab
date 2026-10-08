@@ -21,7 +21,13 @@ public sealed class ScreenDesignerModel : IDisposable
     private bool _committing;
     private string? _mergeKey;
     private int _mergeVersion = -1;
-    private Piece? _clipboard;
+    private List<string> _selected = [];
+
+    /// <summary>
+    /// Peças copiadas (Ctrl+C), com a posição na tela e a Lista de cada uma. Fica no programa todo:
+    /// copiar na Vila e colar na Floresta funciona.
+    /// </summary>
+    private static List<Piece>? _clipboard;
 
     public ScreenDesignerModel(DocumentViewModel doc)
     {
@@ -45,9 +51,18 @@ public sealed class ScreenDesignerModel : IDisposable
     public int? ErrorLine { get; private set; }
     public IReadOnlyList<string> Warnings { get; private set; } = [];
 
-    public string? SelectedName { get; private set; }
+    /// <summary>A peça selecionada, quando é uma só (com várias selecionadas, null).</summary>
+    public string? SelectedName => _selected.Count == 1 ? _selected[0] : null;
+
+    /// <summary>Todas as peças selecionadas (Shift+clique ou arrastando um retângulo no palco).</summary>
+    public IReadOnlyList<string> SelectedNames => _selected;
 
     internal Piece? Selected => SelectedName != null ? Layout?.Find(SelectedName) : null;
+
+    internal IReadOnlyList<Piece> SelectedPieces =>
+        Layout == null ? [] : _selected.Select(n => Layout.Find(n)).OfType<Piece>().ToList();
+
+    public bool IsSelected(string name) => _selected.Contains(name, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>A tela mudou (edição, desfazer, texto mudado no Arquivo ou no disco).</summary>
     public event Action? Changed;
@@ -91,9 +106,9 @@ public sealed class ScreenDesignerModel : IDisposable
         Error = result.Error;
         ErrorLine = result.ErrorLine;
         Warnings = result.Warnings;
-        if (SelectedName != null && Layout?.Find(SelectedName) == null)
+        if (_selected.Count > 0 && _selected.Any(n => Layout?.Find(n) == null))
         {
-            SelectedName = null;
+            _selected = _selected.Where(n => Layout?.Find(n) != null).ToList();
             SelectionChanged?.Invoke();
         }
         Changed?.Invoke();
@@ -104,26 +119,136 @@ public sealed class ScreenDesignerModel : IDisposable
     public void Select(string? name)
     {
         var piece = name != null ? Layout?.Find(name) : null;
-        var newName = piece?.Name;
-        if (newName == SelectedName) return;
-        SelectedName = newName;
+        SelectMany(piece != null ? [piece.Name] : []);
+    }
+
+    /// <summary>Seleciona estas peças (as que não existem são ignoradas).</summary>
+    public void SelectMany(IEnumerable<string> names)
+    {
+        var list = new List<string>();
+        foreach (var name in names)
+        {
+            if (Layout?.Find(name) is { } piece && !list.Contains(piece.Name, StringComparer.OrdinalIgnoreCase)) list.Add(piece.Name);
+        }
+        if (list.SequenceEqual(_selected)) return;
+        _selected = list;
         EndMerge();
         SelectionChanged?.Invoke();
     }
+
+    /// <summary>Shift+clique: põe a peça na seleção, ou tira se já estava.</summary>
+    public void ToggleSelect(string name)
+    {
+        if (Layout?.Find(name) is not { } piece) return;
+        SelectMany(IsSelected(piece.Name)
+            ? _selected.Where(n => !string.Equals(n, piece.Name, StringComparison.OrdinalIgnoreCase))
+            : _selected.Append(piece.Name));
+    }
+
+    public void SelectAll() => SelectMany(Layout?.Pieces.Select(p => p.Name) ?? []);
 
     /// <summary>A peça de cima que está no ponto (as últimas da lista ficam por cima).</summary>
     internal Piece? HitTest(Point point, double tolerance = 0)
     {
         if (Layout == null) return null;
-        for (int i = Layout.Pieces.Count - 1; i >= 0; i--)
+        var order = DrawOrder();
+        for (int i = order.Count - 1; i >= 0; i--)
         {
-            var p = Layout.Pieces[i];
+            var p = order[i];
             if (BoundsOf(p).Inflate(tolerance).Contains(point)) return p;
         }
         return null;
     }
 
-    internal static Rect BoundsOf(Piece p) => new(p.X, p.Y, Math.Max(1, p.Width), Math.Max(1, p.Height));
+    /// <summary>As peças que o retângulo toca (para a seleção arrastando no palco).</summary>
+    internal IReadOnlyList<Piece> PiecesIn(Rect area) =>
+        Layout == null ? [] : DrawOrder().Where(p => BoundsOf(p).IntersectsWith(area)).ToList();
+
+    /// <summary>
+    /// A ordem em que as peças aparecem: a da lista, com as peças do cartão de cada Lista logo depois dela
+    /// (por cima da Lista, como no jogo).
+    /// </summary>
+    internal IReadOnlyList<Piece> DrawOrder()
+    {
+        if (Layout == null) return [];
+        var order = new List<Piece>();
+        foreach (var piece in Layout.Pieces)
+        {
+            if (piece.List != null && Layout.ListOf(piece) != null) continue;
+            order.Add(piece);
+            if (piece.Type == PieceType.List) order.AddRange(Layout.MembersOf(piece.Name));
+        }
+        return order;
+    }
+
+    /// <summary>Onde a peça está no palco (as peças de cartão contam a partir do cartão modelo da Lista).</summary>
+    internal Rect BoundsOf(Piece p) => Layout != null ? AbsoluteBounds(Layout, p) : PlainBounds(p);
+
+    internal static Rect PlainBounds(Piece p) => new(p.X, p.Y, Math.Max(1, p.Width), Math.Max(1, p.Height));
+
+    internal static Rect AbsoluteBounds(ScreenLayout layout, Piece p)
+    {
+        var rect = PlainBounds(p);
+        if (layout.ListOf(p) is { } list) rect.Offset(list.X, list.Y);
+        return rect;
+    }
+
+    /// <summary>O cartão modelo da Lista: onde ficam as peças dela, no palco.</summary>
+    internal static Rect CardSlot(Piece list) => new(list.X, list.Y, list.CardW, list.CardH);
+
+    /// <summary>A Lista cujo cartão modelo tem este retângulo inteiro dentro (null se nenhuma).</summary>
+    internal Piece? ListAt(Rect bounds, Piece? except = null) => Layout != null ? ListAt(Layout, bounds, except) : null;
+
+    private static Piece? ListAt(ScreenLayout layout, Rect bounds, Piece? except)
+    {
+        for (int i = layout.Pieces.Count - 1; i >= 0; i--)
+        {
+            var list = layout.Pieces[i];
+            if (list.Type != PieceType.List || list == except || except?.Name == list.Name) continue;
+            var slot = CardSlot(list);
+            slot.Inflate(0.5, 0.5);
+            if (slot.Contains(bounds)) return list;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Depois de mover: dentro do cartão modelo de uma Lista, a peça passa a fazer parte do cartão; com o
+    /// meio dela fora do cartão, volta a ser uma peça solta.
+    /// </summary>
+    private static void Reparent(ScreenLayout layout, Piece piece)
+    {
+        if (!Piece.Supports(piece.Type, nameof(Piece.List)))
+        {
+            piece.List = null;
+            return;
+        }
+        var abs = AbsoluteBounds(layout, piece);
+        if (layout.ListOf(piece) is { } current)
+        {
+            var center = new Point(abs.X + abs.Width / 2, abs.Y + abs.Height / 2);
+            if (CardSlot(current).Contains(center)) return;
+            piece.List = null;
+            (piece.X, piece.Y) = (abs.X, abs.Y);
+            return;
+        }
+        piece.List = null;
+        if (ListAt(layout, abs, piece) is { } list)
+        {
+            piece.List = list.Name;
+            (piece.X, piece.Y) = (abs.X - list.X, abs.Y - list.Y);
+        }
+    }
+
+    /// <summary>Põe a peça no lugar (posição no palco), cuidando de quem é de cartão.</summary>
+    private static void Place(ScreenLayout layout, Piece piece, Rect abs)
+    {
+        var offset = layout.ListOf(piece) is { } list ? new Vector(list.X, list.Y) : new Vector();
+        piece.X = Math.Round(abs.X - offset.X);
+        piece.Y = Math.Round(abs.Y - offset.Y);
+        piece.Width = Math.Round(abs.Width);
+        piece.Height = Math.Round(abs.Height);
+    }
 
     // ------------------------------------------------------------------ edição
 
@@ -133,6 +258,7 @@ public sealed class ScreenDesignerModel : IDisposable
         if (Layout == null) return null;
         var layout = Layout.Clone();
         var piece = Piece.CreateDefault(type, layout.NewName(type), 0, 0);
+        if (type == PieceType.List) piece.Text = null;
         if (at is { } p)
         {
             // O ponto é o centro da peça (onde o mouse soltou).
@@ -147,6 +273,7 @@ public sealed class ScreenDesignerModel : IDisposable
         piece.Y = Math.Round(piece.Y / 8) * 8;
         ClampInside(piece);
         layout.Pieces.Add(piece);
+        Reparent(layout, piece);   // solta dentro do cartão modelo de uma Lista: vira parte do cartão
         Commit(layout);
         Select(piece.Name);
         return Layout!.Find(piece.Name);
@@ -173,29 +300,55 @@ public sealed class ScreenDesignerModel : IDisposable
         piece.Y = Math.Clamp(piece.Y, KeepInside - piece.Height, ScreenLayout.Height - KeepInside);
     }
 
-    /// <summary>Posição e tamanho novos (depois de arrastar ou redimensionar). Valores arredondados.</summary>
-    internal void SetBounds(string name, Rect bounds, string? mergeKey = null)
+    /// <summary>Um pedaço da peça sempre fica dentro do palco, para ela nunca se perder.</summary>
+    internal static Rect ClampInside(Rect r)
     {
-        Edit(name, p =>
-        {
-            p.X = Math.Round(bounds.X);
-            p.Y = Math.Round(bounds.Y);
-            p.Width = Math.Round(bounds.Width);
-            p.Height = Math.Round(bounds.Height);
-            ClampInside(p);
-        }, mergeKey);
+        double width = Math.Max(MinSize, r.Width), height = Math.Max(MinSize, r.Height);
+        return new Rect(
+            Math.Clamp(r.X, KeepInside - width, ScreenLayout.Width - KeepInside),
+            Math.Clamp(r.Y, KeepInside - height, ScreenLayout.Height - KeepInside),
+            width, height);
     }
 
-    /// <summary>Setas do teclado. Toques seguidos viram um passo só no desfazer.</summary>
+    /// <summary>Posição e tamanho novos no palco (depois de arrastar ou redimensionar). Valores arredondados.</summary>
+    internal void SetBounds(string name, Rect bounds, string? mergeKey = null)
+    {
+        if (Layout?.Find(name) == null) return;
+        var layout = Layout.Clone();
+        var piece = layout.Find(name)!;
+        Place(layout, piece, ClampInside(bounds));
+        Reparent(layout, piece);
+        Commit(layout, mergeKey);
+    }
+
+    /// <summary>
+    /// Move várias peças juntas (arrastando a seleção ou com as setas). As peças do cartão de uma Lista
+    /// que também está sendo movida vão junto com ela.
+    /// </summary>
+    internal void MoveBy(IEnumerable<string> names, double dx, double dy, string? mergeKey = null)
+    {
+        if (Layout == null) return;
+        var layout = Layout.Clone();
+        var set = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+        var moved = new List<Piece>();
+        foreach (var piece in layout.Pieces)
+        {
+            if (!set.Contains(piece.Name) || piece.List != null && set.Contains(piece.List)) continue;
+            var abs = AbsoluteBounds(layout, piece);
+            abs.Offset(dx, dy);
+            Place(layout, piece, ClampInside(abs));
+            moved.Add(piece);
+        }
+        if (moved.Count == 0) return;
+        foreach (var piece in moved) Reparent(layout, piece);
+        Commit(layout, mergeKey);
+    }
+
+    /// <summary>Setas do teclado: movem todas as selecionadas. Toques seguidos viram um passo só no desfazer.</summary>
     public void Nudge(double dx, double dy)
     {
-        if (Selected is not { } piece) return;
-        Edit(piece.Name, p =>
-        {
-            p.X += dx;
-            p.Y += dy;
-            ClampInside(p);
-        }, "nudge:" + piece.Name);
+        if (_selected.Count == 0) return;
+        MoveBy(_selected, dx, dy, "nudge:" + string.Join(",", _selected));
     }
 
     /// <summary>
@@ -229,46 +382,110 @@ public sealed class ScreenDesignerModel : IDisposable
             return $"Já existe uma peça chamada \"{newName}\" nesta tela.";
         var layout = Layout.Clone();
         layout.Find(piece.Name)!.Name = newName;
+        // As peças do cartão continuam na Lista, agora com o nome novo.
+        foreach (var member in layout.Pieces.Where(p => string.Equals(p.List, piece.Name, StringComparison.OrdinalIgnoreCase)))
+            member.List = newName;
         // A seleção acompanha o nome novo antes de avisar a tela, para nada piscar.
-        SelectedName = newName;
+        _selected = [newName];
         Commit(layout);
         Renamed?.Invoke(piece.Name, newName);
         return null;
     }
 
+    /// <summary>Apaga as peças selecionadas (apagar uma Lista apaga o cartão dela junto).</summary>
     public void Delete()
     {
-        if (Selected is not { } piece || Layout == null) return;
+        if (_selected.Count == 0 || Layout == null) return;
         var layout = Layout.Clone();
-        int index = layout.Pieces.FindIndex(p => p.Name == piece.Name);
-        layout.Pieces.RemoveAt(index);
-        SelectedName = null;
+        var gone = new HashSet<string>(_selected, StringComparer.OrdinalIgnoreCase);
+        layout.Pieces.RemoveAll(p => gone.Contains(p.Name) || p.List != null && gone.Contains(p.List));
+        _selected = [];
         Commit(layout);
         SelectionChanged?.Invoke();
     }
 
-    /// <summary>Cópia da peça um pouco deslocada, com nome novo, já selecionada.</summary>
-    internal Piece? Duplicate() => Selected is { } piece ? Paste(piece) : null;
+    /// <summary>As selecionadas (e o cartão das Listas selecionadas), com a posição no palco.</summary>
+    private List<Piece> TakeSelection()
+    {
+        if (Layout == null || _selected.Count == 0) return [];
+        var names = new HashSet<string>(_selected, StringComparer.OrdinalIgnoreCase);
+        var result = new List<Piece>();
+        foreach (var piece in Layout.Pieces)
+        {
+            if (!names.Contains(piece.Name) && !(piece.List != null && names.Contains(piece.List))) continue;
+            var copy = piece.Clone();
+            var abs = AbsoluteBounds(Layout, piece);
+            (copy.X, copy.Y) = (abs.X, abs.Y);
+            result.Add(copy);
+        }
+        return result;
+    }
 
-    public void Copy() => _clipboard = Selected?.Clone();
+    /// <summary>Cópia das selecionadas um pouco deslocada, com nomes novos, já selecionada (não mexe no Ctrl+C).</summary>
+    internal Piece? Duplicate()
+    {
+        var pieces = TakeSelection();
+        return pieces.Count > 0 ? Paste(pieces) : null;
+    }
+
+    public void Copy()
+    {
+        var pieces = TakeSelection();
+        if (pieces.Count > 0) _clipboard = pieces;
+    }
 
     public bool CanPaste => _clipboard != null && Layout != null;
 
+    /// <summary>
+    /// Cola o que foi copiado, nesta tela ou em outra: no mesmo lugar e com os mesmos nomes (assim o mesmo
+    /// código serve às duas telas). Se o lugar já está ocupado pela mesma peça, um pouco para o lado; se o
+    /// nome já existe, um nome novo (Attack2…).
+    /// </summary>
     internal Piece? Paste() => _clipboard != null ? Paste(_clipboard) : null;
 
-    private Piece? Paste(Piece source)
+    private Piece? Paste(IReadOnlyList<Piece> source)
     {
-        if (Layout == null) return null;
+        if (Layout == null || source.Count == 0) return null;
         var layout = Layout.Clone();
-        var copy = source.Clone();
-        copy.Name = UniqueCopyName(layout, source.Name);
-        copy.X += 16;
-        copy.Y += 16;
-        ClampInside(copy);
-        layout.Pieces.Add(copy);
+
+        // Colar por cima da mesma peça no mesmo lugar não serve: desloca até achar lugar livre.
+        double shift = 0;
+        while (shift < 16 * 20 && source.Any(s => layout.Pieces.Any(p =>
+                   p.Type == s.Type && AbsoluteBounds(layout, p) == new Rect(s.X + shift, s.Y + shift, Math.Max(1, s.Width), Math.Max(1, s.Height)))))
+            shift += 16;
+
+        var names = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var pasted = new List<Piece>();
+        var ordered = source.OrderBy(p => p.Type == PieceType.List ? 0 : 1).ToList();   // as Listas antes do cartão delas
+        foreach (var original in ordered)
+        {
+            var copy = original.Clone();
+            copy.Name = layout.Find(original.Name) == null ? original.Name : UniqueCopyName(layout, original.Name);
+            names[original.Name] = copy.Name;
+            copy.List = null;
+            var abs = ClampInside(new Rect(original.X + shift, original.Y + shift, copy.Width, copy.Height));
+            (copy.X, copy.Y) = (abs.X, abs.Y);
+            layout.Pieces.Add(copy);
+            pasted.Add(copy);
+        }
+        // As peças de cartão voltam para a Lista colada junto (ou entram num cartão se caírem dentro de um).
+        for (int i = 0; i < pasted.Count; i++)
+        {
+            var copy = pasted[i];
+            var original = ordered[i];
+            if (original.List != null && names.TryGetValue(original.List, out var listName) && layout.Find(listName) is { } list)
+            {
+                copy.List = list.Name;
+                (copy.X, copy.Y) = (copy.X - list.X, copy.Y - list.Y);
+            }
+            else
+            {
+                Reparent(layout, copy);
+            }
+        }
         Commit(layout);
-        Select(copy.Name);
-        return Layout!.Find(copy.Name);
+        SelectMany(pasted.Where(p => p.List == null || !names.ContainsValue(p.List)).Select(p => p.Name));
+        return Layout!.Find(pasted[0].Name);
     }
 
     private static string UniqueCopyName(ScreenLayout layout, string name)
@@ -287,16 +504,15 @@ public sealed class ScreenDesignerModel : IDisposable
 
     public void SendToBack() => Reorder(toFront: false);
 
+    /// <summary>Leva as selecionadas para cima (ou para baixo) de todas, sem mudar a ordem entre elas.</summary>
     private void Reorder(bool toFront)
     {
-        if (Selected is not { } piece || Layout == null) return;
+        if (_selected.Count == 0 || Layout == null) return;
         var layout = Layout.Clone();
-        int index = layout.Pieces.FindIndex(p => p.Name == piece.Name);
-        if (toFront ? index == layout.Pieces.Count - 1 : index == 0) return;
-        var moving = layout.Pieces[index];
-        layout.Pieces.RemoveAt(index);
-        if (toFront) layout.Pieces.Add(moving);
-        else layout.Pieces.Insert(0, moving);
+        var names = new HashSet<string>(_selected, StringComparer.OrdinalIgnoreCase);
+        var moving = layout.Pieces.Where(p => names.Contains(p.Name)).ToList();
+        var rest = layout.Pieces.Where(p => !names.Contains(p.Name)).ToList();
+        layout.Pieces = toFront ? [.. rest, .. moving] : [.. moving, .. rest];
         Commit(layout);
     }
 
@@ -408,7 +624,7 @@ public sealed class ScreenDesignerModel : IDisposable
     /// <summary>Exemplo de código para a peça, para a pessoa ver como ligar a tela ao programa.</summary>
     internal static string CodeExample(Piece piece)
     {
-        var find = $"game.Find(\"{piece.Name}\")";
+        var find = piece.List != null ? $"card.Find(\"{piece.Name}\")" : $"game.Find(\"{piece.Name}\")";
         return piece.Type switch
         {
             PieceType.Button => $"{find}.OnClick(() =>\n{{\n    \n}});",
@@ -418,6 +634,7 @@ public sealed class ScreenDesignerModel : IDisposable
             PieceType.Box => $"{find}.Visible = true;",
             PieceType.Input => $"{find}.OnAnswer(answer =>\n{{\n    \n}});",
             PieceType.Messages => "game.Write(\"Você causou 7 de dano!\");",
+            PieceType.List => $"{find}.Show(items, (card, item) =>\n{{\n    card.Find(\"Name\").Text = item.Name;\n}});",
             _ => find,
         };
 

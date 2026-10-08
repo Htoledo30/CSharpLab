@@ -16,12 +16,27 @@ namespace CSharpLab.GameEngine;
 internal static class Theme
 {
     public static readonly Brush Background = Freeze(WpfColor.FromRgb(0x17, 0x19, 0x1F));
-    public static readonly Brush Panel = Freeze(WpfColor.FromRgb(0x21, 0x24, 0x2C));
+    public static readonly WpfColor PanelColor = WpfColor.FromRgb(0x21, 0x24, 0x2C);
+    public static readonly Brush Panel = Freeze(PanelColor);
     public static readonly Brush PanelBorder = Freeze(WpfColor.FromRgb(0x2E, 0x32, 0x3C));
     public static readonly Brush Track = Freeze(WpfColor.FromRgb(0x2E, 0x32, 0x3C));
     public static readonly Brush Text = Freeze(WpfColor.FromRgb(0xDD, 0xE1, 0xE8));
     public static readonly Brush Muted = Freeze(WpfColor.FromRgb(0x8C, 0x93, 0xA0));
-    public static readonly FontFamily Font = new("Segoe UI");
+    public static readonly FontFamily DefaultFont = new("Segoe UI");
+
+    // As fontes do Font: todas vêm com o Windows. Símbolos e emoji que faltam nelas vêm da Segoe UI.
+    private static readonly Dictionary<Font, FontFamily> Fonts = new()
+    {
+        [GameEngine.Font.Normal] = DefaultFont,
+        [GameEngine.Font.Fantasy] = new("Gabriola, Segoe UI"),
+        [GameEngine.Font.Book] = new("Palatino Linotype, Segoe UI"),
+        [GameEngine.Font.Hand] = new("Segoe Print, Segoe UI"),
+    };
+
+    public static FontFamily FontOf(Font? font) => Fonts.GetValueOrDefault(font ?? GameEngine.Font.Normal, DefaultFont);
+
+    /// <summary>A Gabriola desenha letras pequenas para o tamanho: ela ganha um pouco mais, para todas parecerem do mesmo tamanho.</summary>
+    public static double FontScale(Font? font) => font == GameEngine.Font.Fantasy ? 1.3 : 1;
 
     private static readonly Dictionary<Color, WpfColor> Colors = new()
     {
@@ -42,7 +57,24 @@ internal static class Theme
 
     public static WpfColor Rgb(Color color) => Colors[color];
 
+    public static WpfColor Rgb(Color color, Shade? shade) => Tone(Colors[color], shade);
+
     public static Brush Brush(Color color) => Brushes[color];
+
+    public static Brush Brush(Color color, Shade? shade) => shade is null or Shade.Normal ? Brushes[color] : Freeze(Rgb(color, shade));
+
+    /// <summary>Tom da cor: escuro ou claro (Normal deixa como está).</summary>
+    public static WpfColor Tone(WpfColor c, Shade? shade) => shade switch
+    {
+        Shade.Dark => Darken(c, 0.55),
+        Shade.Light => Lighten(c, 0.45),
+        _ => c,
+    };
+
+    public static WpfColor WithAlpha(WpfColor c, byte alpha) => WpfColor.FromArgb(alpha, c.R, c.G, c.B);
+
+    /// <summary>Cor clara o bastante para pedir letra escura em cima.</summary>
+    public static bool IsLight(WpfColor c) => (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255 > 0.66;
 
     private static readonly Dictionary<Color, Brush> NewsBacks = Colors.ToDictionary(
         p => p.Key, p => Freeze(WpfColor.FromArgb(0x2C, p.Value.R, p.Value.G, p.Value.B)));
@@ -51,9 +83,10 @@ internal static class Theme
     public static Brush NewsBack(Color? color) => NewsBacks[color ?? Color.Gold];
 
     /// <summary>Fundo de botão: azul padrão, ou a cor escolhida um pouco mais escura (o texto branco continua legível).</summary>
-    public static WpfColor ButtonColor(Color? color) => color is { } c and not Color.White ? Shade(Colors[c], 0.82) : ButtonBlue;
+    public static WpfColor ButtonColor(Color? color, Shade? shade = null) =>
+        Tone(color is { } c and not Color.White ? Darken(Colors[c], 0.82) : ButtonBlue, shade);
 
-    public static WpfColor Shade(WpfColor c, double factor) =>
+    public static WpfColor Darken(WpfColor c, double factor) =>
         WpfColor.FromRgb((byte)Math.Clamp(c.R * factor, 0, 255), (byte)Math.Clamp(c.G * factor, 0, 255), (byte)Math.Clamp(c.B * factor, 0, 255));
 
     public static WpfColor Lighten(WpfColor c, double amount) =>
@@ -68,23 +101,57 @@ internal static class Theme
 
     // ------------------------------------------------------------------ botões
 
-    /// <summary>Botão do jogo: cantos arredondados, cor própria, mais claro com o mouse em cima e mais escuro ao apertar.</summary>
-    public static Button MakeButton(object content, Color? color = null)
+    /// <summary>As cores de um botão: fundo, com o mouse em cima, apertado, borda e letra.</summary>
+    internal sealed record ButtonLook(Brush Back, Brush Hover, Brush Pressed, Brush Border, double BorderWidth, Brush Text);
+
+    /// <summary>Cheio (fundo colorido), contorno (só a borda) ou só texto.</summary>
+    public static ButtonLook LookOf(Color? color, Shade? shade = null, ButtonStyle? style = null)
     {
-        var baseColor = ButtonColor(color);
+        if (style is null or ButtonStyle.Filled)
+        {
+            var back = ButtonColor(color, shade);
+            return new ButtonLook(Freeze(back), Freeze(Lighten(back, 0.14)), Freeze(Darken(back, 0.86)),
+                System.Windows.Media.Brushes.Transparent, 0,
+                IsLight(back) ? Freeze(WpfColor.FromRgb(0x17, 0x19, 0x1F)) : System.Windows.Media.Brushes.White);
+        }
+        // Contorno e só texto: a cor fica na letra (e na borda), um pouco mais clara para ler bem no fundo escuro.
+        var accent = color is { } c and not Color.White
+            ? Tone(Lighten(Colors[c], 0.12), shade)
+            : Tone(Lighten(ButtonBlue, 0.35), shade);
+        var outline = style == ButtonStyle.Outline;
+        return new ButtonLook(System.Windows.Media.Brushes.Transparent,
+            Freeze(WithAlpha(accent, (byte)(outline ? 0x24 : 0x1C))),
+            Freeze(WithAlpha(accent, 0x3C)),
+            outline ? Freeze(accent) : System.Windows.Media.Brushes.Transparent,
+            outline ? 1.5 : 0,
+            Freeze(accent));
+    }
+
+    /// <summary>Botão do jogo: cantos arredondados, cor própria, mais claro com o mouse em cima e mais escuro ao apertar.</summary>
+    public static Button MakeButton(object content, Color? color = null, Shade? shade = null, ButtonStyle? style = null)
+    {
+        var look = LookOf(color, shade, style);
         var button = new Button
         {
             Content = content,
             Template = ButtonTemplate,
             Cursor = Cursors.Hand,
             Focusable = false,
-            Foreground = System.Windows.Media.Brushes.White,
-            Background = Freeze(baseColor),
-            BorderBrush = Freeze(Lighten(baseColor, 0.14)),   // com o mouse em cima
-            Tag = Freeze(Shade(baseColor, 0.86)),              // apertado
+            Foreground = look.Text,
+            Background = look.Back,
+            BorderBrush = look.Border,
+            BorderThickness = new Thickness(look.BorderWidth),
         };
+        button.SetValue(HoverProperty, look.Hover);
+        button.SetValue(PressedProperty, look.Pressed);
         return button;
     }
+
+    private static readonly DependencyProperty HoverProperty =
+        DependencyProperty.RegisterAttached("Hover", typeof(Brush), typeof(Theme), new PropertyMetadata(null));
+
+    private static readonly DependencyProperty PressedProperty =
+        DependencyProperty.RegisterAttached("Pressed", typeof(Brush), typeof(Theme), new PropertyMetadata(null));
 
     private static readonly ControlTemplate ButtonTemplate = CreateButtonTemplate();
 
@@ -92,6 +159,8 @@ internal static class Theme
     {
         var border = new FrameworkElementFactory(typeof(Border), "Back");
         border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+        border.SetValue(Border.BorderBrushProperty, new TemplateBindingExtension(Control.BorderBrushProperty));
+        border.SetValue(Border.BorderThicknessProperty, new TemplateBindingExtension(Control.BorderThicknessProperty));
         border.SetValue(Border.CornerRadiusProperty, new CornerRadius(8));
         border.SetValue(Border.PaddingProperty, new Thickness(18, 8, 18, 8));
         var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
@@ -101,11 +170,15 @@ internal static class Theme
 
         var template = new ControlTemplate(typeof(Button)) { VisualTree = border };
         var hover = new Trigger { Property = UIElement.IsMouseOverProperty, Value = true };
-        hover.Setters.Add(new Setter(Border.BackgroundProperty, new Binding("BorderBrush") { RelativeSource = RelativeSource.TemplatedParent }, "Back"));
+        hover.Setters.Add(new Setter(Border.BackgroundProperty, new Binding { Path = new PropertyPath(HoverProperty), RelativeSource = RelativeSource.TemplatedParent }, "Back"));
         var pressed = new Trigger { Property = System.Windows.Controls.Primitives.ButtonBase.IsPressedProperty, Value = true };
-        pressed.Setters.Add(new Setter(Border.BackgroundProperty, new Binding("Tag") { RelativeSource = RelativeSource.TemplatedParent }, "Back"));
+        pressed.Setters.Add(new Setter(Border.BackgroundProperty, new Binding { Path = new PropertyPath(PressedProperty), RelativeSource = RelativeSource.TemplatedParent }, "Back"));
+        // Desligado (Enabled = false): apagado e sem clique.
+        var disabled = new Trigger { Property = UIElement.IsEnabledProperty, Value = false };
+        disabled.Setters.Add(new Setter(UIElement.OpacityProperty, 0.38, "Back"));
         template.Triggers.Add(hover);
         template.Triggers.Add(pressed);
+        template.Triggers.Add(disabled);
         template.Seal();
         return template;
     }

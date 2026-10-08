@@ -1,0 +1,24 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Stalactites", "x": 0, "y": 0, "width": 960, "height": 44, "text": "▼  ▼▼   ▼  ▼▼▼  ▼    ▼▼  ▼   ▼▼▼  ▼  ▼▼   ▼  ▼▼", "size": 28, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "StalactitesBack", "x": 0, "y": 28, "width": 960, "height": 30, "text": "▾   ▾  ▾    ▾▾   ▾  ▾    ▾   ▾▾  ▾    ▾  ▾   ▾", "size": 20, "align": "Center", "color": "Purple" },
+    { "type": "Text", "name": "Candle", "x": 40, "y": 120, "width": 100, "height": 80, "text": "🕯", "size": 56, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Bones", "x": 40, "y": 260, "width": 100, "height": 80, "text": "💀", "size": 46, "align": "Center", "color": "Gray" },
+    { "type": "Box", "name": "Tablet", "x": 180, "y": 72, "width": 580, "height": 312, "color": "Purple", "shade": "Dark", "opacity": 60, "border": true },
+    { "type": "Text", "name": "Title", "x": 200, "y": 88, "width": 540, "height": 44, "text": "Caverna dos Ecos", "size": 30, "shadow": true, "font": "Fantasy", "align": "Center", "color": "Purple" },
+    { "type": "Text", "name": "Story", "x": 200, "y": 136, "width": 540, "height": 76, "text": "Uma voz ecoa nas pedras: \"Responda e a chave é sua. Erre e sinta a minha mordida.\"", "size": 17, "font": "Book", "align": "Center" },
+    { "type": "Input", "name": "Riddle", "x": 220, "y": 224, "width": 500, "height": 96, "text": "O que é que, quanto mais se tira, maior fica?", "size": 18, "font": "Book" },
+    { "type": "Text", "name": "Echo", "x": 200, "y": 330, "width": 540, "height": 40, "text": "...fica... fica... fica...", "size": 15, "italic": true, "font": "Book", "align": "Center", "color": "Gray" },
+    { "type": "Messages", "name": "Log", "x": 180, "y": 398, "width": 452, "height": 82, "size": 15 },
+    { "type": "Button", "name": "Back", "x": 648, "y": 398, "width": 112, "height": 82, "text": "↩ Vila", "style": "Text" },
+    { "type": "Text", "name": "Crystals", "x": 0, "y": 492, "width": 960, "height": 44, "text": "💎      💎   💎          💎     💎   💎        💎", "size": 26, "align": "Center", "color": "Purple" },
+    { "type": "Box", "name": "StatusCard", "x": 776, "y": 72, "width": 168, "height": 252, "border": true },
+    { "type": "Text", "name": "PlayerInfo", "x": 788, "y": 82, "width": 144, "height": 44, "text": "Herói · Classe · Nível 1", "size": 14, "bold": true },
+    { "type": "Bar", "name": "Health", "x": 788, "y": 128, "width": 144, "height": 44, "text": "♥ Vida", "color": "Green", "value": 100, "max": 100 },
+    { "type": "Bar", "name": "Mana", "x": 788, "y": 176, "width": 144, "height": 44, "text": "✦ Mana", "color": "Blue", "value": 30, "max": 30 },
+    { "type": "Bar", "name": "Xp", "x": 788, "y": 224, "width": 144, "height": 44, "text": "★ XP", "color": "Purple", "value": 0, "max": 30 },
+    { "type": "Text", "name": "Gold", "x": 788, "y": 278, "width": 72, "height": 28, "text": "💰 15", "size": 16, "color": "Gold" },
+    { "type": "Text", "name": "Potions", "x": 860, "y": 278, "width": 72, "height": 28, "text": "🧪 1", "size": 16, "align": "Right", "color": "Green" }
+  ]
+}

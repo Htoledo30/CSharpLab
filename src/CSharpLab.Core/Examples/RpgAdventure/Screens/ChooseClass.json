@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Title", "x": 32, "y": 18, "width": 896, "height": 44, "text": "Escolha o seu caminho", "size": 30, "shadow": true, "font": "Fantasy", "align": "Center" },
+    { "type": "Text", "name": "Subtitle", "x": 32, "y": 62, "width": 896, "height": 30, "text": "Herói, como você quer enfrentar o Rei Goblin?", "size": 18, "italic": true, "font": "Book", "align": "Center", "color": "Gray" },
+    { "type": "List", "name": "Classes", "x": 32, "y": 104, "width": 896, "height": 416, "cardWidth": 288, "cardHeight": 416, "gap": 16 },
+    { "type": "Box", "name": "CardBack", "list": "Classes", "x": 0, "y": 0, "width": 288, "height": 416, "color": "Red", "shade": "Dark", "opacity": 35, "border": true },
+    { "type": "Text", "name": "Icon", "list": "Classes", "x": 0, "y": 12, "width": 288, "height": 96, "text": "⚔", "size": 64, "align": "Center", "color": "Red" },
+    { "type": "Text", "name": "Name", "list": "Classes", "x": 20, "y": 110, "width": 248, "height": 44, "text": "Guerreiro", "size": 30, "shadow": true, "font": "Fantasy", "align": "Center", "color": "Red" },
+    { "type": "Text", "name": "About", "list": "Classes", "x": 20, "y": 156, "width": 248, "height": 76, "text": "Forte e resistente.", "size": 16, "font": "Book", "align": "Center" },
+    { "type": "Text", "name": "Stats", "list": "Classes", "x": 20, "y": 240, "width": 248, "height": 84, "text": "♥ 130    ✦ 20\nDano 7 a 12\nEspecial: Golpe brutal", "size": 15, "align": "Center", "color": "Gray" },
+    { "type": "Button", "name": "Pick", "list": "Classes", "x": 24, "y": 344, "width": 240, "height": 52, "text": "Ser guerreiro", "color": "Red" }
+  ]
+}

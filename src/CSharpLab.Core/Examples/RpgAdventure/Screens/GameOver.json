@@ -1,0 +1,9 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Skull", "x": 380, "y": 50, "width": 200, "height": 130, "text": "💀", "size": 92, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Title", "x": 40, "y": 178, "width": 880, "height": 70, "text": "Fim de jogo", "size": 46, "shadow": true, "font": "Fantasy", "align": "Center", "color": "Red" },
+    { "type": "Text", "name": "Story", "x": 140, "y": 256, "width": 680, "height": 110, "text": "Você caiu em batalha.", "size": 19, "font": "Book", "align": "Center" },
+    { "type": "Button", "name": "Again", "x": 370, "y": 400, "width": 220, "height": 56, "text": "Tentar de novo", "color": "Red" }
+  ]
+}

@@ -11,8 +11,9 @@ namespace CSharpLab.Screens;
 
 /// <summary>
 /// O palco da aba Tela: mostra a tela do jogo (com o mesmo desenho do jogo) e deixa selecionar,
-/// arrastar e redimensionar as peças. Durante o arraste só a peça na tela se mexe; o arquivo é
+/// arrastar e redimensionar as peças. Durante o arraste só as peças na tela se mexem; o arquivo é
 /// gravado uma vez, ao soltar o mouse. Por isso o movimento fica leve.
+/// Shift+clique ou arrastar um retângulo no fundo seleciona várias peças, que andam juntas.
 /// </summary>
 public sealed class ScreenStage : Grid
 {
@@ -28,6 +29,9 @@ public sealed class ScreenStage : Grid
     private static readonly Brush HiddenBrush = Freeze(WpfColor.FromArgb(0xAA, 0x8C, 0x93, 0xA0));
     private static readonly Brush LabelBack = Freeze(WpfColor.FromRgb(0x7C, 0x8C, 0xF8));
     private static readonly Brush LabelText = Freeze(WpfColor.FromRgb(0x10, 0x12, 0x25));
+    private static readonly Brush MarqueeFill = Freeze(WpfColor.FromArgb(0x1E, 0x7C, 0x8C, 0xF8));
+    private static readonly Brush SlotFill = Freeze(WpfColor.FromArgb(0x2A, 0x5C, 0xCB, 0x7A));
+    private static readonly Brush SlotStroke = Freeze(WpfColor.FromRgb(0x5C, 0xCB, 0x7A));
 
     private readonly ScreenDesignerModel _model;
     private readonly Canvas _host = new() { ClipToBounds = true };
@@ -36,19 +40,23 @@ public sealed class ScreenStage : Grid
     private readonly Canvas _background = new();
     private readonly Canvas _pieces = new();
     private readonly Canvas _overlay = new() { IsHitTestVisible = false };
+    private readonly Canvas _selections = new();
     private readonly ScaleTransform _scale = new(1, 1);
     private readonly TextBlock _emptyHint;
     private readonly Dictionary<string, FrameworkElement> _elements = new(StringComparer.OrdinalIgnoreCase);
 
     // Peças da seleção (recriadas a cada mudança de zoom ou seleção)
     private readonly Rectangle _hover = new() { StrokeThickness = 1, Visibility = Visibility.Collapsed };
-    private readonly Rectangle _selection = new() { Visibility = Visibility.Collapsed };
     private readonly Rectangle[] _handles = new Rectangle[8];
     private readonly Border _nameTag;
     private readonly TextBlock _nameText = new() { FontSize = 11, Foreground = LabelText, FontWeight = FontWeights.SemiBold };
     private readonly Border _sizeTag;
     private readonly TextBlock _sizeText = new() { FontSize = 11, Foreground = Brushes.White };
     private readonly Rectangle _dropGhost = new() { Visibility = Visibility.Collapsed, StrokeDashArray = [4, 3], Fill = Freeze(WpfColor.FromArgb(0x22, 0x7C, 0x8C, 0xF8)) };
+    private readonly Rectangle _marquee = new() { Visibility = Visibility.Collapsed, StrokeDashArray = [4, 3], Fill = MarqueeFill };
+    private readonly Rectangle _slotHint = new() { Visibility = Visibility.Collapsed, Fill = SlotFill, Stroke = SlotStroke, RadiusX = 8, RadiusY = 8 };
+    private readonly Border _slotTag;
+    private readonly TextBlock _slotText = new() { FontSize = 11, Foreground = LabelText, FontWeight = FontWeights.SemiBold };
     private readonly List<Line> _guides = [];
 
     private double _zoom = 1;
@@ -57,15 +65,18 @@ public sealed class ScreenStage : Grid
     private static readonly object HiddenHolder = new();
 
     // Arraste em andamento
-    private enum Drag { None, Pending, Moving, Resizing }
+    private enum Drag { None, Pending, Moving, Resizing, Marquee }
     private Drag _drag;
-    private string? _dragName;
+    private string? _dragName;                 // a peça que o mouse pegou
+    private List<string> _dragNames = [];      // as que andam juntas (a seleção)
+    private readonly Dictionary<string, Rect> _dragOrigins = new(StringComparer.OrdinalIgnoreCase);
     private Point _dragStart;      // ponto do palco onde o mouse desceu
-    private Rect _dragOrigin;      // posição da peça quando o arraste começou
+    private Rect _dragOrigin;      // posição da peça (ou do grupo) quando o arraste começou
     private Rect _dragCurrent;
     private Edges _dragEdges;
     private Snapper? _snapper;
     private bool _altDuringDrag;   // o Alt solto depois do arraste não deve abrir o menu da janela
+    private List<string> _marqueeBase = [];
 
     public ScreenStage(ScreenDesignerModel model)
     {
@@ -103,9 +114,9 @@ public sealed class ScreenStage : Grid
         Children.Add(_emptyHint);
 
         _hover.Stroke = HoverBrush;
-        _selection.Stroke = SelectionBrush;
+        _overlay.Children.Add(_slotHint);
         _overlay.Children.Add(_hover);
-        _overlay.Children.Add(_selection);
+        _overlay.Children.Add(_selections);
         for (int i = 0; i < _handles.Length; i++)
         {
             _handles[i] = new Rectangle { Fill = Brushes.White, Stroke = SelectionBrush, Visibility = Visibility.Collapsed };
@@ -113,10 +124,14 @@ public sealed class ScreenStage : Grid
         }
         _dropGhost.Stroke = SelectionBrush;
         _overlay.Children.Add(_dropGhost);
+        _marquee.Stroke = SelectionBrush;
+        _overlay.Children.Add(_marquee);
         _nameTag = MakeTag(_nameText, LabelBack);
         _sizeTag = MakeTag(_sizeText, Freeze(WpfColor.FromArgb(0xE6, 0x25, 0x26, 0x2A)));
+        _slotTag = MakeTag(_slotText, SlotStroke);
         _overlay.Children.Add(_nameTag);
         _overlay.Children.Add(_sizeTag);
+        _overlay.Children.Add(_slotTag);
 
         SizeChanged += (_, _) => Fit();
         model.Changed += Rebuild;
@@ -203,8 +218,8 @@ public sealed class ScreenStage : Grid
         if (_model.ProjectDirectory != null) Theme.ImageRoots = [_model.ProjectDirectory];
 
         if (ScreenRenderer.Background(layout) is { } bg) _background.Children.Add(bg);
-        var context = new RenderContext { Live = false };
-        foreach (var piece in layout.Pieces)
+        var context = new RenderContext { Live = false, Members = list => layout.MembersOf(list.Name) };
+        foreach (var piece in _model.DrawOrder())
         {
             FrameworkElement element;
             try
@@ -225,8 +240,9 @@ public sealed class ScreenStage : Grid
                 holder.Children.Add(new Rectangle { Stroke = HiddenBrush, StrokeDashArray = [3, 3], StrokeThickness = 1 });
                 element = holder;
             }
-            Canvas.SetLeft(element, piece.X);
-            Canvas.SetTop(element, piece.Y);
+            var bounds = _model.BoundsOf(piece);
+            Canvas.SetLeft(element, bounds.X);
+            Canvas.SetTop(element, bounds.Y);
             _pieces.Children.Add(element);
             _elements[piece.Name] = element;
         }
@@ -234,67 +250,90 @@ public sealed class ScreenStage : Grid
         UpdateOverlay();
     }
 
-    private Rect? SelectedBounds()
+    /// <summary>Onde a peça está agora (durante o arraste, onde ela está indo).</summary>
+    private Rect CurrentBounds(Piece piece)
     {
-        if (_model.Selected is not { } piece) return null;
-        if (_drag is Drag.Moving or Drag.Resizing && string.Equals(_dragName, piece.Name, StringComparison.OrdinalIgnoreCase))
+        if (_drag == Drag.Resizing && string.Equals(_dragName, piece.Name, StringComparison.OrdinalIgnoreCase))
             return _dragCurrent;
-        return ScreenDesignerModel.BoundsOf(piece);
+        if (_drag == Drag.Moving && _dragOrigins.TryGetValue(piece.Name, out var origin))
+        {
+            origin.Offset(_dragCurrent.X - _dragOrigin.X, _dragCurrent.Y - _dragOrigin.Y);
+            return origin;
+        }
+        return _model.BoundsOf(piece);
     }
 
-    /// <summary>Contorno, alças, nome e medidas da peça selecionada, sempre do mesmo tamanho na tela.</summary>
+    private Rect? SelectedBounds() => _model.Selected is { } piece ? CurrentBounds(piece) : null;
+
+    /// <summary>Contorno de cada peça selecionada; com uma só, as alças, o nome e as medidas, sempre do mesmo tamanho na tela.</summary>
     private void UpdateOverlay()
     {
         double px = 1 / _zoom;
-        var bounds = SelectedBounds();
-        if (bounds is not { } r)
+        _selections.Children.Clear();
+        var selected = _model.SelectedPieces;
+        foreach (var piece in selected)
         {
-            _selection.Visibility = Visibility.Collapsed;
-            foreach (var h in _handles) h.Visibility = Visibility.Collapsed;
+            var outline = new Rectangle { Stroke = SelectionBrush, StrokeThickness = 1.5 * px };
+            Place(outline, CurrentBounds(piece));
+            _selections.Children.Add(outline);
+        }
+
+        var single = SelectedBounds();
+        for (int i = 0; i < _handles.Length; i++) _handles[i].Visibility = Visibility.Collapsed;
+        if (selected.Count == 0)
+        {
             _nameTag.Visibility = Visibility.Collapsed;
             _sizeTag.Visibility = Visibility.Collapsed;
             return;
         }
 
-        Place(_selection, r);
-        _selection.StrokeThickness = 1.5 * px;
-        _selection.Visibility = Visibility.Visible;
-
-        bool small = r.Width * _zoom < 36 || r.Height * _zoom < 36;
-        var points = HandlePoints(r);
-        double size = HandleSize * px;
-        for (int i = 0; i < _handles.Length; i++)
+        if (single is { } r)
         {
-            var h = _handles[i];
-            bool middle = i % 2 == 1;
-            h.Visibility = small && middle ? Visibility.Collapsed : Visibility.Visible;
-            h.Width = h.Height = size;
-            h.StrokeThickness = px;
-            Canvas.SetLeft(h, points[i].X - size / 2);
-            Canvas.SetTop(h, points[i].Y - size / 2);
+            bool small = r.Width * _zoom < 36 || r.Height * _zoom < 36;
+            var points = HandlePoints(r);
+            double size = HandleSize * px;
+            for (int i = 0; i < _handles.Length; i++)
+            {
+                var h = _handles[i];
+                bool middle = i % 2 == 1;
+                h.Visibility = small && middle ? Visibility.Collapsed : Visibility.Visible;
+                h.Width = h.Height = size;
+                h.StrokeThickness = px;
+                Canvas.SetLeft(h, points[i].X - size / 2);
+                Canvas.SetTop(h, points[i].Y - size / 2);
+            }
         }
 
         // Nome da peça em cima (é o nome do game.Find) e medidas embaixo durante o arraste.
-        _nameText.Text = _model.Selected!.Name;
+        var group = single ?? Union(selected.Select(CurrentBounds));
+        _nameText.Text = single != null ? _model.Selected!.Name : $"{selected.Count} peças";
         _nameTag.LayoutTransform = new ScaleTransform(px, px);
         _nameTag.Visibility = Visibility.Visible;
         _nameTag.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Canvas.SetLeft(_nameTag, r.Left);
-        Canvas.SetTop(_nameTag, r.Top - _nameTag.DesiredSize.Height - 4 * px);
+        Canvas.SetLeft(_nameTag, group.Left);
+        Canvas.SetTop(_nameTag, group.Top - _nameTag.DesiredSize.Height - 4 * px);
 
         if (_drag is Drag.Moving or Drag.Resizing)
         {
-            _sizeText.Text = _drag == Drag.Moving ? $"x {r.X:0}   y {r.Y:0}" : $"{r.Width:0} × {r.Height:0}";
+            var shown = _drag == Drag.Moving ? _dragCurrent : group;
+            _sizeText.Text = _drag == Drag.Moving ? $"x {shown.X:0}   y {shown.Y:0}" : $"{shown.Width:0} × {shown.Height:0}";
             _sizeTag.LayoutTransform = new ScaleTransform(px, px);
             _sizeTag.Visibility = Visibility.Visible;
             _sizeTag.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-            Canvas.SetLeft(_sizeTag, r.Left + r.Width / 2 - _sizeTag.DesiredSize.Width / 2);
-            Canvas.SetTop(_sizeTag, r.Bottom + 6 * px);
+            Canvas.SetLeft(_sizeTag, group.Left + group.Width / 2 - _sizeTag.DesiredSize.Width / 2);
+            Canvas.SetTop(_sizeTag, group.Bottom + 6 * px);
         }
         else
         {
             _sizeTag.Visibility = Visibility.Collapsed;
         }
+    }
+
+    private static Rect Union(IEnumerable<Rect> rects)
+    {
+        Rect? all = null;
+        foreach (var r in rects) all = all is { } a ? Rect.Union(a, r) : r;
+        return all ?? Rect.Empty;
     }
 
     private static void Place(FrameworkElement element, Rect r)
@@ -360,21 +399,43 @@ public sealed class ScreenStage : Grid
 
     private void ShowHover(Piece? piece)
     {
-        if (piece == null || _drag != Drag.None ||
-            string.Equals(piece.Name, _model.SelectedName, StringComparison.OrdinalIgnoreCase))
+        if (piece == null || _drag != Drag.None || _model.IsSelected(piece.Name))
         {
             _hover.Visibility = Visibility.Collapsed;
             return;
         }
-        Place(_hover, ScreenDesignerModel.BoundsOf(piece));
+        Place(_hover, _model.BoundsOf(piece));
         _hover.StrokeThickness = 1 / _zoom;
         _hover.Visibility = Visibility.Visible;
+    }
+
+    /// <summary>Arrastando uma peça para dentro do cartão modelo de uma Lista: o cartão fica verde ("vai entrar").</summary>
+    private void ShowSlotHint(Rect? slot, string? text = null)
+    {
+        if (slot is not { } r)
+        {
+            _slotHint.Visibility = Visibility.Collapsed;
+            _slotTag.Visibility = Visibility.Collapsed;
+            return;
+        }
+        double px = 1 / _zoom;
+        Place(_slotHint, r);
+        _slotHint.StrokeThickness = 1.5 * px;
+        _slotHint.Visibility = Visibility.Visible;
+        _slotText.Text = text ?? "";
+        _slotTag.LayoutTransform = new ScaleTransform(px, px);
+        _slotTag.Visibility = Visibility.Visible;
+        _slotTag.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Canvas.SetLeft(_slotTag, r.Left);
+        Canvas.SetTop(_slotTag, r.Bottom + 4 * px);
     }
 
     // ------------------------------------------------------------------ mouse
 
     private Point StagePoint(MouseEventArgs e) => e.GetPosition(_stage);
     private Point StagePoint(DragEventArgs e) => e.GetPosition(_stage);
+
+    private static bool ShiftDown => (Keyboard.Modifiers & ModifierKeys.Shift) != 0;
 
     protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
     {
@@ -383,45 +444,71 @@ public sealed class ScreenStage : Grid
         if (_model.Layout == null) return;
         var p = StagePoint(e);
 
-        var edges = HandleAt(p);
+        var edges = ShiftDown ? Edges.None : HandleAt(p);
         if (edges != Edges.None && _model.Selected is { } selected)
         {
-            Begin(Drag.Resizing, selected, p);
+            Begin(Drag.Resizing, selected, [selected.Name], p);
             _dragEdges = edges;
             e.Handled = true;
             return;
         }
 
         var hit = _model.HitTest(p, 2 / _zoom);
-        _model.Select(hit?.Name);
         if (hit == null)
         {
+            // No fundo: arrastar desenha um retângulo que seleciona as peças que ele toca.
+            _marqueeBase = ShiftDown ? [.. _model.SelectedNames] : [];
+            if (!ShiftDown) _model.Select(null);
+            _drag = Drag.Marquee;
+            _dragStart = p;
+            _hover.Visibility = Visibility.Collapsed;
+            CaptureMouse();
+            e.Handled = true;
+            return;
+        }
+        if (ShiftDown)
+        {
+            _model.ToggleSelect(hit.Name);
             e.Handled = true;
             return;
         }
         if (e.ClickCount == 2)
         {
+            _model.Select(hit.Name);
             EditTextRequested?.Invoke();
             e.Handled = true;
             return;
         }
-        Begin(Drag.Pending, hit, p);
+        // Clicar numa peça de uma seleção de várias pega o grupo todo; senão, só ela.
+        if (!_model.IsSelected(hit.Name)) _model.Select(hit.Name);
+        Begin(Drag.Pending, hit, [.. _model.SelectedNames], p);
         e.Handled = true;
     }
 
-    private void Begin(Drag kind, Piece piece, Point at)
+    private void Begin(Drag kind, Piece piece, IReadOnlyList<string> names, Point at)
     {
         _drag = kind;
         _dragName = piece.Name;
+        _dragNames = [.. names];
         _dragStart = at;
-        _dragOrigin = ScreenDesignerModel.BoundsOf(piece);
-        _dragCurrent = _dragOrigin;
-        _snapper = new Snapper(_model.Layout!.Pieces
-            .Where(o => !string.Equals(o.Name, piece.Name, StringComparison.OrdinalIgnoreCase))
-            .Select(ScreenDesignerModel.BoundsOf))
+        _dragOrigins.Clear();
+        var layout = _model.Layout!;
+        // Quem anda junto: as selecionadas e, de cada Lista, as peças do cartão dela.
+        var moving = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+        foreach (var p in layout.Pieces)
         {
-            Threshold = 6 / _zoom,
-        };
+            if (moving.Contains(p.Name) || p.List != null && moving.Contains(p.List))
+                _dragOrigins[p.Name] = _model.BoundsOf(p);
+        }
+        _dragOrigin = kind == Drag.Resizing ? _model.BoundsOf(piece) : Union(names.Where(_dragOrigins.ContainsKey).Select(n => _dragOrigins[n]));
+        _dragCurrent = _dragOrigin;
+
+        // O ímã: as outras peças, as bordas do palco e o cartão modelo de cada Lista.
+        var others = layout.Pieces
+            .Where(o => !_dragOrigins.ContainsKey(o.Name))
+            .Select(_model.BoundsOf)
+            .Concat(layout.Pieces.Where(l => l.Type == PieceType.List && !_dragOrigins.ContainsKey(l.Name)).Select(ScreenDesignerModel.CardSlot));
+        _snapper = new Snapper(others) { Threshold = 6 / _zoom };
         _hover.Visibility = Visibility.Collapsed;
         CaptureMouse();
     }
@@ -439,6 +526,16 @@ public sealed class ScreenStage : Grid
         if (e.LeftButton != MouseButtonState.Pressed)
         {
             Finish(commit: true);
+            return;
+        }
+
+        if (_drag == Drag.Marquee)
+        {
+            var area = new Rect(_dragStart, p);
+            Place(_marquee, area);
+            _marquee.StrokeThickness = 1 / _zoom;
+            _marquee.Visibility = Visibility.Visible;
+            _model.SelectMany(_marqueeBase.Concat(_model.PiecesIn(area).Select(x => x.Name)));
             return;
         }
 
@@ -460,21 +557,25 @@ public sealed class ScreenStage : Grid
             moved.Offset(p.X - _dragStart.X, p.Y - _dragStart.Y);
             (_dragCurrent, guides) = _snapper!.Move(moved, snap);
             _dragCurrent = KeepVisible(_dragCurrent);
+            double dx = _dragCurrent.X - _dragOrigin.X, dy = _dragCurrent.Y - _dragOrigin.Y;
+            foreach (var (name, origin) in _dragOrigins)
+            {
+                if (!_elements.TryGetValue(name, out var element)) continue;
+                Canvas.SetLeft(element, origin.X + dx);
+                Canvas.SetTop(element, origin.Y + dy);
+            }
+            UpdateSlotHint();
         }
         else
         {
             // Com Shift a proporção manda; o ímã ficaria brigando com ela.
-            bool keepRatio = (Keyboard.Modifiers & ModifierKeys.Shift) != 0 && IsCorner(_dragEdges);
+            bool keepRatio = ShiftDown && IsCorner(_dragEdges);
             (_dragCurrent, guides) = _snapper!.Resize(Resized(p), _dragEdges, snap && !keepRatio);
             _dragCurrent = EnforceMinimum(_dragCurrent);
-        }
-
-        if (_elements.TryGetValue(_dragName!, out var element))
-        {
-            Canvas.SetLeft(element, _dragCurrent.X);
-            Canvas.SetTop(element, _dragCurrent.Y);
-            if (_drag == Drag.Resizing)
+            if (_elements.TryGetValue(_dragName!, out var element))
             {
+                Canvas.SetLeft(element, _dragCurrent.X);
+                Canvas.SetTop(element, _dragCurrent.Y);
                 element.Width = _dragCurrent.Width;
                 element.Height = _dragCurrent.Height;
                 if (element.Tag == HiddenHolder && element is Grid holder && holder.Children[0] is FrameworkElement inner)
@@ -488,6 +589,30 @@ public sealed class ScreenStage : Grid
         UpdateOverlay();
     }
 
+    /// <summary>Uma peça só (que não é Lista) entrando ou saindo do cartão modelo de uma Lista.</summary>
+    private void UpdateSlotHint()
+    {
+        var layout = _model.Layout;
+        if (layout == null || _dragNames.Count != 1 || layout.Find(_dragName!) is not { } piece ||
+            !Piece.Supports(piece.Type, nameof(Piece.List)))
+        {
+            ShowSlotHint(null);
+            return;
+        }
+        var rect = _dragCurrent;
+        if (layout.ListOf(piece) is { } current)
+        {
+            var center = new Point(rect.X + rect.Width / 2, rect.Y + rect.Height / 2);
+            var slot = ScreenDesignerModel.CardSlot(current);
+            ShowSlotHint(slot.Contains(center) ? slot : null, $"no cartão da lista {current.Name}");
+            return;
+        }
+        if (_model.ListAt(rect, piece) is { } list)
+            ShowSlotHint(ScreenDesignerModel.CardSlot(list), $"entra no cartão da lista {list.Name}");
+        else
+            ShowSlotHint(null);
+    }
+
     /// <summary>Novo retângulo puxando as alças. Shift mantém a proporção (bom para imagens).</summary>
     private Rect Resized(Point p)
     {
@@ -498,7 +623,7 @@ public sealed class ScreenStage : Grid
         if (_dragEdges.HasFlag(Edges.Top)) top = Math.Min(top + dy, bottom - ScreenDesignerModel.MinSize);
         if (_dragEdges.HasFlag(Edges.Bottom)) bottom = Math.Max(bottom + dy, top + ScreenDesignerModel.MinSize);
 
-        if (IsCorner(_dragEdges) && (Keyboard.Modifiers & ModifierKeys.Shift) != 0 && _dragOrigin.Height > 0)
+        if (IsCorner(_dragEdges) && ShiftDown && _dragOrigin.Height > 0)
         {
             double ratio = _dragOrigin.Width / _dragOrigin.Height;
             double width = right - left, height = bottom - top;
@@ -516,7 +641,7 @@ public sealed class ScreenStage : Grid
     private static Rect EnforceMinimum(Rect r) =>
         new(r.X, r.Y, Math.Max(ScreenDesignerModel.MinSize, r.Width), Math.Max(ScreenDesignerModel.MinSize, r.Height));
 
-    /// <summary>Um pedaço da peça sempre fica dentro do palco, para ela nunca se perder.</summary>
+    /// <summary>Um pedaço da peça (ou do grupo) sempre fica dentro do palco, para nunca se perder.</summary>
     private static Rect KeepVisible(Rect r)
     {
         double keep = ScreenDesignerModel.KeepInside;
@@ -547,22 +672,42 @@ public sealed class ScreenStage : Grid
     {
         var kind = _drag;
         var name = _dragName;
+        var names = _dragNames;
         var rect = _dragCurrent;
         _drag = Drag.None;
         _dragName = null;
         _snapper = null;
+        _marquee.Visibility = Visibility.Collapsed;
         ShowGuides([]);
+        ShowSlotHint(null);
         if (IsMouseCaptured) ReleaseMouseCapture();
 
+        if (kind == Drag.Marquee)
+        {
+            UpdateOverlay();
+            return;
+        }
+        if (kind == Drag.Pending)
+        {
+            // Foi só um clique: numa seleção de várias, fica só a peça clicada.
+            if (names.Count > 1 && name != null) _model.Select(name);
+            UpdateOverlay();
+            return;
+        }
         if (kind is not (Drag.Moving or Drag.Resizing))
         {
-            UpdateOverlay();                       // foi só um clique
+            UpdateOverlay();
             return;
         }
         if (commit && name != null && rect != _dragOrigin)
-            _model.SetBounds(name, rect);          // grava e redesenha
+        {
+            if (kind == Drag.Resizing) _model.SetBounds(name, rect);                     // grava e redesenha
+            else _model.MoveBy(names, rect.X - _dragOrigin.X, rect.Y - _dragOrigin.Y);
+        }
         else
-            Rebuild();                             // volta a peça para o lugar (Esc ou nada mudou)
+        {
+            Rebuild();                             // volta as peças para o lugar (Esc ou nada mudou)
+        }
     }
 
     private void UpdateCursor(Point p)
@@ -585,7 +730,8 @@ public sealed class ScreenStage : Grid
         if (_model.Layout == null) return;
         Focus();
         var hit = _model.HitTest(StagePoint(e), 2 / _zoom);
-        _model.Select(hit?.Name);
+        // Botão direito numa peça da seleção mantém a seleção (o menu vale para todas).
+        if (hit == null || !_model.IsSelected(hit.Name)) _model.Select(hit?.Name);
         ContextMenu = hit != null ? PieceMenu() : StageMenu(StagePoint(e));
         ContextMenu.PlacementTarget = this;
         ContextMenu.IsOpen = true;
@@ -596,16 +742,19 @@ public sealed class ScreenStage : Grid
     {
         var menu = new ContextMenu();
         menu.Items.Add(Item("Duplicar", "Ctrl+D", () => _model.Duplicate()));
-        menu.Items.Add(Item("Copiar", "Ctrl+C", _model.Copy));
+        menu.Items.Add(Item("Copiar", "Ctrl+C", CopySelection));
         menu.Items.Add(Item("Apagar", "Del", _model.Delete));
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Trazer para frente", "Ctrl+]", _model.BringToFront));
         menu.Items.Add(Item("Enviar para trás", "Ctrl+[", _model.SendToBack));
-        menu.Items.Add(new Separator());
-        menu.Items.Add(Item("Copiar o código da peça (game.Find)", null, () =>
+        if (_model.Selected is { })
         {
-            if (_model.Selected is { } piece) TrySetClipboard(ScreenDesignerModel.CodeExample(piece).Replace("\n", Environment.NewLine));
-        }));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(Item("Copiar o código da peça (game.Find)", null, () =>
+            {
+                if (_model.Selected is { } piece) TrySetClipboard(ScreenDesignerModel.CodeExample(piece).Replace("\n", Environment.NewLine));
+            }));
+        }
         return menu;
     }
 
@@ -615,6 +764,7 @@ public sealed class ScreenStage : Grid
         var paste = Item("Colar", "Ctrl+V", () => _model.Paste());
         paste.IsEnabled = _model.CanPaste;
         menu.Items.Add(paste);
+        menu.Items.Add(Item("Selecionar tudo", "Ctrl+A", _model.SelectAll));
         menu.Items.Add(new Separator());
         foreach (var type in Enum.GetValues<PieceType>())
             menu.Items.Add(Item("Nova peça: " + Piece.Describe(type), null, () => _model.Add(type, at)));
@@ -627,6 +777,9 @@ public sealed class ScreenStage : Grid
         item.Click += (_, _) => action();
         return item;
     }
+
+    /// <summary>Ctrl+C: guarda as peças para colar em qualquer tela.</summary>
+    private void CopySelection() => _model.Copy();
 
     internal static void TrySetClipboard(string text)
     {
@@ -655,18 +808,22 @@ public sealed class ScreenStage : Grid
         Place(_dropGhost, ghost);
         _dropGhost.StrokeThickness = 1.5 / _zoom;
         _dropGhost.Visibility = Visibility.Visible;
+        var list = Piece.Supports(type, nameof(Piece.List)) ? _model.ListAt(ghost) : null;
+        ShowSlotHint(list != null ? ScreenDesignerModel.CardSlot(list) : null, list != null ? $"entra no cartão da lista {list.Name}" : null);
     }
 
     protected override void OnDragLeave(DragEventArgs e)
     {
         base.OnDragLeave(e);
         _dropGhost.Visibility = Visibility.Collapsed;
+        ShowSlotHint(null);
     }
 
     protected override void OnDrop(DragEventArgs e)
     {
         base.OnDrop(e);
         _dropGhost.Visibility = Visibility.Collapsed;
+        ShowSlotHint(null);
         if (e.Data.GetData(PieceDragFormat) is not PieceType type) return;
         _model.Add(type, StagePoint(e));
         Focus();
@@ -701,8 +858,9 @@ public sealed class ScreenStage : Grid
             case Key.Tab:
                 SelectNext(shift ? -1 : 1);
                 break;
+            case Key.A when ctrl: _model.SelectAll(); break;
             case Key.D when ctrl: _model.Duplicate(); break;
-            case Key.C when ctrl: _model.Copy(); break;
+            case Key.C when ctrl: CopySelection(); break;
             case Key.V when ctrl: _model.Paste(); break;
             case Key.Z when ctrl && shift: _model.Redo(); break;
             case Key.Z when ctrl: _model.Undo(); break;
@@ -747,9 +905,9 @@ public sealed class ScreenStage : Grid
     /// <summary>Tab passa para a próxima peça (na ordem de desenho).</summary>
     private void SelectNext(int direction)
     {
-        var pieces = _model.Layout?.Pieces;
-        if (pieces == null || pieces.Count == 0) return;
-        int index = _model.Selected is { } current ? pieces.FindIndex(p => p.Name == current.Name) : -1;
+        var pieces = _model.DrawOrder();
+        if (pieces.Count == 0) return;
+        int index = _model.Selected is { } current ? pieces.ToList().FindIndex(p => p.Name == current.Name) : -1;
         index = ((index + direction) % pieces.Count + pieces.Count) % pieces.Count;
         _model.Select(pieces[index].Name);
     }

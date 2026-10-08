@@ -1,0 +1,23 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Box", "name": "PortraitBox", "x": 32, "y": 24, "width": 220, "height": 220, "color": "Orange", "shade": "Dark", "opacity": 100, "border": true, "corner": "Circle" },
+    { "type": "Text", "name": "Portrait", "x": 32, "y": 40, "width": 220, "height": 190, "text": "🧓", "size": 120, "align": "Center", "color": "Orange" },
+    { "type": "Text", "name": "Pointer", "x": 252, "y": 110, "width": 24, "height": 40, "text": "◀", "size": 22, "color": "Gray" },
+    { "type": "Box", "name": "Speech", "x": 272, "y": 24, "width": 656, "height": 220, "border": true },
+    { "type": "Text", "name": "Title", "x": 296, "y": 40, "width": 610, "height": 44, "text": "Um encontro", "size": 28, "shadow": true, "font": "Fantasy" },
+    { "type": "Text", "name": "Story", "x": 296, "y": 88, "width": 610, "height": 146, "text": "Algo acontece na trilha.", "size": 18, "font": "Book" },
+    { "type": "Button", "name": "ChoiceA", "x": 272, "y": 260, "width": 208, "height": 56, "text": "Primeira escolha", "size": 15 },
+    { "type": "Button", "name": "ChoiceB", "x": 496, "y": 260, "width": 208, "height": 56, "text": "Segunda escolha", "size": 15, "style": "Outline" },
+    { "type": "Button", "name": "ChoiceC", "x": 720, "y": 260, "width": 208, "height": 56, "text": "Terceira escolha", "size": 15, "color": "Red" },
+    { "type": "Button", "name": "Leave", "x": 272, "y": 330, "width": 656, "height": 48, "text": "↩ Voltar à trilha", "style": "Outline", "visible": false },
+    { "type": "Messages", "name": "Log", "x": 272, "y": 392, "width": 656, "height": 132, "size": 15 },
+    { "type": "Box", "name": "StatusCard", "x": 32, "y": 260, "width": 220, "height": 252, "border": true },
+    { "type": "Text", "name": "PlayerInfo", "x": 44, "y": 270, "width": 196, "height": 44, "text": "Herói · Classe · Nível 1", "size": 14, "bold": true },
+    { "type": "Bar", "name": "Health", "x": 44, "y": 316, "width": 196, "height": 44, "text": "♥ Vida", "color": "Green", "value": 100, "max": 100 },
+    { "type": "Bar", "name": "Mana", "x": 44, "y": 364, "width": 196, "height": 44, "text": "✦ Mana", "color": "Blue", "value": 30, "max": 30 },
+    { "type": "Bar", "name": "Xp", "x": 44, "y": 412, "width": 196, "height": 44, "text": "★ XP", "color": "Purple", "value": 0, "max": 30 },
+    { "type": "Text", "name": "Gold", "x": 44, "y": 466, "width": 98, "height": 28, "text": "💰 15", "size": 16, "color": "Gold" },
+    { "type": "Text", "name": "Potions", "x": 142, "y": 466, "width": 98, "height": 28, "text": "🧪 1", "size": 16, "align": "Right", "color": "Green" }
+  ]
+}

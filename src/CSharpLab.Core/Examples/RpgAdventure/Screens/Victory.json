@@ -1,0 +1,18 @@
+{
+  "format": 1,
+  "pieces": [
+    { "type": "Text", "name": "Spark1", "x": 80, "y": 60, "width": 50, "height": 50, "text": "✦", "size": 30, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Spark2", "x": 190, "y": 150, "width": 50, "height": 50, "text": "✧", "size": 30, "align": "Center", "color": "Orange" },
+    { "type": "Text", "name": "Spark3", "x": 300, "y": 50, "width": 50, "height": 50, "text": "✨", "size": 30, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Spark4", "x": 640, "y": 70, "width": 50, "height": 50, "text": "✦", "size": 30, "align": "Center", "color": "Purple" },
+    { "type": "Text", "name": "Spark5", "x": 760, "y": 150, "width": 50, "height": 50, "text": "✧", "size": 30, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Spark6", "x": 860, "y": 60, "width": 50, "height": 50, "text": "✨", "size": 30, "align": "Center", "color": "Orange" },
+    { "type": "Text", "name": "Spark7", "x": 120, "y": 300, "width": 50, "height": 50, "text": "✦", "size": 30, "align": "Center", "color": "Purple" },
+    { "type": "Text", "name": "Spark8", "x": 820, "y": 320, "width": 50, "height": 50, "text": "✦", "size": 30, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Crown", "x": 380, "y": 40, "width": 200, "height": 130, "text": "👑", "size": 96, "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Title", "x": 40, "y": 168, "width": 880, "height": 70, "text": "Vitória!", "size": 46, "shadow": true, "font": "Fantasy", "align": "Center", "color": "Gold" },
+    { "type": "Text", "name": "Story", "x": 140, "y": 246, "width": 680, "height": 110, "text": "Você volta com a coroa.", "size": 19, "font": "Book", "align": "Center" },
+    { "type": "Text", "name": "Summary", "x": 40, "y": 362, "width": 880, "height": 30, "text": "Classe · nível 1 · 0 de ouro", "size": 17, "align": "Center", "color": "Gray" },
+    { "type": "Button", "name": "Again", "x": 370, "y": 420, "width": 220, "height": 56, "text": "Jogar de novo", "color": "Gold" }
+  ]
+}
