@@ -176,6 +176,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnProjectsChanged(IReadOnlyList<ProjectFile> value)
     {
+        foreach (var doc in Documents) doc.LivesInStudio = doc.IsScreen && BelongsToGame(doc);
         OnPropertyChanged(nameof(HasMultipleProjects));
         OnPropertyChanged(nameof(RunButtonToolTip));
         OnPropertyChanged(nameof(HasGame));

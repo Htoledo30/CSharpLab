@@ -10,7 +10,7 @@ using WpfColor = System.Windows.Media.Color;
 namespace CSharpLab.Screens;
 
 /// <summary>
-/// O palco da aba Tela: mostra a tela do jogo (com o mesmo desenho do jogo) e deixa selecionar,
+/// O palco do Estúdio: mostra a tela do jogo (com o mesmo desenho do jogo) e deixa selecionar,
 /// arrastar e redimensionar as peças. Durante o arraste só as peças na tela se mexem; o arquivo é
 /// gravado uma vez, ao soltar o mouse. Por isso o movimento fica leve.
 /// Shift+clique ou arrastar um retângulo no fundo seleciona várias peças, que andam juntas.

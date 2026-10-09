@@ -41,7 +41,7 @@ internal sealed class RenderContext
 }
 
 /// <summary>
-/// Desenha cada peça de uma tela desenhada. Usado pela janela do jogo e pela aba Tela do CSharp Lab:
+/// Desenha cada peça de uma tela desenhada. Usado pela janela do jogo e pelo Estúdio do CSharp Lab:
 /// o mesmo código, o mesmo resultado.
 /// </summary>
 internal static class ScreenRenderer
@@ -63,10 +63,22 @@ internal static class ScreenRenderer
         };
         element.Width = Math.Max(1, piece.Width);
         element.Height = Math.Max(1, piece.Height);
-        if (!context.Live) element.IsHitTestVisible = false;
+        if (!context.Live || IsDecoration(piece, context)) element.IsHitTestVisible = false;
         context.Created?.Invoke(piece, element);
         return element;
     }
+
+    /// <summary>
+    /// Peça que só enfeita (Texto, Caixa, Barra, Imagem sem OnClick) deixa o clique passar:
+    /// um Texto ou um ícone por cima de um Botão não atrapalha clicar nele.
+    /// </summary>
+    private static bool IsDecoration(Piece piece, RenderContext context) => piece.Type switch
+    {
+        PieceType.Text => piece.Scroll != true,
+        PieceType.Box or PieceType.Bar => true,
+        PieceType.Image => !(context.Click != null && piece.Enabled && context.IsClickable?.Invoke(piece) == true),
+        _ => false,
+    };
 
     /// <summary>Fundo da tela (imagem da pasta Assets cobrindo o palco inteiro). Null sem fundo.</summary>
     public static FrameworkElement? Background(ScreenLayout layout)
@@ -161,7 +173,7 @@ internal static class ScreenRenderer
             }
             case PieceType.Button:
             {
-                var label = Label(piece, piece.Text);
+                var label = ButtonLabel(piece, Theme.Text);
                 label.TextWrapping = TextWrapping.NoWrap;
                 label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
                 double needed = Math.Ceiling(label.DesiredSize.Width + ButtonPadding + 2);
@@ -172,63 +184,159 @@ internal static class ScreenRenderer
         }
     }
 
-    private static FrameworkElement ButtonPiece(Piece piece, RenderContext context)
+    private static TextBlock ButtonLabel(Piece piece, Brush foreground)
     {
-        var look = Theme.LookOf(piece.Color, piece.Shade, piece.Style);
-        var label = Label(piece, piece.Text ?? "", look.Text);
+        var label = Label(piece, piece.Text ?? "", foreground);
         label.TextAlignment = TextAlignment.Center;
         label.TextTrimming = TextTrimming.CharacterEllipsis;
-        var button = Theme.MakeButton(label, piece.Color, piece.Shade, piece.Style);
+        if (piece.Bold == true) label.FontWeight = FontWeights.Bold;
+        return label;
+    }
+
+    private static FrameworkElement ButtonPiece(Piece piece, RenderContext context)
+    {
+        var look = Theme.LookOf(piece.Color, piece.Shade, piece.Style, piece.TextColor);
+        var button = Theme.MakeButton(ButtonLabel(piece, look.Text), piece.Color, piece.Shade, piece.Style, piece.TextColor,
+            Theme.ButtonCorners(piece.Corner, piece.Height));
+        if (piece.Shadow == true) button.Effect = Theme.DropShadow;
         button.IsEnabled = piece.Enabled;
         if (context.Live && context.Click != null)
             button.Click += (_, _) => context.Click(piece);
         return button;
     }
 
+    // ------------------------------------------------------------------ barras
+
     private static FrameworkElement BarPiece(Piece piece)
     {
         int max = piece.BarMax, value = piece.BarValue;
         double fraction = Math.Clamp((double)value / max, 0, 1);
-        var size = Math.Min(piece.FontSize, 16);
+        var style = piece.BarStyle ?? BarStyle.Smooth;
+        var place = piece.BarText ?? BarText.Above;
+        var color = Theme.Rgb(piece.Color ?? Color.Green, piece.Shade);
+        var font = Theme.FontOf(piece.Font ?? Theme.Current.BodyFont);
+        var size = Math.Min(piece.FontSize, 16) * Theme.FontScale(piece.Font ?? Theme.Current.BodyFont);
 
-        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 5), LastChildFill = true };
-        var amount = new TextBlock { Text = $"{value} / {max}", FontFamily = Theme.BodyFamily, FontSize = size - 1, Foreground = Theme.Muted };
-        DockPanel.SetDock(amount, Dock.Right);
-        header.Children.Add(amount);
-        header.Children.Add(new TextBlock
+        // Em cima: o nome e o número numa linha, a barra embaixo. Dentro ou sem texto: a barra ocupa a peça toda.
+        double trackHeight = place == BarText.Above ? Math.Clamp(piece.Height - 27, 6, 28) : Math.Max(4, piece.Height);
+        var corners = piece.Corner == Corner.Square ? new CornerRadius(2) : new CornerRadius(trackHeight / 2);
+        var track = style == BarStyle.Blocks ? BlocksTrack(piece, fraction, color, trackHeight) : FillTrack(style, fraction, color, trackHeight, corners);
+
+        if (place == BarText.Above)
+        {
+            var header = new DockPanel { Margin = new Thickness(0, 0, 0, 5), LastChildFill = true };
+            var amount = new TextBlock { Text = $"{value} / {max}", FontFamily = font, FontSize = size - 1, Foreground = Theme.Muted };
+            DockPanel.SetDock(amount, Dock.Right);
+            header.Children.Add(amount);
+            header.Children.Add(new TextBlock
+            {
+                Text = piece.Text ?? "",
+                FontFamily = font,
+                FontSize = size,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = Theme.Text,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                Margin = new Thickness(0, 0, 8, 0),
+            });
+            track.VerticalAlignment = VerticalAlignment.Top;
+            var panel = new DockPanel { LastChildFill = true };
+            DockPanel.SetDock(header, Dock.Top);
+            panel.Children.Add(header);
+            panel.Children.Add(track);
+            return panel;
+        }
+        if (place == BarText.None) return track;
+
+        // Dentro: letra branca com sombra por cima da barra, como nos jogos de luta.
+        var inside = new Grid();
+        inside.Children.Add(track);
+        var line = new DockPanel { Margin = new Thickness(Math.Max(8, corners.TopLeft * 0.6), 0, Math.Max(8, corners.TopLeft * 0.6), 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+        var insideSize = Math.Clamp(trackHeight * 0.5, 10, Math.Max(10, piece.FontSize));
+        var number = new TextBlock { Text = $"{value} / {max}", FontFamily = font, FontSize = insideSize, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Effect = DarkShadow };
+        DockPanel.SetDock(number, Dock.Right);
+        line.Children.Add(number);
+        line.Children.Add(new TextBlock
         {
             Text = piece.Text ?? "",
-            FontFamily = Theme.BodyFamily,
-            FontSize = size,
+            FontFamily = font,
+            FontSize = insideSize,
             FontWeight = FontWeights.SemiBold,
-            Foreground = Theme.Text,
+            Foreground = Brushes.White,
+            Effect = DarkShadow,
             TextTrimming = TextTrimming.CharacterEllipsis,
             Margin = new Thickness(0, 0, 8, 0),
         });
+        inside.Children.Add(line);
+        return inside;
+    }
 
-        double trackHeight = Math.Clamp(piece.Height - 27, 6, 28);
+    /// <summary>A barra inteira: o fundo e a parte cheia por cima (lisa ou com brilho).</summary>
+    private static FrameworkElement FillTrack(BarStyle style, double fraction, System.Windows.Media.Color color, double height, CornerRadius corners)
+    {
+        bool shine = style == BarStyle.Shine;
         var fill = new Border
         {
-            Background = Theme.Brush(piece.Color ?? Color.Green, piece.Shade),
-            CornerRadius = new CornerRadius(trackHeight / 2),
+            Background = shine ? Theme.Vertical(Theme.Lighten(color, 0.35), Theme.Darken(color, 0.72)) : Theme.Freeze(color),
+            CornerRadius = corners,
             HorizontalAlignment = HorizontalAlignment.Left,
             Width = 0,
         };
+        var content = new Grid();
+        content.Children.Add(fill);
+        if (shine)
+        {
+            // O brilho: uma faixa clarinha na metade de cima.
+            var gloss = new Border
+            {
+                Background = Theme.Vertical(System.Windows.Media.Color.FromArgb(0x70, 0xFF, 0xFF, 0xFF), System.Windows.Media.Color.FromArgb(0x08, 0xFF, 0xFF, 0xFF)),
+                CornerRadius = corners,
+                Height = Math.Max(2, height * 0.45),
+                VerticalAlignment = VerticalAlignment.Top,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(2, 1, 0, 0),
+                Width = 0,
+            };
+            content.Children.Add(gloss);
+            fill.SizeChanged += (_, e) => gloss.Width = Math.Max(0, e.NewSize.Width - 4);
+        }
         var track = new Border
         {
-            Background = Theme.Track,
-            CornerRadius = new CornerRadius(trackHeight / 2),
-            Height = trackHeight,
-            VerticalAlignment = VerticalAlignment.Top,
-            Child = fill,
+            // Lisa: o fundo do tema. Com brilho: a própria cor bem escura, com uma borda da cor.
+            Background = shine ? Theme.Freeze(Theme.WithAlpha(Theme.Darken(color, 0.3), 0xE0)) : Theme.Track,
+            BorderBrush = shine ? Theme.Freeze(Theme.WithAlpha(color, 0x90)) : null,
+            BorderThickness = new Thickness(shine ? 1 : 0),
+            CornerRadius = corners,
+            Height = height,
+            Child = content,
+            ClipToBounds = false,
         };
-        track.SizeChanged += (_, e) => fill.Width = e.NewSize.Width * fraction;
+        track.SizeChanged += (_, e) => fill.Width = Math.Max(0, (e.NewSize.Width - (shine ? 2 : 0)) * fraction);
+        return track;
+    }
 
-        var panel = new DockPanel { LastChildFill = true };
-        DockPanel.SetDock(header, Dock.Top);
-        panel.Children.Add(header);
-        panel.Children.Add(track);
-        return panel;
+    /// <summary>Em blocos: um pedaço por ponto (até 20; acima disso, 10 pedaços), o último pela metade se for o caso.</summary>
+    private static FrameworkElement BlocksTrack(Piece piece, double fraction, System.Windows.Media.Color color, double height)
+    {
+        int count = piece.BarMax <= 20 ? piece.BarMax : 10;
+        double filled = fraction * count;
+        var grid = new System.Windows.Controls.Primitives.UniformGrid { Rows = 1, Columns = count, Height = height };
+        double radius = piece.Corner == Corner.Square ? 1 : Math.Min(4, height / 2);
+        var empty = Theme.Freeze(Theme.WithAlpha(Theme.Darken(color, 0.35), 0xB0));
+        var full = Theme.Vertical(Theme.Lighten(color, 0.18), Theme.Darken(color, 0.85));
+        for (int i = 0; i < count; i++)
+        {
+            double part = Math.Clamp(filled - i, 0, 1);
+            var block = new Grid { Margin = new Thickness(i == 0 ? 0 : 1.5, 0, i == count - 1 ? 0 : 1.5, 0) };
+            block.Children.Add(new Border { Background = empty, CornerRadius = new CornerRadius(radius) });
+            if (part > 0)
+            {
+                var piecePart = new Border { Background = full, CornerRadius = new CornerRadius(radius), HorizontalAlignment = HorizontalAlignment.Left };
+                block.SizeChanged += (_, e) => piecePart.Width = e.NewSize.Width * part;
+                block.Children.Add(piecePart);
+            }
+            grid.Children.Add(block);
+        }
+        return grid;
     }
 
     private static FrameworkElement ImagePiece(Piece piece, RenderContext context)
@@ -302,7 +410,7 @@ internal static class ScreenRenderer
         if (piece.Corner == Corner.Circle)
         {
             var grid = new Grid();
-            grid.Children.Add(new Ellipse { Fill = fill, Stroke = stroke, StrokeThickness = stroke != null ? 1.5 : 0 });
+            grid.Children.Add(new Ellipse { Fill = fill, Stroke = stroke, StrokeThickness = stroke != null ? 1.5 : 0, Effect = piece.Shadow == true ? Theme.DropShadow : null });
             return grid;
         }
         return new Border
@@ -311,6 +419,7 @@ internal static class ScreenRenderer
             BorderBrush = stroke,
             BorderThickness = new Thickness(stroke != null ? 1 : 0),
             CornerRadius = new CornerRadius(piece.Corner == Corner.Square ? 0 : Theme.PanelRadius),
+            Effect = piece.Shadow == true ? Theme.DropShadow : null,
         };
     }
 

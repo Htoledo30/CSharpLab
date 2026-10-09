@@ -360,6 +360,8 @@ public static class UpdateService
             UseShellExecute = false,
             CreateNoWindow = true,
             WindowStyle = ProcessWindowStyle.Hidden,
+            // Fora da pasta do aplicativo: um processo "parado" dentro dela trava a troca da pasta.
+            WorkingDirectory = Path.GetFullPath(UpdatesDir),
         };
         // Aberto a partir do PowerShell 7 (ex.: terminal do VS Code), o PSModulePath herdado aponta
         // para módulos que o Windows PowerShell 5.1 não carrega (Get-FileHash, ConvertFrom-Json…).

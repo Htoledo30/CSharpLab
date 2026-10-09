@@ -73,7 +73,7 @@ public sealed class ScreenFileTests
     [InlineData("{ \"pieces\": [ { \"type\": \"Button\" } ] }", "precisa de um \"name\"")]
     [InlineData("{ \"pieces\": [ { \"type\": \"Button\", \"name\": \"Atacar já\" } ] }", "letras sem acento")]
     [InlineData("{ \"pieces\": [ { \"type\": \"Text\", \"name\": \"A\" }, { \"type\": \"Text\", \"name\": \"a\" } ] }", "Duas peças se chamam \"a\"")]
-    [InlineData("{ \"pieces\": [ { \"type\": \"Text\", \"name\": \"A\", \"color\": \"Yellow\" } ] }", "White, Gray, Red, Green, Blue, Gold, Purple, Orange")]
+    [InlineData("{ \"pieces\": [ { \"type\": \"Text\", \"name\": \"A\", \"color\": \"Yellow\" } ] }", "White, Gray, Black, Red, Pink, Orange, Gold, Green, Cyan, Blue, Purple, Brown (ou o")]
     [InlineData("{ \"pieces\": [ { \"type\": \"Text\", \"name\": \"A\", \"x\": \"40\" } ] }", "\"x\" precisa ser um número, sem aspas")]
     [InlineData("{ \"pieces\": [ { \"type\": \"Text\", \"name\": \"A\", \"width\": 0 } ] }", "\"width\" precisa ser maior que 0")]
     [InlineData("{ \"format\": 9, \"pieces\": [] }", "versão mais nova")]
@@ -88,7 +88,7 @@ public sealed class ScreenFileTests
     [Fact]
     public void Erro_aponta_a_linha_da_peca()
     {
-        var json = "{\n  \"pieces\": [\n    { \"type\": \"Text\", \"name\": \"Ok\" },\n    { \"type\": \"Text\", \"name\": \"Bad\", \"color\": \"Pink\" }\n  ]\n}";
+        var json = "{\n  \"pieces\": [\n    { \"type\": \"Text\", \"name\": \"Ok\" },\n    { \"type\": \"Text\", \"name\": \"Bad\", \"color\": \"Yellow\" }\n  ]\n}";
         var result = ScreenFile.Parse(json);
         Assert.Equal(4, result.ErrorLine);
     }
@@ -207,6 +207,37 @@ public sealed class DesignedSceneTests : IDisposable
     }
 
     [Fact]
+    public void Clear_apaga_as_mensagens_e_o_que_vem_depois_aparece()
+    {
+        Draw("Village", P(PieceType.Messages, "Log"), P(PieceType.Button, "Search"), P(PieceType.Button, "Rest"));
+        var (game, view) = Started(g => g.Scene("Village", () =>
+        {
+            g.Find("Search").OnClick(() => g.Write("Você achou 5 moedas!"));
+            g.Find("Rest").OnClick(() =>
+            {
+                g.Write("some junto com as antigas");
+                g.Clear();
+                g.Write("Você descansou.");
+            });
+        }), "Village");
+
+        game.ClickPiece(view.Piece("Search"));
+        game.ClickPiece(view.Piece("Search"));
+        Assert.Equal(2, view.Last.Messages.Count);
+
+        game.ClickPiece(view.Piece("Rest"));
+        Assert.Equal([new MessageLine("Você descansou.", null, true)], view.Last.Messages);
+    }
+
+    [Fact]
+    public void Clear_solto_na_cena_explica_onde_usar()
+    {
+        Draw("Village", P(PieceType.Messages, "Log"));
+        var error = Assert.Throws<GameException>(() => Started(g => g.Scene("Village", () => g.Clear()), "Village"));
+        Assert.Contains("game.Clear funciona dentro de um clique", error.Message);
+    }
+
+    [Fact]
     public void Botao_sem_OnClick_explica_o_que_falta()
     {
         Draw("Start", P(PieceType.Button, "Go"));
@@ -249,16 +280,16 @@ public sealed class DesignedSceneTests : IDisposable
         Assert.Contains("só botões e imagens têm OnClick", error.Message);
 
         error = Assert.Throws<GameException>(() => Started(g => g.Scene("Fight", () => g.Button("Fugir", () => { })), "Fight"));
-        Assert.Contains("foi desenhada na aba Tela", error.Message);
+        Assert.Contains("foi desenhada no Estúdio", error.Message);
 
         error = Assert.Throws<GameException>(() => Started(g => g.Scene("Plain", () => g.Find("X")), "Plain"));
-        Assert.Contains("não foi desenhada na aba Tela", error.Message);
+        Assert.Contains("não foi desenhada no Estúdio", error.Message);
     }
 
     [Fact]
     public void Tela_com_erro_no_arquivo_para_com_a_linha()
     {
-        File.WriteAllText(Path.Combine(_dir, "Screens", "Bad.json"), "{\n  \"pieces\": [\n    { \"type\": \"Text\", \"name\": \"A\", \"color\": \"Pink\" }\n  ]\n}");
+        File.WriteAllText(Path.Combine(_dir, "Screens", "Bad.json"), "{\n  \"pieces\": [\n    { \"type\": \"Text\", \"name\": \"A\", \"color\": \"Yellow\" }\n  ]\n}");
         var error = Assert.Throws<GameException>(() => Started(g => g.Scene("Bad", () => { }), "Bad"));
         Assert.Contains("Screens/Bad.json tem um erro (linha 3)", error.Message);
     }

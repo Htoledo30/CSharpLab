@@ -24,7 +24,7 @@ public sealed class CompletionEntry
         Priority = item.Rules.MatchPriority;
     }
 
-    /// <summary>Nome de uma peça desenhada na aba Tela (dentro de game.Find("…")).</summary>
+    /// <summary>Nome de uma peça desenhada no Estúdio (dentro de game.Find("…")).</summary>
     public CompletionEntry(ScreenPiece piece, string scene)
     {
         PieceName = piece.Name;

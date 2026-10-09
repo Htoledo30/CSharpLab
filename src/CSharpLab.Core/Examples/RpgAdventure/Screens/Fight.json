@@ -7,20 +7,20 @@
     { "type": "Box", "name": "EnemyRing", "x": 380, "y": 16, "width": 200, "height": 200, "color": "Red", "opacity": 30, "border": true, "corner": "Circle" },
     { "type": "Text", "name": "EnemyIcon", "x": 380, "y": 36, "width": 200, "height": 160, "text": "🐺", "size": 100, "align": "Center", "color": "Gray" },
     { "type": "Text", "name": "EnemyName", "x": 180, "y": 218, "width": 600, "height": 44, "text": "Lobo cinzento", "size": 32, "shadow": true, "font": "Fantasy", "align": "Center" },
-    { "type": "Bar", "name": "EnemyHealth", "x": 230, "y": 262, "width": 500, "height": 46, "text": "Vida do inimigo", "color": "Red", "value": 24, "max": 24 },
+    { "type": "Bar", "name": "EnemyHealth", "x": 230, "y": 262, "width": 500, "height": 46, "text": "Vida do inimigo", "color": "Red", "barStyle": "Shine", "barText": "Inside", "font": "Strong", "value": 24, "max": 24 },
     { "type": "Text", "name": "Story", "x": 180, "y": 312, "width": 600, "height": 30, "text": "O lobo rosna e mostra os dentes.", "size": 16, "italic": true, "font": "Book", "align": "Center", "color": "Gray" },
     { "type": "Messages", "name": "Log", "x": 660, "y": 16, "width": 284, "height": 196, "size": 15 },
     { "type": "Box", "name": "HeroPanel", "x": 16, "y": 352, "width": 330, "height": 172, "border": true },
     { "type": "Text", "name": "PlayerInfo", "x": 32, "y": 362, "width": 300, "height": 28, "text": "Herói · Classe · Nível 1", "size": 15, "bold": true },
     { "type": "Bar", "name": "Health", "x": 32, "y": 392, "width": 300, "height": 42, "text": "♥ Vida", "color": "Green", "value": 100, "max": 100 },
-    { "type": "Bar", "name": "Mana", "x": 32, "y": 436, "width": 300, "height": 42, "text": "✦ Mana", "color": "Blue", "value": 30, "max": 30 },
+    { "type": "Bar", "name": "Mana", "x": 32, "y": 436, "width": 300, "height": 42, "text": "✦ Mana", "color": "Blue", "barStyle": "Shine", "value": 30, "max": 30 },
     { "type": "Bar", "name": "Xp", "x": 32, "y": 478, "width": 150, "height": 40, "text": "★ XP", "color": "Purple", "value": 0, "max": 30 },
     { "type": "Text", "name": "Gold", "x": 196, "y": 484, "width": 66, "height": 28, "text": "💰 15", "size": 15, "color": "Gold" },
     { "type": "Text", "name": "Potions", "x": 262, "y": 484, "width": 70, "height": 28, "text": "🧪 1", "size": 15, "align": "Right", "color": "Green" },
-    { "type": "Button", "name": "Attack", "x": 362, "y": 352, "width": 280, "height": 54, "text": "⚔ Atacar", "color": "Red" },
-    { "type": "Button", "name": "Skill", "x": 658, "y": 352, "width": 286, "height": 54, "text": "✦ Especial", "color": "Purple" },
-    { "type": "Button", "name": "Potion", "x": 362, "y": 414, "width": 280, "height": 54, "text": "🧪 Beber poção", "color": "Green" },
+    { "type": "Button", "name": "Attack", "x": 362, "y": 352, "width": 280, "height": 54, "text": "⚔ Atacar", "color": "Red", "style": "Gradient", "bold": true, "shadow": true },
+    { "type": "Button", "name": "Skill", "x": 658, "y": 352, "width": 286, "height": 54, "text": "✦ Especial", "color": "Purple", "style": "Gradient", "bold": true, "shadow": true },
+    { "type": "Button", "name": "Potion", "x": 362, "y": 414, "width": 280, "height": 54, "text": "🧪 Beber poção", "color": "Green", "style": "Gradient", "bold": true, "shadow": true },
     { "type": "Button", "name": "Flee", "x": 658, "y": 414, "width": 286, "height": 54, "text": "🏃 Fugir", "style": "Outline" },
-    { "type": "Button", "name": "Continue", "x": 362, "y": 476, "width": 582, "height": 48, "text": "Continuar ➜", "color": "Gold", "visible": false }
+    { "type": "Button", "name": "Continue", "x": 362, "y": 476, "width": 582, "height": 48, "text": "Continuar ➜", "color": "Gold", "style": "Gradient", "corner": "Circle", "textColor": "Black", "bold": true, "visible": false }
   ]
 }

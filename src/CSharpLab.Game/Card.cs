@@ -1,7 +1,7 @@
 namespace CSharpLab.GameEngine;
 
 /// <summary>
-/// Card = cartão. Um cartão da Lista: uma cópia do cartão modelo desenhado na aba Tela, uma para cada item.
+/// Card = cartão. Um cartão da Lista: uma cópia do cartão modelo desenhado no Estúdio, uma para cada item.
 /// Ele chega pronto dentro do Show; mude as peças dele com card.Find.
 /// </summary>
 /// <example>
@@ -42,7 +42,7 @@ public sealed class Card
         var hint = guess != null ? $" Você quis dizer \"{guess}\"?" : "";
         var list = names.Count > 0
             ? $" Peças do cartão: {string.Join(", ", names.Select(n => $"\"{n}\""))}."
-            : " O cartão ainda não tem peças: desenhe-as dentro do primeiro cartão da Lista, na aba Tela.";
+            : " O cartão ainda não tem peças: desenhe-as dentro do primeiro cartão da Lista, no Estúdio.";
         throw new GameException(name.Length == 0
             ? $"Faltou o nome da peça no card.Find.{list}"
             : $"O cartão da lista \"{_list}\" não tem a peça \"{name}\".{hint}{list}");

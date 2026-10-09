@@ -1,7 +1,7 @@
 namespace CSharpLab.GameEngine;
 
 /// <summary>
-/// Item = peça. Uma peça desenhada na aba Tela (texto, botão, barra, imagem…), pega pelo nome com game.Find.
+/// Item = peça. Uma peça desenhada no Estúdio (texto, botão, barra, imagem…), pega pelo nome com game.Find.
 /// Mude as propriedades dela com =.
 /// </summary>
 /// <example>
@@ -35,7 +35,7 @@ public sealed class Item
     /// <summary>Os cartões que o Show criou (só na Lista).</summary>
     internal IReadOnlyList<Card> Cards => _cards;
 
-    /// <summary>Name = nome. O nome da peça na aba Tela.</summary>
+    /// <summary>Name = nome. O nome da peça no Estúdio.</summary>
     public string Name => Piece.Name;
 
     /// <summary>
@@ -126,7 +126,10 @@ public sealed class Item
         set => Check(nameof(Border)).Border = value;
     }
 
-    /// <summary>Corner = canto. Cantos da Caixa: Corner.Round (redondos), Corner.Square (retos) ou Corner.Circle (círculo).</summary>
+    /// <summary>
+    /// Corner = canto. Cantos da Caixa, do Botão e da Barra: Corner.Round (redondos), Corner.Square (retos) ou
+    /// Corner.Circle (na Caixa, um círculo; no Botão e na Barra, pontas todas redondas, como uma pílula).
+    /// </summary>
     /// <example><code>game.Find("Portrait").Corner = Corner.Circle;</code></example>
     public Corner Corner
     {
@@ -134,7 +137,9 @@ public sealed class Item
         set => Check(nameof(Corner)).Corner = value == Corner.Round ? null : value;
     }
 
-    /// <summary>Font = fonte, o desenho das letras: Font.Normal, Font.Fantasy, Font.Book ou Font.Hand.</summary>
+    /// <summary>
+    /// Font = fonte, o desenho das letras: Font.Normal, Fantasy, Book, Hand, Strong, Classic, Elegant, Fun, Retro ou Tech.
+    /// </summary>
     /// <example><code>game.Find("Title").Font = Font.Fantasy;</code></example>
     public Font Font
     {
@@ -142,7 +147,7 @@ public sealed class Item
         set => Check(nameof(Font)).Font = value == Font.Normal ? null : value;
     }
 
-    /// <summary>Bold = negrito. true deixa as letras do Texto mais grossas.</summary>
+    /// <summary>Bold = negrito. true deixa as letras do Texto (ou do Botão) mais grossas.</summary>
     public bool Bold
     {
         get => Check(nameof(Bold)).Bold == true;
@@ -168,7 +173,10 @@ public sealed class Item
         set => Check(nameof(Scroll)).Scroll = value ? true : null;
     }
 
-    /// <summary>Shadow = sombra. true põe uma sombra atrás das letras, para ler bem em cima de qualquer fundo.</summary>
+    /// <summary>
+    /// Shadow = sombra. No Texto, uma sombra atrás das letras (para ler bem em cima de qualquer fundo);
+    /// no Botão e na Caixa, uma sombra embaixo da peça, que parece saltar da tela.
+    /// </summary>
     /// <example><code>game.Find("Title").Shadow = true;</code></example>
     public bool Shadow
     {
@@ -176,12 +184,39 @@ public sealed class Item
         set => Check(nameof(Shadow)).Shadow = value ? true : null;
     }
 
-    /// <summary>Style = estilo do botão: ButtonStyle.Filled (cheio), ButtonStyle.Outline (contorno) ou ButtonStyle.Text (só texto).</summary>
+    /// <summary>
+    /// Style = estilo do botão: ButtonStyle.Filled (cheio), Gradient (degradê), Soft (suave), Outline (contorno)
+    /// ou Text (só texto).
+    /// </summary>
     /// <example><code>game.Find("Back").Style = ButtonStyle.Text;</code></example>
     public ButtonStyle Style
     {
         get => Check(nameof(Style)).Style ?? ButtonStyle.Filled;
         set => Check(nameof(Style)).Style = value == ButtonStyle.Filled ? null : value;
+    }
+
+    /// <summary>TextColor = cor da letra do botão. Sem escolher, ela é automática (a que aparece bem em cima do fundo).</summary>
+    /// <example><code>game.Find("Buy").TextColor = Color.Gold;</code></example>
+    public Color TextColor
+    {
+        get => Check(nameof(TextColor)).TextColor ?? Color.White;
+        set => Check(nameof(TextColor)).TextColor = value;
+    }
+
+    /// <summary>BarStyle = estilo da barra: BarStyle.Smooth (lisa), BarStyle.Shine (brilhante) ou BarStyle.Blocks (em blocos).</summary>
+    /// <example><code>game.Find("Mana").BarStyle = BarStyle.Shine;</code></example>
+    public BarStyle BarStyle
+    {
+        get => Check(nameof(BarStyle)).BarStyle ?? BarStyle.Smooth;
+        set => Check(nameof(BarStyle)).BarStyle = value == BarStyle.Smooth ? null : value;
+    }
+
+    /// <summary>BarText = onde ficam o nome e o número da barra: BarText.Above (em cima), BarText.Inside (dentro) ou BarText.None (sem texto).</summary>
+    /// <example><code>game.Find("Health").BarText = BarText.Inside;</code></example>
+    public BarText BarText
+    {
+        get => Check(nameof(BarText)).BarText ?? BarText.Above;
+        set => Check(nameof(BarText)).BarText = value == BarText.Above ? null : value;
     }
 
     /// <summary>
@@ -295,7 +330,7 @@ public sealed class Item
             throw new GameException($"O Show da lista \"{Name}\" precisa dizer o que vai em cada cartão: game.Find(\"{Name}\").Show(items, (card, item) => {{ ... }});");
         var owner = _owner ?? throw new GameException($"A lista \"{Name}\" não está numa cena desenhada.");
         if (owner.Layout.MembersOf(Name).Count == 0)
-            throw new GameException($"A lista \"{Name}\" ainda não tem cartão modelo. Na aba Tela, ponha as peças (nome, preço, botão…) dentro do primeiro cartão dela.");
+            throw new GameException($"A lista \"{Name}\" ainda não tem cartão modelo. No Estúdio, ponha as peças (nome, preço, botão…) dentro do primeiro cartão dela.");
 
         var cards = new List<Card>();
         foreach (var value in items)
@@ -338,10 +373,15 @@ public sealed class Item
             nameof(Value) or nameof(Max) => $"só barras têm {property}",
             nameof(Image) => "só imagens têm Image",
             nameof(Color) or nameof(Shade) => $"Imagem, Campo de escrita, Mensagens e Lista não têm {property}",
-            nameof(Opacity) or nameof(Border) or nameof(Corner) => $"só a Caixa tem {property}",
-            nameof(Bold) or nameof(Italic) or nameof(Shadow) => $"só o Texto tem {property}",
-            nameof(Font) => "só Texto, Botão, Campo de escrita e Mensagens têm Font",
+            nameof(Opacity) or nameof(Border) => $"só a Caixa tem {property}",
+            nameof(Corner) => "só Caixa, Botão e Barra têm Corner",
+            nameof(Italic) => "só o Texto tem Italic",
+            nameof(Bold) => "só Texto e Botão têm Bold",
+            nameof(Shadow) => "só Texto, Botão e Caixa têm Shadow",
+            nameof(Font) => "só Texto, Botão, Barra, Campo de escrita e Mensagens têm Font",
             nameof(Style) => "só botões têm Style",
+            nameof(TextColor) => "só botões têm TextColor (no Texto, a cor da letra é o Color)",
+            nameof(BarStyle) or nameof(BarText) => $"só barras têm {property}",
             nameof(Shortcut) => "só botões têm Shortcut (atalho de teclado)",
             nameof(Enabled) => "só botões, campos de escrita e imagens têm Enabled",
             _ => $"esta peça não tem {property}",

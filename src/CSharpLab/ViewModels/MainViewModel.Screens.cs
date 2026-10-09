@@ -7,7 +7,7 @@ using CSharpLab.GameEngine;
 
 namespace CSharpLab.ViewModels;
 
-// Telas desenhadas dos jogos (aba Tela): criar a tela de uma cena e ligar ela ao Program.cs.
+// Telas desenhadas dos jogos (Estúdio): criar a tela de uma cena e ligar ela ao Program.cs.
 public sealed partial class MainViewModel
 {
     /// <summary>O jogo aberto (o projeto de janela que o Executar roda), ou null se a pasta não tem jogo.</summary>
@@ -39,9 +39,12 @@ public sealed partial class MainViewModel
             });
         if (name == null) return;
         name = name.Trim();
+        var templateId = Dialogs.AskScreenTemplate(name, project.Directory);
+        if (templateId == null) return;
+        var template = Screens.ScreenTemplates.Find(templateId) ?? Screens.ScreenTemplates.All[0];
 
         var path = Path.Combine(screens, name + ".json");
-        if (!CreateScreenFile(path, name)) return;
+        if (!CreateScreenFile(path, name, template)) return;
 
         // Se o código ainda não tem a cena, oferece escrever o começo dela (com o botão da tela já ligado).
         if (!scenes.Contains(name, StringComparer.OrdinalIgnoreCase) && File.Exists(program) &&
@@ -50,21 +53,21 @@ public sealed partial class MainViewModel
                 "Ela aparece antes do game.Start, pronta para você completar.",
                 "Escrever a cena"))
         {
-            AddSceneToProgram(program, name);
+            AddSceneToProgram(program, name, template.Code(name));
         }
         OpenFile(path);
         FocusEditorRequested?.Invoke();
     }
 
     /// <summary>Cria Screens/&lt;Cena&gt;.json com a tela inicial (título e botão Continuar).</summary>
-    private bool CreateScreenFile(string path, string scene)
+    private bool CreateScreenFile(string path, string scene, Screens.ScreenTemplate? template = null)
     {
         var screens = Path.GetDirectoryName(path)!;
         try
         {
             Directory.CreateDirectory(screens);
             using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write);
-            stream.Write(TextFileIO.Utf8NoBom.GetBytes(ScreenFile.Serialize(ScreenLayout.CreateDefault(scene))));
+            stream.Write(TextFileIO.Utf8NoBom.GetBytes(ScreenFile.Serialize(template?.Layout(scene) ?? ScreenLayout.CreateDefault(scene))));
             return true;
         }
         catch (Exception ex)
@@ -74,11 +77,11 @@ public sealed partial class MainViewModel
         }
     }
 
-    /// <summary>A pasta aberta tem um jogo com botões (mostra o botão Cenas ao lado do Executar).</summary>
+    /// <summary>A pasta aberta tem um jogo com botões (mostra o botão Estúdio ao lado do Executar).</summary>
     public bool HasGame => GameProject != null;
 
     /// <summary>
-    /// As cenas do jogo para o botão Cenas: as do código (na ordem em que aparecem) e as telas que
+    /// As cenas do jogo para o botão Estúdio: as do código (na ordem em que aparecem) e as telas que
     /// ainda não têm cena no código.
     /// </summary>
     public IReadOnlyList<GameSceneInfo> GameScenes()
@@ -105,6 +108,29 @@ public sealed partial class MainViewModel
                 scenes.Add(new GameSceneInfo(screen, HasScreen: true, InCode: false, IsStart: false));
         }
         return scenes.Select(s => s with { IsStart = string.Equals(s.Name, start, StringComparison.OrdinalIgnoreCase) }).ToList();
+    }
+
+    /// <summary>As idas entre cenas escritas no código (game.GoTo dentro de cada cena), para o mapa do jogo.</summary>
+    public IReadOnlyList<(string From, string To)> GameSceneLinks()
+    {
+        if (GameProject is not { } project) return [];
+        var links = new List<(string, string)>();
+        foreach (var file in CodeFiles(project.Directory))
+        {
+            var text = FindDocument(file)?.Document.Text ?? TryRead(file);
+            if (text == null || !text.Contains("GoTo", StringComparison.Ordinal)) continue;
+            var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text).GetRoot();
+            foreach (var link in Core.Language.GameAssist.SceneLinks(root))
+                if (!links.Contains(link)) links.Add(link);
+        }
+        return links;
+    }
+
+    /// <summary>O texto atual da tela da cena (o da aba, se estiver aberta sem salvar), ou null se não tem tela.</summary>
+    public string? ScreenText(string projectDirectory, string scene)
+    {
+        var path = GameScreens.PathOf(projectDirectory, scene);
+        return FindDocument(path)?.Document.Text ?? (File.Exists(path) ? TryRead(path) : null);
     }
 
     /// <summary>Abre a cena: a tela, se ela tiver; senão, o código dela.</summary>
@@ -140,7 +166,7 @@ public sealed partial class MainViewModel
         return GameScreens.OpenTexts.ContainsKey(path) || File.Exists(path);
     }
 
-    /// <summary>Abre a tela da cena na aba Tela. Sem tela ainda, oferece criar.</summary>
+    /// <summary>Abre a tela da cena no Estúdio. Sem tela ainda, oferece criar.</summary>
     public void OpenSceneScreen(string projectDirectory, string scene)
     {
         var path = GameScreens.PathOf(projectDirectory, scene);
@@ -310,21 +336,19 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>Escreve a cena no Program.cs (aberto numa aba, para a pessoa ver e poder desfazer).</summary>
-    private void AddSceneToProgram(string program, string name)
+    private void AddSceneToProgram(string program, string name, IReadOnlyList<string>? body = null)
     {
         var doc = OpenFile(program, activate: false);
         if (doc == null) return;
         var text = doc.Document.Text;
         var nl = TextFileIO.DetectLineEnding(text) is "LF" ? "\n" : "\r\n";
+        body ??= Screens.ScreenTemplates.All[0].Code(name);
         var snippet = string.Join(nl,
         [
             $"game.Scene(\"{name}\", () =>",
             "{",
-            $"    // As peças da tela \"{name}\" (aba Tela). Mude pelo nome: game.Find(\"Nome\")",
-            "    game.Find(\"Continue\").OnClick(() =>",
-            "    {",
-            "        game.Write(\"Você clicou em Continuar!\");",
-            "    });",
+            $"    // As peças da tela \"{name}\" (Estúdio). Mude pelo nome: game.Find(\"Nome\")",
+            .. body.Select(line => line.Length == 0 ? "" : "    " + line),
             "});",
             "",
             "",
@@ -347,7 +371,7 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// Uma peça mudou de nome na aba Tela: troca os game.Find("antigo") daquela cena no código.
+    /// Uma peça mudou de nome no Estúdio: troca os game.Find("antigo") daquela cena no código.
     /// As abas alteradas ficam sem salvar (dá para desfazer). Retorna quantos lugares mudaram.
     /// </summary>
     public int RenamePieceInCode(string projectDirectory, string scene, string oldName, string newName)
@@ -416,7 +440,7 @@ public sealed partial class MainViewModel
     private static partial Regex StartCall();
 }
 
-/// <summary>Uma cena do jogo no botão Cenas.</summary>
+/// <summary>Uma cena do jogo no botão Estúdio.</summary>
 /// <param name="HasScreen">Tem tela desenhada (Screens/Nome.json).</param>
 /// <param name="InCode">Tem game.Scene("Nome", …) no código.</param>
 /// <param name="IsStart">É a cena do game.Start (onde o jogo começa).</param>

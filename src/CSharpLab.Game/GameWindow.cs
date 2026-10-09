@@ -13,10 +13,10 @@ namespace CSharpLab.GameEngine;
 /// <summary>
 /// A janela do jogo: palco fixo de 960×540 que cresce e diminui com a janela (sem distorcer).
 /// Cena automática: título em cima, textos no meio, barras à direita e botões embaixo (teclas 1 a 9 apertam os botões).
-/// Cena desenhada: as peças da aba Tela, cada uma no seu lugar.
+/// Cena desenhada: as peças do Estúdio, cada uma no seu lugar.
 /// Ao trocar de cena, a tela escurece e clareia sozinha.
 /// </summary>
-internal sealed class GameWindow : Window, IGameView
+internal sealed partial class GameWindow : Window, IGameView
 {
     public const double StageWidth = ScreenLayout.Width, StageHeight = ScreenLayout.Height;
 
@@ -218,8 +218,10 @@ internal sealed class GameWindow : Window, IGameView
     /// <summary>Uma ação por pressionamento; digitar, combinações de teclas e transições não acionam botões.</summary>
     internal bool HandleKey(Key key, ModifierKeys modifiers, bool isRepeat, bool isTyping)
     {
-        if (isRepeat || isTyping || _transition || modifiers != ModifierKeys.None) return false;
-        if (ButtonShortcuts.FromKey(key) is { } shortcut && _game.PressShortcut(shortcut)) return true;
+        if (isTyping || _transition || modifiers != ModifierKeys.None) return false;
+        if (!isRepeat && ButtonShortcuts.FromKey(key) is { } shortcut && _game.PressShortcut(shortcut)) return true;
+        if (_game.PressKey(key)) return true;   // game.OnKey da cena (segurar a tecla repete)
+        if (isRepeat) return false;
         int number = key switch
         {
             >= Key.D1 and <= Key.D9 => key - Key.D1,

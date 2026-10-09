@@ -12,7 +12,7 @@
     { "type": "Box", "name": "StatusCard", "x": 16, "y": 16, "width": 200, "height": 252, "border": true },
     { "type": "Text", "name": "PlayerInfo", "x": 28, "y": 26, "width": 176, "height": 44, "text": "Herói · Classe · Nível 1", "size": 14, "bold": true },
     { "type": "Bar", "name": "Health", "x": 28, "y": 72, "width": 176, "height": 44, "text": "♥ Vida", "color": "Green", "value": 100, "max": 100 },
-    { "type": "Bar", "name": "Mana", "x": 28, "y": 120, "width": 176, "height": 44, "text": "✦ Mana", "color": "Blue", "value": 30, "max": 30 },
+    { "type": "Bar", "name": "Mana", "x": 28, "y": 120, "width": 176, "height": 44, "text": "✦ Mana", "color": "Blue", "barStyle": "Shine", "value": 30, "max": 30 },
     { "type": "Bar", "name": "Xp", "x": 28, "y": 168, "width": 176, "height": 44, "text": "★ XP", "color": "Purple", "value": 0, "max": 30 },
     { "type": "Text", "name": "Gold", "x": 28, "y": 222, "width": 88, "height": 28, "text": "💰 15", "size": 16, "color": "Gold" },
     { "type": "Text", "name": "Potions", "x": 116, "y": 222, "width": 88, "height": 28, "text": "🧪 1", "size": 16, "align": "Right", "color": "Green" }

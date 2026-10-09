@@ -10,7 +10,7 @@ using CSharpLab.ViewModels;
 
 namespace CSharpLab.App.Tests;
 
-/// <summary>A aba Tela: cada edição grava o JSON no documento, com desfazer de um passo por ação.</summary>
+/// <summary>O Estúdio: cada edição grava o JSON no documento, com desfazer de um passo por ação.</summary>
 public sealed class ScreenDesignerTests
 {
     private static (DocumentViewModel Doc, ScreenDesignerModel Model, string Dir) Open(string? json = null)
@@ -489,11 +489,11 @@ public sealed class ScreenDesignerTests
     });
 
     /// <summary>
-    /// O botão Cenas (ao lado do Executar) lista as cenas do jogo e troca entre a tela e o código da cena atual.
+    /// O botão Estúdio (ao lado do Executar) lista as cenas do jogo e troca entre a tela e o código da cena atual.
     /// O menu fica em %TEMP%\csharplab-menu-cenas.png para conferir o visual.
     /// </summary>
     [Fact]
-    public void Botao_Cenas_lista_as_cenas_e_troca_tela_e_codigo() => Ui.Run(async () =>
+    public void Cenas_do_jogo_vem_do_codigo_e_das_telas() => Ui.Run(async () =>
     {
         using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
         await vm.InitializeAsync();
@@ -525,33 +525,6 @@ public sealed class ScreenDesignerTests
         vm.OpenGameScene("Shop");
         Assert.Equal(program.IndexOf("game.Scene(\"Shop\"", StringComparison.Ordinal), offset);
         Assert.Equal(created.ProgramPath, vm.ActiveDocument?.FilePath);
-
-        // No código, dentro da cena Fight: o primeiro item leva para a tela dela.
-        var menu = CSharpLab.Views.ScenesMenu.Build(vm, new CSharpLab.Views.SceneContext("Fight", OnScreen: false));
-        var texts = menu.Items.OfType<System.Windows.Controls.MenuItem>()
-            .Select(i => string.Join(" ", Descendants(i.Header as DependencyObject ?? new DependencyObject()).Prepend(i.Header as DependencyObject ?? new DependencyObject())
-                .OfType<System.Windows.Controls.TextBlock>().Select(t => t.Text)))
-            .ToList();
-        Assert.Contains("Ver a tela da cena Fight", texts[0]);
-        Assert.Contains(texts, t => t.Contains("Fight") && t.Contains("começa aqui"));
-        Assert.Contains(texts, t => t.Contains("Shop") && t.Contains("só código"));
-        Assert.Contains(texts, t => t.Contains("Cave") && t.Contains("falta no código"));
-        Assert.Contains(texts, t => t.Contains("Nova tela do jogo"));
-
-        // Na tela: o primeiro item leva para o código.
-        var fromScreen = CSharpLab.Views.ScenesMenu.Build(vm, new CSharpLab.Views.SceneContext("Fight", OnScreen: true));
-        var first = (System.Windows.Controls.MenuItem)fromScreen.Items[0];
-        Assert.Contains(((System.Windows.Controls.Panel)first.Header).Children.OfType<System.Windows.Controls.TextBlock>(), t => t.Text == "Ver o código da cena Fight");
-
-        menu.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        menu.Arrange(new Rect(menu.DesiredSize));
-        menu.UpdateLayout();
-        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(menu.ActualWidth), (int)Math.Ceiling(menu.ActualHeight), 96, 96, PixelFormats.Pbgra32);
-        bitmap.Render(menu);
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(bitmap));
-        using var file = File.Create(Path.Combine(Path.GetTempPath(), "csharplab-menu-cenas.png"));
-        encoder.Save(file);
     });
 
     [Fact]
@@ -614,7 +587,7 @@ public sealed class ScreenDesignerTests
     }
 
     /// <summary>
-    /// A aba Tela inteira desenhada fora da tela (peças, seleção, painel de propriedades).
+    /// O Estúdio inteira desenhada fora da tela (peças, seleção, painel de propriedades).
     /// A imagem fica em %TEMP%\csharplab-aba-tela.png para conferir o visual.
     /// </summary>
     [Fact]

@@ -38,6 +38,8 @@ public interface IDialogService
     string? AskText(string title, string message, string initial, Func<string, string?>? validate = null);
     /// <summary>Abre uma página no navegador.</summary>
     void OpenUrl(string url);
+    /// <summary>Modelo da tela nova (Em branco, Abertura, História…): o Id dele, ou null se cancelar.</summary>
+    string? AskScreenTemplate(string scene, string? projectDirectory);
 }
 
 /// <summary>O terminal integrado, visto pelo ViewModel.</summary>

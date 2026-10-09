@@ -63,13 +63,33 @@ Crie em **Arquivo → Novo projeto… → Jogo com botões**. Ele já nasce com 
 
 O jogo tem duas partes, cada uma no seu lugar:
 
-- **A tela** (aba Tela): onde fica cada coisa, tamanho, cor e texto. Você arrasta com o mouse.
+- **A tela**: onde fica cada coisa, tamanho, cor e texto. Você arrasta com o mouse.
 - **O código** (`Program.cs`): o que muda na tela e o que cada botão faz. Você escreve em C#.
+
+As duas ficam juntas no **Estúdio** (botão **Estúdio**, ao lado do **Executar**): à esquerda, todas as cenas do jogo e as
+camadas da cena aberta; no meio, a tela; à direita, o código de verdade, já no `game.Scene` da cena (com uma faixa
+marcando onde ele começa e termina). Clicar numa cena troca as três coisas juntas, e levar o cursor do código para
+dentro de outra cena faz a tela ir junto. Sem abas: para voltar ao editor de sempre, **Voltar ao editor**.
+
+- **Peça ↔ código**: escolha uma peça na tela e o código marca em dourado cada `game.Find("Nome")` dela (e diz quantos
+  são, ou que ela ainda não aparece no código). Ao contrário também: com o cursor num `game.Find("Attack")`, ou dentro
+  do `OnClick` dele, o botão fica selecionado na tela.
+- **Mapa do jogo** (no alto da lista de cenas): todas as cenas em miniatura, com setas de para onde cada uma leva
+  (os `game.GoTo` do código, até os que ficam dentro de funções). Começa na cena do `game.Start`.
+- **Jogar daqui**: abre o jogo já na cena que está aberta. As variáveis começam com o valor do começo do código.
+- **Modelos de tela**: a cena nova pode nascer Em branco, ou como Abertura, História, Escolhas, Combate ou Loja, com as
+  peças arrumadas e o código já ligando os botões (com comentários do que falta você escrever).
+- **Exportar**: gera o `.exe` do jogo e um `.zip` em `Documentos\CSharp Lab\Jogos prontos`, que roda em qualquer
+  Windows sem instalar nada (também em **Arquivo → Exportar o jogo**).
 
 ### A tela
 
-Cada cena tem a sua tela em `Screens/<Cena>.json`. Abra pelo botão **Cenas** (ao lado do **Executar**) ou pelo explorador.
-Para uma cena nova: **Cenas → Nova tela do jogo…**.
+Cada cena tem a sua tela em `Screens/<Cena>.json`. Ela abre no **Estúdio** (pelo botão ou pelo explorador).
+Para uma cena nova: o **+** ao lado de **CENAS**, no Estúdio (ou **Arquivo → Nova tela do jogo…**).
+
+**Camadas**: a lista abaixo das cenas mostra todas as peças da tela, da frente (em cima) para trás (embaixo). Clicar
+seleciona, mesmo uma peça escondida atrás de outra; arrastar uma linha muda quem fica na frente. Peças que só enfeitam
+(Texto, Caixa, Barra, Imagem sem `OnClick`) deixam o clique passar no jogo: um texto em cima de um botão não atrapalha.
 
 **Tema do jogo**: com nenhuma peça selecionada, o painel da direita mostra os quatro temas, com uma miniatura de cada:
 **Clássico** (escuro e limpo), **Fantasia** (noite púrpura, bordas de bronze, títulos de conto de fadas), **Livro**
@@ -148,6 +168,12 @@ game.Start("Start");
 | `Enabled` | ativo | `game.Find("Tower").Enabled = hasKey;` deixa o botão apagado e sem clique enquanto for `false`. |
 | `Show` | mostrar | Enche uma Lista: um cartão para cada item (veja abaixo). |
 | `Wait` | esperar | Dentro de um clique, uma pausa curta: `game.Wait(0.6);` mostra o seu golpe e o inimigo responde logo depois. |
+| `Pause` | pausar | Dentro de um clique, espera o jogador apertar **Continuar** (ou Enter) e segue na linha de baixo: `game.Write("Achou uma chave!"); game.Pause(); game.Clear();`. |
+| `Read` | ler | O `Console.ReadLine()` do jogo: `string answer = game.Read("Quanto você aposta?");`. |
+| `Choose` | escolher | Uma pergunta com botões: `string choice = game.Choose("Abrir o baú?", "Sim", "Não");`. |
+| `OnKey` | ao apertar | Na cena, recebe as teclas como no terminal: `game.OnKey(key => { if (key == ConsoleKey.D) x++; });`. |
+| `Close` | fechar | Termina o jogo (um botão Sair). |
+| `Clear` | limpar | Dentro de um clique, apaga as mensagens que a cena já mostrou, como o `Console.Clear()`: `game.Clear();`. O que for escrito depois aparece normalmente. |
 | `Shake` / `Flash` | tremer / piscar | `game.Find("EnemyIcon").Shake();` treme a peça; `.Flash();` faz piscar. Bom ao levar dano. |
 | `Background` | fundo | A imagem de fundo da tela (pasta `Assets`), para a mesma tela servir a lugares diferentes: `game.Background = "tower.png";`. |
 | `Start` | começar | Abre a janela na primeira cena. Sempre na última linha. |
@@ -178,10 +204,25 @@ Um `gold += 10` ou um sorteio com `Random` solto na cena (fora do `OnEnter` e do
 o editor sublinha e explica. Voltar para a cena roda o `OnEnter` de novo: uma recompensa que só pode acontecer uma vez
 na aventura precisa de uma variável (`if (!gotKey) { ... gotKey = true; }`).
 
+### Personalizar: cores, letras, botões e barras
+
+Selecione a peça no Estúdio e mude no painel ao lado da tela. Cada opção mostra o resultado antes de escolher:
+
+- **Cor**: 12 cores com nome, que combinam com o tema (`Color.Red`, `Color.Pink`, `Color.Cyan`…), e a **Cor própria**
+  (a bolinha de arco-íris): uma paleta grande, as cores próprias que a tela já usa e o código da cor (`#8A2BE2`).
+  No código: `Color.Hex("#8A2BE2")` ou `Color.Rgb(138, 43, 226)`.
+- **Letra**: 10 fontes do Windows, cada nome escrito na própria fonte: Normal, Fantasia, Livro, À mão, Forte, Clássica,
+  Elegante, Divertida, Retrô e Técnica.
+- **Botão**: cinco estilos com miniatura (Cheio, Degradê, Suave, Contorno, Só texto), cor do botão, cor da letra,
+  cantos (do tema, retos ou pílula), negrito e sombra embaixo.
+- **Barra**: três estilos (Lisa, Brilhante, Em blocos), o nome e o número em cima, dentro ou escondidos, cantos e fonte.
+  Vida, mana e energia podem ter cara diferente, não só cor diferente.
+- **Caixa**: cor, preenchimento, borda, cantos e sombra embaixo.
+
 ### Lista: um cartão para cada item
 
 Ponha uma **Lista** na tela e desenhe dentro do primeiro cartão (o tracejado) as peças de um item: ícone, nome, preço,
-botão. Na aba Tela os outros cartões aparecem apagadinhos, como prévia. No código, entregue a lista e diga o que vai
+botão. No Estúdio os outros cartões aparecem apagadinhos, como prévia. No código, entregue a lista e diga o que vai
 em cada cartão:
 
 ```csharp
@@ -200,8 +241,7 @@ O autocomplete e o mouse em cima de cada comando mostram a tradução e um exemp
 sugere os nomes das peças daquela tela; um nome que não existe ganha uma dica antes de rodar, e renomear uma peça na Tela
 também troca o nome no código.
 
-Para ir e voltar: o botão **Cenas** troca entre a tela e o código da cena em que você está; no alto da aba Tela,
-**Código da cena** leva até o `game.Scene`; `Ctrl`+clique ou `F12` no nome da cena abre a tela dela, e no nome de
+Fora do Estúdio, no editor com abas: `Ctrl`+clique ou `F12` no nome da cena abre a tela dela (no Estúdio), e no nome de
 um `game.GoTo("Shop")` vai até o código da cena.
 
 ### Cenas só com código

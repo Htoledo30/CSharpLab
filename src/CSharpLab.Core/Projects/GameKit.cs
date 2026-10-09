@@ -14,7 +14,7 @@ public static class GameKit
     public const string Namespace = "CSharpLab.GameEngine";
     public const string LibraryFolder = "lib";
     public const string AssetsFolder = "Assets";
-    /// <summary>Telas desenhadas na aba Tela (uma por cena, em JSON).</summary>
+    /// <summary>Telas desenhadas no Estúdio (uma por cena, em JSON).</summary>
     public const string ScreensFolder = "Screens";
     public const string TargetFramework = "net10.0-windows";
 

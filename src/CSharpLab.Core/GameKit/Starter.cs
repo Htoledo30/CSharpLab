@@ -1,5 +1,5 @@
 // Jogo com botões. Aperte F5 para jogar.
-// As telas ficam na pasta Screens, uma por cena: abra Screens/Start.json (ou use o botão Cenas,
+// As telas ficam na pasta Screens, uma por cena: abra Screens/Start.json (ou use o botão Estúdio,
 // lá em cima) para arrastar os botões e mudar textos e cores.
 // Aqui no código fica o que muda na tela e o que cada botão faz.
 

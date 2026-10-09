@@ -91,7 +91,7 @@ public static class GameScreens
         }
     }
 
-    /// <summary>Nome da peça em português, como na aba Tela.</summary>
+    /// <summary>Nome da peça em português, como no Estúdio.</summary>
     public static string Describe(string type) => type.ToLowerInvariant() switch
     {
         "text" => "Texto",

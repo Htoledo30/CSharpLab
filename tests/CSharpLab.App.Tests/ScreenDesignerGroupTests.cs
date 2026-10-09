@@ -10,7 +10,7 @@ using CSharpLab.ViewModels;
 namespace CSharpLab.App.Tests;
 
 /// <summary>
-/// A aba Tela com várias peças de uma vez: seleção múltipla, copiar e colar entre telas,
+/// O Estúdio com várias peças de uma vez: seleção múltipla, copiar e colar entre telas,
 /// e a Lista (peças que entram e saem do cartão modelo).
 /// </summary>
 public sealed class ScreenDesignerGroupTests
@@ -159,7 +159,7 @@ public sealed class ScreenDesignerGroupTests
     });
 
     /// <summary>
-    /// A aba Tela com uma Lista (cartão modelo e prévia) e o painel de cada tipo de peça.
+    /// O Estúdio com uma Lista (cartão modelo e prévia) e o painel de cada tipo de peça.
     /// Fotos em %TEMP%\csharplab-aba-lista-*.png para conferir o visual.
     /// </summary>
     [Fact]

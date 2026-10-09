@@ -71,6 +71,10 @@ public sealed partial class DocumentViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsActive { get; set; }
 
+    /// <summary>Tela de um jogo aberto: ela fica no Estúdio, sem aba própria.</summary>
+    [ObservableProperty]
+    public partial bool LivesInStudio { get; set; }
+
     [ObservableProperty]
     public partial IReadOnlyList<CodeDiagnostic> Diagnostics { get; set; } = [];
 
@@ -81,7 +85,7 @@ public sealed partial class DocumentViewModel : ObservableObject
 
     public bool IsCSharp => FilePath == null || FilePath.EndsWith(".cs", StringComparison.OrdinalIgnoreCase);
 
-    /// <summary>Tela de um jogo (Screens/*.json): abre no editor visual (aba Tela).</summary>
+    /// <summary>Tela de um jogo (Screens/*.json): abre no editor visual (Estúdio).</summary>
     public bool IsScreen => FilePath != null && FilePath.EndsWith(".json", StringComparison.OrdinalIgnoreCase) &&
                             string.Equals(Path.GetFileName(Path.GetDirectoryName(FilePath)), "Screens", StringComparison.OrdinalIgnoreCase);
 

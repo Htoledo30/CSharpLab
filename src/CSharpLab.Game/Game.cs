@@ -18,7 +18,7 @@ namespace CSharpLab.GameEngine;
 /// game.Start("Start");
 /// </code>
 /// </example>
-public sealed class Game
+public sealed partial class Game
 {
     private const int MaxRedirects = 20;
 
@@ -102,9 +102,9 @@ public sealed class Game
     }
 
     /// <summary>
-    /// Find = encontrar. Pega uma peça desenhada na aba Tela pelo nome, para mudar ela pelo código.
+    /// Find = encontrar. Pega uma peça desenhada no Estúdio pelo nome, para mudar ela pelo código.
     /// </summary>
-    /// <param name="name">O nome da peça na aba Tela. Exemplo: "Attack".</param>
+    /// <param name="name">O nome da peça no Estúdio. Exemplo: "Attack".</param>
     /// <example>
     /// <code>
     /// game.Scene("Fight", () =>
@@ -119,7 +119,7 @@ public sealed class Game
         if (!_started)
             throw new GameException("game.Find funciona dentro das cenas: game.Scene(\"Fight\", () => { game.Find(\"Attack\").OnClick(...); });");
         var scene = _designed ?? throw new GameException(
-            $"A cena \"{_current}\" não foi desenhada na aba Tela, então não tem peças para o game.Find. " +
+            $"A cena \"{_current}\" não foi desenhada no Estúdio, então não tem peças para o game.Find. " +
             $"Crie a tela em Arquivo → Nova tela… (o arquivo {ScreenLibrary.Folder}/{_current}.json) ou use game.Write e game.Button.");
         name = name?.Trim() ?? "";
         if (scene.Find(name) is { } item) return item;
@@ -139,7 +139,7 @@ public sealed class Game
 
     /// <summary>
     /// Background = fundo. A imagem de fundo da tela desenhada (da pasta Assets). Começa com a escolhida
-    /// na aba Tela; mude pelo código para a mesma tela servir a lugares diferentes.
+    /// no Estúdio; mude pelo código para a mesma tela servir a lugares diferentes.
     /// </summary>
     /// <example>
     /// <code>
@@ -221,6 +221,31 @@ public sealed class Game
     }
 
     /// <summary>
+    /// Clear = limpar. Apaga as mensagens que a cena já mostrou (a peça Mensagens fica vazia), como o
+    /// Console.Clear() do terminal. O que for escrito depois do Clear aparece normalmente.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// game.Find("Search").OnClick(() =>
+    /// {
+    ///     game.Clear();
+    ///     game.Write("Você achou 5 moedas!");
+    /// });
+    /// </code>
+    /// </example>
+    public void Clear()
+    {
+        if (!_started || (_building != null && !_inEnter))
+            throw new GameException(
+                "game.Clear funciona dentro de um clique (OnClick, OnAnswer ou game.Button) ou do game.OnEnter: " +
+                "game.Find(\"Search\").OnClick(() => { game.Clear(); game.Write(\"Você achou 5 moedas!\"); }); " +
+                "Solto na cena, ele apagaria as mensagens a cada clique.");
+        _news.Clear();
+        _flushed = 0;
+        _designed?.History.Clear();
+    }
+
+    /// <summary>
     /// OnEnter = ao entrar. O código entre as chaves roda uma vez cada vez que o jogador chega na cena,
     /// e não nos cliques dentro dela. Use para preparar a visita: sortear um inimigo, dar a
     /// recompensa da chegada, contar quantas vezes ele veio. O resto da cena continua rodando a cada clique.
@@ -283,13 +308,13 @@ public sealed class Game
     /// <param name="label">Nome da barra. Exemplo: "Vida".</param>
     /// <param name="value">Quanto tem agora. Exemplo: health.</param>
     /// <param name="max">O máximo. Exemplo: 100.</param>
-    /// <param name="color">Cor da barra. Exemplo: Color.Red.</param>
-    public void Bar(string label, int value, int max, Color color = Color.Green)
+    /// <param name="color">Cor da barra (sem dizer, verde). Exemplo: Color.Red.</param>
+    public void Bar(string label, int value, int max, Color? color = null)
     {
         var screen = Building(nameof(Bar));
         if (max <= 0)
             throw new GameException($"A barra \"{label}\" precisa de um máximo maior que 0 (veio {max}).");
-        screen.Bars.Add(new BarItem(label ?? "", value, max, color));
+        screen.Bars.Add(new BarItem(label ?? "", value, max, color ?? Color.Green));
     }
 
     /// <summary>
@@ -326,6 +351,9 @@ public sealed class Game
     /// <param name="firstScene">A cena que aparece primeiro. Exemplo: "Start".</param>
     public void Start(string firstScene)
     {
+        // "Jogar daqui", no Estúdio: o jogo começa na cena que está aberta lá (se ela existir no código).
+        if (Environment.GetEnvironmentVariable(StartSceneVariable) is { Length: > 0 } jump && _scenes.ContainsKey(jump))
+            firstScene = jump;
         if (StartForTests is { } play)
         {
             play(this, firstScene);
@@ -345,6 +373,9 @@ public sealed class Game
     }
 
     // ------------------------------------------------------------------ por dentro
+
+    /// <summary>Variável de ambiente com que o CSharp Lab pede para o jogo começar numa cena ("Jogar daqui").</summary>
+    internal const string StartSceneVariable = "CSHARPLAB_START_SCENE";
 
     /// <summary>
     /// Para os testes jogarem um programa de verdade sem abrir janela: no lugar da janela, o Start
@@ -380,7 +411,7 @@ public sealed class Game
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
         Theme.Current = _look;   // a janela tem a thread dela: o tema vai junto
         var window = new GameWindow(this);
-        window.Closed += (_, _) => Close();   // um game.Wait em andamento para junto
+        window.Closed += (_, _) => WindowClosed();   // um game.Wait em andamento para junto
         _view = window;
         Redraw();
         app.Run(window);
@@ -478,8 +509,6 @@ public sealed class Game
 
     private Item? ItemFor(Piece piece) => _designed?.ItemFor(piece) ?? _designed?.Find(piece.Name);
 
-    /// <summary>A janela fechou: um game.Wait em andamento para, e nada mais roda.</summary>
-    internal void Close() => _closed = true;
 
     private void Redraw()
     {
@@ -499,6 +528,7 @@ public sealed class Game
             _arriving = _entering;
             _entering = false;
             _designed?.ClearHandlers();
+            ClearKeyHandler();
             screen.Designed = _designed;
             _building = screen;
             _pendingScene = null;
@@ -552,7 +582,7 @@ public sealed class Game
             $"game.{method} precisa ficar dentro de uma cena: game.Scene(\"Start\", () => {{ game.{method}(...); }});");
         if (screen.Designed != null)
             throw new GameException(
-                $"A cena \"{_current}\" foi desenhada na aba Tela, então o game.{method} não funciona nela. " +
+                $"A cena \"{_current}\" foi desenhada no Estúdio, então o game.{method} não funciona nela. " +
                 "Desenhe a peça na Tela e mude ela pelo código com game.Find(\"Nome\").");
         return screen;
     }

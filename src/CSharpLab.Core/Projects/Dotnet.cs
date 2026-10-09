@@ -63,7 +63,9 @@ public static class Dotnet
             CreateNoWindow = true,
             StandardOutputEncoding = Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
-            WorkingDirectory = workingDirectory ?? Environment.CurrentDirectory,
+            // Sem pasta de projeto: a pasta do usuário, nunca a do aplicativo (os servidores de build do
+            // dotnet ficam abertos minutos depois e travariam a atualização).
+            WorkingDirectory = workingDirectory ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         };
         foreach (var a in args) psi.ArgumentList.Add(a);
         foreach (var (k, v) in QuietEnvironment)

@@ -178,6 +178,44 @@ public sealed class DialogService : IDialogService
         return radios.FirstOrDefault(r => r.IsChecked == true)?.Tag as ProjectFile;
     }
 
+    /// <summary>Os modelos de tela lado a lado, cada um com a miniatura desenhada no tema do jogo.</summary>
+    public string? AskScreenTemplate(string scene, string? projectDirectory)
+    {
+        var dialog = new DialogWindow($"Como começa a cena \"{scene}\"?") { Width = 760 };
+        if (projectDirectory != null)
+        {
+            GameEngine.Theme.ImageRoots = [projectDirectory];
+            GameEngine.Theme.UseProject([projectDirectory]);
+        }
+        var panel = new StackPanel();
+        panel.Children.Add(DialogWindow.Paragraph("Escolha um modelo: as peças já vêm arrumadas e o código já liga os botões, com comentários do que falta. " +
+                                                  "Depois você muda tudo do seu jeito.", muted: true));
+        var grid = new System.Windows.Controls.Primitives.UniformGrid { Columns = 3, Margin = new Thickness(0, 12, 0, 0) };
+        var options = new List<(RadioButton Radio, string Id)>();
+        foreach (var template in Screens.ScreenTemplates.All)
+        {
+            var thumb = new Border { Height = 112, CornerRadius = new CornerRadius(6), ClipToBounds = true, Child = Screens.ScreenThumbnail.Create(template.Layout(scene)) };
+            var content = new StackPanel { Width = 200 };
+            content.Children.Add(thumb);
+            content.Children.Add(new TextBlock { Text = template.Title, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 6, 0, 0) });
+            content.Children.Add(new TextBlock { Text = template.Description, Foreground = Res("TextMuted"), FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Height = 34 });
+            var radio = new RadioButton { Content = content, IsChecked = options.Count == 0, Margin = new Thickness(0, 0, 12, 12), GroupName = "template" };
+            radio.MouseDoubleClick += (_, _) =>
+            {
+                radio.IsChecked = true;
+                dialog.DialogResult = true;
+            };
+            options.Add((radio, template.Id));
+            grid.Children.Add(radio);
+        }
+        panel.Children.Add(grid);
+        dialog.Body = panel;
+        dialog.AddButton("Criar a cena", true, "PrimaryButton", isDefault: true);
+        dialog.AddButton("Cancelar", false, isCancel: true);
+        if (dialog.ShowDialog() != true || dialog.Result is false) return null;
+        return options.FirstOrDefault(o => o.Radio.IsChecked == true).Id ?? "Blank";
+    }
+
     private static Window? Owner() => Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
 }
 

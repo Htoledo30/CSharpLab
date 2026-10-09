@@ -43,6 +43,50 @@ public sealed class GameAssistTests : IDisposable
         """;
 
     [Fact]
+    public void Cursor_no_codigo_de_uma_peca_diz_qual_e_e_as_idas_entre_cenas()
+    {
+        const string code = """
+            var game = new Game("T");
+            game.Scene("Fight", () =>
+            {
+                game.Find("Story").Text = "Um goblin!";
+                game.Find("Attack").OnClick(() =>
+                {
+                    gold -= 1;
+                    game.Find("Log").Visible = true;
+                    game.GoTo("Victory");
+                });
+                game.Find("Flee").OnClick(() => game.GoTo("Village"));
+            });
+            game.Scene("Village", () => game.Find("Fight").OnClick(() => game.GoTo("Fight")));
+            game.Start("Village");
+            """;
+        var root = CSharpSyntaxTree.ParseText(code).GetRoot();
+        (string?, string)? At(string marker, int delta = 0) => GameAssist.PieceAt(root, code.IndexOf(marker, StringComparison.Ordinal) + delta);
+        Assert.Equal(("Fight", "Story"), At("Story", 2));
+        Assert.Equal(("Fight", "Story"), At("Text ="));            // depois do Find, na mesma linha
+        Assert.Equal(("Fight", "Attack"), At("gold -= 1"));         // dentro do OnClick do Attack
+        Assert.Equal(("Fight", "Log"), At("Visible"));              // o Find mais de dentro vale
+        Assert.Null(At("game.Scene(\"Fight\""));
+        Assert.Null(At("game.Start"));
+
+        Assert.Equal([("Fight", "Victory"), ("Fight", "Village"), ("Village", "Fight")], GameAssist.SceneLinks(root));
+
+        // O GoTo dentro de uma função conta para as cenas que chamam a função.
+        const string withFunction = """
+            var game = new Game("T");
+            game.Scene("Fight", () => game.Find("Attack").OnClick(() => Hit()));
+            game.Scene("Shop", () => game.Find("Back").OnClick(() => Leave()));
+            game.Start("Fight");
+
+            void Hit() { if (enemy <= 0) Win(); }
+            void Win() => game.GoTo("Victory");
+            void Leave() => game.GoTo("Village");
+            """;
+        Assert.Equal([("Fight", "Victory"), ("Shop", "Village")], GameAssist.SceneLinks(CSharpSyntaxTree.ParseText(withFunction).GetRoot()));
+    }
+
+    [Fact]
     public void Cursor_dentro_do_Find_sabe_a_cena_e_o_que_foi_digitado()
     {
         var root = CSharpSyntaxTree.ParseText(Code).GetRoot();
@@ -195,7 +239,7 @@ public sealed class GameAssistTests : IDisposable
         var hint = Assert.Single(GameAssist.CheckBuildCallsInDrawnScenes(root, _dir));
         Assert.Equal(GameAssist.BuildInDrawnSceneId, hint.Id);
         Assert.Contains("game.Title não funciona", hint.Message);
-        Assert.Contains("um Texto na aba Tela", hint.Message);
+        Assert.Contains("um Texto no Estúdio", hint.Message);
         Assert.Equal(code.IndexOf("Title(\"Luta\")", StringComparison.Ordinal), hint.Location.SourceSpan.Start);
     }
 

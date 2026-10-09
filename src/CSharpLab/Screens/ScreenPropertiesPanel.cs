@@ -374,11 +374,22 @@ public sealed class ScreenPropertiesPanel : Border
             shortcutHelp.Margin = new Thickness(0, 6, 0, 0);
             _content.Children.Add(shortcutHelp);
             _content.Children.Add(Section("ESTILO"));
-            _content.Children.Add(Segmented(
-                [(ButtonStyle.Filled, "Cheio", "Fundo colorido: a ação principal (Atacar)"),
-                 (ButtonStyle.Outline, "Contorno", "Só a borda: ações secundárias"),
-                 (ButtonStyle.Text, "Só texto", "Sem fundo nem borda: ações discretas (Voltar)")],
+            _content.Children.Add(PreviewPicker(
+                [(ButtonStyle.Filled, "Cheio", "ButtonStyle.Filled: fundo colorido, a ação principal (Atacar)"),
+                 (ButtonStyle.Gradient, "Degradê", "ButtonStyle.Gradient: claro em cima e escuro embaixo, com borda: botão de videogame"),
+                 (ButtonStyle.Soft, "Suave", "ButtonStyle.Soft: fundo clarinho da cor, sem borda (opções, abas)"),
+                 (ButtonStyle.Outline, "Contorno", "ButtonStyle.Outline: só a borda (ações secundárias)"),
+                 (ButtonStyle.Text, "Só texto", "ButtonStyle.Text: sem fundo nem borda (Voltar)")],
+                3, style => MiniButton(Current(), style),
                 () => Current()?.Style ?? ButtonStyle.Filled, v => Edit(p => p.Style = v == ButtonStyle.Filled ? null : v, "style")));
+            _content.Children.Add(Section("CANTOS"));
+            _content.Children.Add(Segmented(
+                [(Corner.Round, "Do tema", "Os cantos do tema do jogo"), (Corner.Square, "Retos", "Cantos em ângulo"), (Corner.Circle, "Pílula", "Pontas todas redondas")],
+                () => Current()?.Corner ?? Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
+            var shadow = SwitchRow("Sombra embaixo", "Uma sombra embaixo do botão: ele parece saltar da tela.",
+                () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
+            shadow.Margin = new Thickness(0, 10, 0, 0);
+            _content.Children.Add(shadow);
         }
 
         if (type == PieceType.List)
@@ -401,6 +412,23 @@ public sealed class ScreenPropertiesPanel : Border
             row.Children.Add(Labeled("Valor", NumberField(() => Current()?.BarValue ?? 0, v => Edit(p => p.Value = (int)v, "value"), 0, 99999)));
             row.Children.Add(Labeled("Máximo", NumberField(() => Current()?.BarMax ?? 100, v => Edit(p => p.Max = (int)v, "max"), 1, 99999), left: 8));
             _content.Children.Add(row);
+            _content.Children.Add(Section("ESTILO DA BARRA"));
+            _content.Children.Add(PreviewPicker(
+                [(BarStyle.Smooth, "Lisa", "BarStyle.Smooth: uma cor só"),
+                 (BarStyle.Shine, "Brilhante", "BarStyle.Shine: degradê com brilho e fundo da mesma cor (mana, magia)"),
+                 (BarStyle.Blocks, "Em blocos", "BarStyle.Blocks: um pedaço por ponto, até 20 (corações, energia, munição)")],
+                3, style => MiniBar(Current(), style),
+                () => Current()?.BarStyle ?? BarStyle.Smooth, v => Edit(p => p.BarStyle = v == BarStyle.Smooth ? null : v, "barstyle")));
+            _content.Children.Add(Section("NOME E NÚMERO"));
+            _content.Children.Add(Segmented(
+                [(BarText.Above, "Em cima", "BarText.Above: \"Vida\" e \"30 / 50\" em cima da barra"),
+                 (BarText.Inside, "Dentro", "BarText.Inside: dentro da barra, como nos jogos de luta (a barra fica da altura da peça)"),
+                 (BarText.None, "Sem texto", "BarText.None: só a barra")],
+                () => Current()?.BarText ?? BarText.Above, v => Edit(p => p.BarText = v == BarText.Above ? null : v, "bartext")));
+            _content.Children.Add(Section("CANTOS"));
+            _content.Children.Add(Segmented(
+                [(Corner.Round, "Redondos", "Pontas redondas"), (Corner.Square, "Retos", "Pontas retas")],
+                () => Current()?.Corner == Corner.Square ? Corner.Square : Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
         }
 
         if (type == PieceType.Image)
@@ -409,7 +437,25 @@ public sealed class ScreenPropertiesPanel : Border
             _content.Children.Add(ImagePicker(() => Current()?.Image, image => Edit(p => p.Image = image, "image"), "Escolher imagem…"));
         }
 
-        if (Piece.Supports(type, nameof(Piece.Size)) || Piece.Supports(type, nameof(Piece.Bold)))
+        if (Piece.Supports(type, nameof(Piece.Color)))
+        {
+            _content.Children.Add(Section(type switch { PieceType.Button => "COR DO BOTÃO", PieceType.Bar => "COR DA BARRA", PieceType.Box => "COR DA CAIXA", _ => "COR" }));
+            _content.Children.Add(ColorField(() => Current()?.Color, v => Edit(p => p.Color = v, "color")));
+            var shade = Segmented(
+                [(Shade.Normal, "Normal", "A cor como ela é"), (Shade.Dark, "Escuro", "A cor mais escura (vermelho escuro, azul escuro…)"), (Shade.Light, "Claro", "A cor mais clarinha")],
+                () => Current()?.Shade ?? Shade.Normal, v => Edit(p => p.Shade = v == Shade.Normal ? null : v, "shade"));
+            shade.Margin = new Thickness(0, 6, 0, 0);
+            _content.Children.Add(shade);
+        }
+
+        if (Piece.Supports(type, nameof(Piece.TextColor)))
+        {
+            _content.Children.Add(Section("COR DA LETRA"));
+            _content.Children.Add(ColorField(() => Current()?.TextColor, v => Edit(p => p.TextColor = v, "textcolor"),
+                "Automática: escura num botão claro, branca num botão escuro"));
+        }
+
+        if (Piece.Supports(type, nameof(Piece.Size)) || Piece.Supports(type, nameof(Piece.Bold)) || Piece.Supports(type, nameof(Piece.Font)))
         {
             _content.Children.Add(Section("LETRA"));
             if (Piece.Supports(type, nameof(Piece.Font)))
@@ -433,39 +479,38 @@ public sealed class ScreenPropertiesPanel : Border
                 bold.Margin = new Thickness(8, 0, 0, 0);
                 DockPanel.SetDock(bold, Dock.Left);
                 row.Children.Add(bold);
-                var italic = Toggle("I", "Itálico", () => Current()?.Italic == true, v => Edit(p => p.Italic = v ? true : null, "italic"), bold: false);
-                italic.FontStyle = FontStyles.Italic;
-                italic.FontFamily = new FontFamily("Georgia");
-                italic.Margin = new Thickness(2, 0, 0, 0);
-                DockPanel.SetDock(italic, Dock.Left);
-                row.Children.Add(italic);
-                var align = AlignField(() => Current()?.Align ?? TextAlign.Left, v => Edit(p => p.Align = v == TextAlign.Left ? null : v, "align"));
-                align.HorizontalAlignment = HorizontalAlignment.Right;
-                row.Children.Add(align);
+                if (Piece.Supports(type, nameof(Piece.Italic)))
+                {
+                    var italic = Toggle("I", "Itálico", () => Current()?.Italic == true, v => Edit(p => p.Italic = v ? true : null, "italic"), bold: false);
+                    italic.FontStyle = FontStyles.Italic;
+                    italic.FontFamily = new FontFamily("Georgia");
+                    italic.Margin = new Thickness(2, 0, 0, 0);
+                    DockPanel.SetDock(italic, Dock.Left);
+                    row.Children.Add(italic);
+                }
+                if (Piece.Supports(type, nameof(Piece.Align)))
+                {
+                    var align = AlignField(() => Current()?.Align ?? TextAlign.Left, v => Edit(p => p.Align = v == TextAlign.Left ? null : v, "align"));
+                    align.HorizontalAlignment = HorizontalAlignment.Right;
+                    row.Children.Add(align);
+                }
+                else
+                {
+                    row.Children.Add(new Border());
+                }
             }
             else
             {
                 row.Children.Add(new Border());
             }
-            _content.Children.Add(row);
-            if (Piece.Supports(type, nameof(Piece.Shadow)))
+            if (row.Children.Count > 0) _content.Children.Add(row);
+            if (type == PieceType.Text && Piece.Supports(type, nameof(Piece.Shadow)))
             {
                 var shadow = SwitchRow("Sombra nas letras", "Uma sombra escura atrás do texto: fica legível em cima de qualquer fundo.",
                     () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
                 shadow.Margin = new Thickness(0, 10, 0, 0);
                 _content.Children.Add(shadow);
             }
-        }
-
-        if (Piece.Supports(type, nameof(Piece.Color)))
-        {
-            _content.Children.Add(Section("COR"));
-            _content.Children.Add(ColorField(() => Current()?.Color, v => Edit(p => p.Color = v, "color")));
-            var shade = Segmented(
-                [(Shade.Normal, "Normal", "A cor como ela é"), (Shade.Dark, "Escuro", "A cor mais escura (vermelho escuro, azul escuro…)"), (Shade.Light, "Claro", "A cor mais clarinha")],
-                () => Current()?.Shade ?? Shade.Normal, v => Edit(p => p.Shade = v == Shade.Normal ? null : v, "shade"));
-            shade.Margin = new Thickness(0, 6, 0, 0);
-            _content.Children.Add(shade);
         }
 
         if (type == PieceType.Box)
@@ -484,6 +529,10 @@ public sealed class ScreenPropertiesPanel : Border
             var border = SwitchRow("Borda", "Uma linha em volta da caixa.", () => Current()?.HasBorder == true, v => Edit(p => p.Border = v, "border"));
             border.Margin = new Thickness(0, 12, 0, 0);
             _content.Children.Add(border);
+            var boxShadow = SwitchRow("Sombra embaixo", "Uma sombra embaixo da caixa: ela parece flutuar em cima do fundo.",
+                () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
+            boxShadow.Margin = new Thickness(0, 10, 0, 0);
+            _content.Children.Add(boxShadow);
             _content.Children.Add(Section("CANTOS"));
             _content.Children.Add(Segmented(
                 [(Corner.Round, "Redondos", "Cantos arredondados"), (Corner.Square, "Retos", "Cantos em ângulo"), (Corner.Circle, "Círculo", "Círculo (numa caixa quadrada) ou oval: retratos redondos")],
@@ -900,53 +949,87 @@ public sealed class ScreenPropertiesPanel : Border
         return box;
     }
 
-    private static readonly GameColor[] Palette =
-        [GameColor.White, GameColor.Gray, GameColor.Red, GameColor.Orange, GameColor.Gold, GameColor.Green, GameColor.Blue, GameColor.Purple];
-
-    private static readonly Dictionary<GameColor, string> ColorNames = new()
+    private static readonly Dictionary<string, string> ColorNames = new()
     {
-        [GameColor.White] = "Branco (White)", [GameColor.Gray] = "Cinza (Gray)", [GameColor.Red] = "Vermelho (Red)",
-        [GameColor.Orange] = "Laranja (Orange)", [GameColor.Gold] = "Dourado (Gold)", [GameColor.Green] = "Verde (Green)",
-        [GameColor.Blue] = "Azul (Blue)", [GameColor.Purple] = "Roxo (Purple)",
+        ["White"] = "Branco (White)", ["Gray"] = "Cinza (Gray)", ["Black"] = "Preto (Black)", ["Red"] = "Vermelho (Red)",
+        ["Pink"] = "Rosa (Pink)", ["Orange"] = "Laranja (Orange)", ["Gold"] = "Dourado (Gold)", ["Green"] = "Verde (Green)",
+        ["Cyan"] = "Ciano (Cyan)", ["Blue"] = "Azul (Blue)", ["Purple"] = "Roxo (Purple)", ["Brown"] = "Marrom (Brown)",
     };
 
-    /// <summary>Bolinhas de cor; a primeira é a cor padrão da peça.</summary>
-    private FrameworkElement ColorField(Func<GameColor?> get, Action<GameColor?> set)
+    /// <summary>As cores da janela "Cor própria": vivas, claras, escuras e os cinzas.</summary>
+    private static readonly string[] CustomPalette =
+    [
+        "#FF4040", "#FF8C1A", "#FFD21A", "#8BD12C", "#2DBE60", "#1CC7C7", "#2F80ED", "#6C4CF5", "#B04CF5", "#F0479A",
+        "#FF9E9E", "#FFC28A", "#FFE88A", "#C6EE96", "#96E3B0", "#92E8E8", "#9CC2F7", "#B9A8FA", "#DDA8FA", "#F8A6CC",
+        "#A31F1F", "#A8530A", "#A88A0A", "#4F8A14", "#157A3C", "#117D7D", "#1A4F9C", "#3C2A9C", "#6E2A9C", "#9C2660",
+        "#FFFFFF", "#E0E0E0", "#BDBDBD", "#9E9E9E", "#757575", "#545454", "#3A3A3A", "#262626", "#141414", "#000000",
+    ];
+
+    private static Ellipse Dot(WpfColor color, double size = 18) => new()
+    {
+        Width = size,
+        Height = size,
+        Fill = new SolidColorBrush(color),
+        Stroke = new SolidColorBrush(WpfColor.FromArgb(0x50, 0xFF, 0xFF, 0xFF)),
+        StrokeThickness = 0.8,
+    };
+
+    private Border Ring(FrameworkElement dot, string tip)
+    {
+        var ring = new Border
+        {
+            Child = dot,
+            Padding = new Thickness(2),
+            CornerRadius = new CornerRadius(12),
+            BorderThickness = new Thickness(2),
+            BorderBrush = Brushes.Transparent,
+            Margin = new Thickness(0, 0, 3, 3),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = tip,
+        };
+        return ring;
+    }
+
+    /// <summary>
+    /// Bolinhas das cores com nome (combinam com o tema), a cor padrão e a "Cor própria": qualquer cor, por uma
+    /// paleta grande ou pelo código (#8A2BE2).
+    /// </summary>
+    private FrameworkElement ColorField(Func<GameColor?> get, Action<GameColor?> set, string defaultTip = "Cor padrão")
     {
         var panel = new WrapPanel();
         var swatches = new List<(GameColor? Color, Border Ring)>();
-        foreach (var color in new GameColor?[] { null }.Concat(Palette.Select(c => (GameColor?)c)))
+        // "Padrão": círculo vazio cortado por uma linha.
+        var none = new Grid { Width = 18, Height = 18 };
+        none.Children.Add(new Ellipse { Stroke = Theme.Muted, StrokeThickness = 1.2 });
+        none.Children.Add(new Line { X1 = 4, Y1 = 14, X2 = 14, Y2 = 4, Stroke = Theme.Muted, StrokeThickness = 1.2 });
+        var noneRing = Ring(none, defaultTip);
+        noneRing.MouseLeftButtonUp += (_, _) => set(null);
+        swatches.Add((null, noneRing));
+        panel.Children.Add(noneRing);
+        foreach (var color in GameColor.Named)
         {
-            FrameworkElement dot;
-            if (color is { } c)
-            {
-                var rgb = Theme.Rgb(c);
-                dot = new Ellipse { Width = 18, Height = 18, Fill = new SolidColorBrush(rgb) };
-            }
-            else
-            {
-                // "Padrão": círculo vazio cortado por uma linha.
-                var grid = new Grid { Width = 18, Height = 18 };
-                grid.Children.Add(new Ellipse { Stroke = Theme.Muted, StrokeThickness = 1.2 });
-                grid.Children.Add(new Line { X1 = 4, Y1 = 14, X2 = 14, Y2 = 4, Stroke = Theme.Muted, StrokeThickness = 1.2 });
-                dot = grid;
-            }
-            var ring = new Border
-            {
-                Child = dot,
-                Padding = new Thickness(2),
-                CornerRadius = new CornerRadius(12),
-                BorderThickness = new Thickness(2),
-                BorderBrush = Brushes.Transparent,
-                Margin = new Thickness(0, 0, 4, 4),
-                Background = Brushes.Transparent,
-                Cursor = Cursors.Hand,
-                ToolTip = color is { } n ? ColorNames[n] : "Cor padrão",
-            };
+            var ring = Ring(Dot(Theme.Rgb(color)), ColorNames.GetValueOrDefault(color.Name!, color.Name!) + "\nNo código: Color." + color.Name);
             ring.MouseLeftButtonUp += (_, _) => set(color);
             swatches.Add((color, ring));
             panel.Children.Add(ring);
         }
+
+        // Cor própria: o arco-íris quando não tem; a própria cor quando a peça usa uma.
+        var customHost = new Grid { Width = 18, Height = 18 };
+        var customRing = Ring(customHost, "Cor própria: qualquer cor (paleta grande ou código #RRGGBB)");
+        panel.Children.Add(customRing);
+        var popup = new Popup { PlacementTarget = customRing, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, VerticalOffset = 4 };
+        customRing.MouseLeftButtonUp += (_, _) =>
+        {
+            popup.Child = CustomColorCard(get(), color =>
+            {
+                popup.IsOpen = false;
+                set(color);
+            });
+            popup.IsOpen = true;
+        };
+
         _refreshers.Add(() =>
         {
             var current = get();
@@ -955,8 +1038,204 @@ public sealed class ScreenPropertiesPanel : Border
                 if (color == current) ring.SetResourceReference(Border.BorderBrushProperty, "Accent");
                 else ring.BorderBrush = Brushes.Transparent;
             }
+            customHost.Children.Clear();
+            if (current is { IsNamed: false } custom)
+            {
+                customHost.Children.Add(Dot(Theme.Rgb(custom)));
+                customRing.SetResourceReference(Border.BorderBrushProperty, "Accent");
+                customRing.ToolTip = $"Cor própria {custom}\nNo código: Color.Hex(\"{custom}\")\nClique para trocar";
+            }
+            else
+            {
+                customHost.Children.Add(new Ellipse
+                {
+                    Fill = new LinearGradientBrush(
+                        [new GradientStop(WpfColor.FromRgb(0xFF, 0x4D, 0x4D), 0), new GradientStop(WpfColor.FromRgb(0xFF, 0xD2, 0x1A), 0.33),
+                         new GradientStop(WpfColor.FromRgb(0x2D, 0xBE, 0x60), 0.55), new GradientStop(WpfColor.FromRgb(0x2F, 0x80, 0xED), 0.78),
+                         new GradientStop(WpfColor.FromRgb(0xB0, 0x4C, 0xF5), 1)], 45),
+                });
+                customHost.Children.Add(new TextBlock { Text = "+", FontSize = 13, FontWeight = FontWeights.Bold, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, -2, 0, 0) });
+                customRing.BorderBrush = Brushes.Transparent;
+                customRing.ToolTip = "Cor própria: qualquer cor (paleta grande ou código #RRGGBB)";
+            }
         });
         return panel;
+    }
+
+    /// <summary>A janelinha da cor própria: a paleta grande, as cores próprias que a tela já usa e o código.</summary>
+    private Border CustomColorCard(GameColor? current, Action<GameColor> choose)
+    {
+        var stack = new StackPanel { Width = 270 };
+        var title = new TextBlock { Text = "Cor própria", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 0, 8) };
+        title.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
+        stack.Children.Add(title);
+
+        var grid = new UniformGrid { Columns = 10 };
+        foreach (var hex in CustomPalette)
+        {
+            var color = GameColor.Hex(hex);
+            var cell = new Border
+            {
+                Width = 23,
+                Height = 23,
+                Margin = new Thickness(1),
+                CornerRadius = new CornerRadius(4),
+                Background = new SolidColorBrush(Theme.Rgb(color)),
+                BorderThickness = new Thickness(1),
+                BorderBrush = new SolidColorBrush(WpfColor.FromArgb(0x40, 0xFF, 0xFF, 0xFF)),
+                Cursor = Cursors.Hand,
+                ToolTip = hex,
+            };
+            cell.MouseLeftButtonUp += (_, _) => choose(color);
+            grid.Children.Add(cell);
+        }
+        stack.Children.Add(grid);
+
+        // As cores próprias que esta tela já usa: para repetir a mesma cor em outra peça.
+        var used = (_model.Layout?.Pieces ?? [])
+            .SelectMany(p => new[] { p.Color, p.TextColor })
+            .OfType<GameColor>()
+            .Where(c => !c.IsNamed)
+            .Distinct()
+            .Take(10)
+            .ToList();
+        if (used.Count > 0)
+        {
+            var usedTitle = new TextBlock { Text = "Já usadas nesta tela", FontSize = 11, Margin = new Thickness(0, 10, 0, 4) };
+            usedTitle.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+            stack.Children.Add(usedTitle);
+            var row = new WrapPanel();
+            foreach (var color in used)
+            {
+                var ring = Ring(Dot(Theme.Rgb(color)), color.ToString());
+                ring.MouseLeftButtonUp += (_, _) => choose(color);
+                row.Children.Add(ring);
+            }
+            stack.Children.Add(row);
+        }
+
+        var codeTitle = new TextBlock { Text = "Ou o código da cor (#RRGGBB)", FontSize = 11, Margin = new Thickness(0, 10, 0, 4) };
+        codeTitle.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        stack.Children.Add(codeTitle);
+        var preview = new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(4), Margin = new Thickness(0, 0, 6, 0), BorderThickness = new Thickness(1) };
+        preview.SetResourceReference(Border.BorderBrushProperty, "BorderStrong");
+        var box = new TextBox { Text = current is { IsNamed: false } c ? c.ToString() : "#", FontFamily = (FontFamily)FindResource("CodeFont"), VerticalContentAlignment = VerticalAlignment.Center };
+        var use = new Button { Content = "Usar", Margin = new Thickness(6, 0, 0, 0), MinWidth = 0 };
+        use.SetResourceReference(StyleProperty, "DialogButton");
+        use.MinWidth = 0;
+        void UpdatePreview()
+        {
+            bool ok = GameColor.TryParse(box.Text, out var parsed) && box.Text.Trim().StartsWith('#');
+            preview.Background = ok ? new SolidColorBrush(Theme.Rgb(parsed)) : Brushes.Transparent;
+            use.IsEnabled = ok;
+        }
+        void Apply()
+        {
+            if (box.Text.Trim().StartsWith('#') && GameColor.TryParse(box.Text, out var parsed)) choose(parsed);
+        }
+        box.TextChanged += (_, _) => UpdatePreview();
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Enter) Apply();
+        };
+        use.Click += (_, _) => Apply();
+        UpdatePreview();
+        var line = new DockPanel();
+        DockPanel.SetDock(preview, Dock.Left);
+        DockPanel.SetDock(use, Dock.Right);
+        line.Children.Add(preview);
+        line.Children.Add(use);
+        line.Children.Add(box);
+        stack.Children.Add(line);
+        var hint = new TextBlock { Text = "No código: Color.Hex(\"#8A2BE2\"). Dá para copiar o código de qualquer site de cores.", FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 8, 0, 0) };
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        stack.Children.Add(hint);
+
+        var card = new Border
+        {
+            Child = stack,
+            Padding = new Thickness(12),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(1),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect { BlurRadius = 14, ShadowDepth = 3, Opacity = 0.45, Color = Colors.Black },
+            Margin = new Thickness(0, 0, 12, 12),
+        };
+        card.SetResourceReference(Border.BackgroundProperty, "BgElevated");
+        card.SetResourceReference(Border.BorderBrushProperty, "BorderStrong");
+        return card;
+    }
+
+    /// <summary>
+    /// Opções com miniatura: cada uma desenhada de verdade, com a cor da peça (estilos de botão e de barra).
+    /// </summary>
+    private FrameworkElement PreviewPicker<T>(IReadOnlyList<(T Value, string Text, string Tip)> options, int columns,
+        Func<T, FrameworkElement> preview, Func<T> get, Action<T> set) where T : struct
+    {
+        var grid = new UniformGrid { Columns = columns };
+        var items = new List<(T Value, ToggleButton Button, Border Host)>();
+        foreach (var (value, text, tip) in options)
+        {
+            var host = new Border { Height = 30, HorizontalAlignment = HorizontalAlignment.Stretch, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+            var caption = new TextBlock { Text = text, FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0) };
+            var stack = new StackPanel { HorizontalAlignment = HorizontalAlignment.Stretch };
+            stack.Children.Add(host);
+            stack.Children.Add(caption);
+            var button = new ToggleButton
+            {
+                Content = stack,
+                Style = (Style)FindResource("IconToggle"),
+                ToolTip = tip,
+                Focusable = false,
+                Height = 64,
+                Padding = new Thickness(6, 4, 6, 4),
+                Margin = new Thickness(0, 0, 4, 4),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            };
+            button.Width = double.NaN;
+            button.HorizontalAlignment = HorizontalAlignment.Stretch;
+            button.Click += (_, _) => set(value);
+            items.Add((value, button, host));
+            grid.Children.Add(button);
+        }
+        _refreshers.Add(() =>
+        {
+            var current = get();
+            foreach (var (value, button, host) in items)
+            {
+                button.IsChecked = EqualityComparer<T>.Default.Equals(value, current);
+                host.Child = preview(value);
+            }
+        });
+        return grid;
+    }
+
+    /// <summary>Um botão pequenininho no estilo, com a cor da peça.</summary>
+    private static FrameworkElement MiniButton(Piece? piece, ButtonStyle style)
+    {
+        // Desenhado no tamanho de um botão de verdade e encolhido (o botão do jogo tem margens fixas por dentro).
+        var label = new TextBlock { Text = "Aa", FontSize = 17, FontFamily = Theme.FontOf(piece != null ? Theme.FontFor(piece) : null) };
+        if (piece?.Bold == true) label.FontWeight = FontWeights.Bold;
+        var look = Theme.LookOf(piece?.Color, piece?.Shade, style, piece?.TextColor);
+        label.Foreground = look.Text;
+        var button = Theme.MakeButton(label, piece?.Color, piece?.Shade, style, piece?.TextColor, Theme.ButtonCorners(piece?.Corner, 44));
+        button.Width = 104;
+        button.Height = 44;
+        if (piece?.Shadow == true) button.Effect = Theme.DropShadow;
+        // O palco do jogo por trás, para ver o estilo no fundo de verdade.
+        var stage = new Border { Child = button, Background = Theme.Background, Padding = new Thickness(8, 6, 8, 8) };
+        return new Viewbox { Child = stage, Height = 30, Stretch = Stretch.Uniform };
+    }
+
+    /// <summary>Uma barrinha no estilo, com a cor da peça.</summary>
+    private static FrameworkElement MiniBar(Piece? piece, BarStyle style)
+    {
+        var sample = new Piece
+        {
+            Type = PieceType.Bar, Name = "Sample", Width = 62, Height = 12, Value = 6, Max = 10,
+            Color = piece?.Color ?? GameColor.Green, Shade = piece?.Shade, Corner = piece?.Corner, BarStyle = style, BarText = BarText.None,
+        };
+        var bar = ScreenRenderer.Create(sample, new RenderContext { Live = false });
+        return new Border { Child = bar, Background = Theme.Background, CornerRadius = new CornerRadius(4), Padding = new Thickness(5, 9, 5, 9), HorizontalAlignment = HorizontalAlignment.Center };
     }
 
     private FrameworkElement AlignField(Func<TextAlign> get, Action<TextAlign> set)
@@ -1017,7 +1296,7 @@ public sealed class ScreenPropertiesPanel : Border
         return grid;
     }
 
-    /// <summary>As 4 fontes, cada nome escrito na própria fonte (assim dá para ver antes de escolher).</summary>
+    /// <summary>As fontes, cada nome escrito na própria fonte (assim dá para ver antes de escolher).</summary>
     private FrameworkElement FontField(Func<GameFont> get, Action<GameFont> set)
     {
         var grid = new UniformGrid { Columns = 2 };
@@ -1028,6 +1307,12 @@ public sealed class ScreenPropertiesPanel : Border
                      (GameFont.Fantasy, "Fantasia", "Font.Fantasy: de conto de fadas, boa para títulos"),
                      (GameFont.Book, "Livro", "Font.Book: de livro antigo, boa para pergaminhos e histórias"),
                      (GameFont.Hand, "À mão", "Font.Hand: parece escrita com caneta (bilhetes, diários)"),
+                     (GameFont.Strong, "Forte", "Font.Strong: alta e grossa, de cartaz (VITÓRIA!, GAME OVER, dano)"),
+                     (GameFont.Classic, "Clássica", "Font.Classic: de jornal antigo, séria e bonita (histórias, diálogos)"),
+                     (GameFont.Elegant, "Elegante", "Font.Elegant: cursiva, de convite (nomes de reinos, cartas reais)"),
+                     (GameFont.Fun, "Divertida", "Font.Fun: de quadrinho (jogos engraçados, falas)"),
+                     (GameFont.Retro, "Retrô", "Font.Retro: de computador antigo (terminais, naves)"),
+                     (GameFont.Tech, "Técnica", "Font.Tech: reta e moderna, de painel (placares, menus)"),
                  })
         {
             var button = new ToggleButton

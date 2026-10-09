@@ -1,4 +1,4 @@
-// A Coroa Perdida: um RPG completo de escolhas, com telas desenhadas (pasta Screens, botão Cenas lá em cima).
+// A Coroa Perdida: um RPG completo de escolhas, com telas desenhadas (pasta Screens, botão Estúdio lá em cima).
 // Mostra quase tudo que o motor faz: nome digitado, classes, loja com Lista, níveis, eventos com escolhas,
 // um enigma para responder, lutas com pausa (game.Wait), tremidas (Shake) e um chefe final.
 //

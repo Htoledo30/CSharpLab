@@ -7,7 +7,7 @@ using CSharpLab.ViewModels;
 namespace CSharpLab.Screens;
 
 /// <summary>
-/// O que a aba Tela edita, sem nada de interface (testável). O texto do arquivo continua sendo a fonte
+/// O que o Estúdio edita, sem nada de interface (testável). O texto do arquivo continua sendo a fonte
 /// de verdade: cada mudança grava o JSON no mesmo documento da aba, então desfazer, salvar, a recuperação
 /// e o aviso de "arquivo mudou no disco" funcionam como em qualquer arquivo.
 /// </summary>
@@ -118,7 +118,7 @@ public sealed class ScreenDesignerModel : IDisposable
     public event Action<string, string>? Renamed;
 
     /// <summary>
-    /// Quando o texto muda enquanto a aba Tela está escondida (Arquivo aberto), a leitura espera ela aparecer.
+    /// Quando o texto muda enquanto o Estúdio está escondida (Arquivo aberto), a leitura espera ela aparecer.
     /// </summary>
     public bool IsLive { get; set; } = true;
 
@@ -137,7 +137,7 @@ public sealed class ScreenDesignerModel : IDisposable
         Reparse();
     }
 
-    /// <summary>Lê o texto de novo (ao voltar para a aba Tela, por exemplo).</summary>
+    /// <summary>Lê o texto de novo (ao voltar para o Estúdio, por exemplo).</summary>
     public void Refresh()
     {
         if (_stale || Layout == null && Error == null) Reparse();
@@ -575,6 +575,50 @@ public sealed class ScreenDesignerModel : IDisposable
         var rest = layout.Pieces.Where(p => !names.Contains(p.Name)).ToList();
         layout.Pieces = toFront ? [.. rest, .. moving] : [.. moving, .. rest];
         Commit(layout);
+    }
+
+    // ------------------------------------------------------------------ camadas
+
+    /// <summary>
+    /// As camadas, da frente para trás: cada peça com quantos níveis ela está "dentro" (as peças de um
+    /// cartão aparecem logo acima da Lista delas, um nível para dentro).
+    /// </summary>
+    internal IReadOnlyList<(Piece Piece, int Depth)> Layers()
+    {
+        if (Layout == null) return [];
+        var layers = new List<(Piece, int)>();
+        foreach (var piece in DrawOrder().Reverse())
+            layers.Add((piece, Layout.ListOf(piece) != null ? 1 : 0));
+        return layers;
+    }
+
+    /// <summary>Duas peças trocam de ordem entre si só se estão no mesmo lugar: ambas soltas, ou no mesmo cartão.</summary>
+    internal bool SameLayerGroup(string a, string b) =>
+        Layout?.Find(a) is { } pa && Layout.Find(b) is { } pb &&
+        string.Equals(Layout.ListOf(pa)?.Name, Layout.ListOf(pb)?.Name, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Camadas: põe a peça logo na frente (ou logo atrás) de outra. Um passo só no desfazer.</summary>
+    public bool MoveLayer(string name, string target, bool inFront)
+    {
+        if (Layout == null || string.Equals(name, target, StringComparison.OrdinalIgnoreCase) || !SameLayerGroup(name, target)) return false;
+        var layout = Layout.Clone();
+        var piece = layout.Find(name)!;
+        layout.Pieces.Remove(piece);
+        var index = layout.Pieces.IndexOf(layout.Find(target)!);
+        layout.Pieces.Insert(inFront ? index + 1 : index, piece);
+        if (layout.Pieces.Select(p => p.Name).SequenceEqual(Layout.Pieces.Select(p => p.Name))) return false;
+        Commit(layout);
+        return true;
+    }
+
+    /// <summary>Camadas: um degrau para a frente (+1) ou para trás (-1), entre as peças do mesmo grupo.</summary>
+    public bool MoveLayerStep(string name, int direction)
+    {
+        if (Layout?.Find(name) is not { } piece) return false;
+        var group = Layout.Pieces.Where(p => SameLayerGroup(p.Name, piece.Name)).ToList();
+        int next = group.IndexOf(piece) + Math.Sign(direction);
+        if (next < 0 || next >= group.Count) return false;
+        return MoveLayer(piece.Name, group[next].Name, inFront: direction > 0);
     }
 
     /// <summary>Termina a junção de passos de desfazer (ao sair de um campo, trocar de peça…).</summary>

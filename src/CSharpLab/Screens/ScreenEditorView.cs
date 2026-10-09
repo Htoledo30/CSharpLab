@@ -117,6 +117,13 @@ public sealed class ScreenEditorView : Grid
 
     public bool IsDesignMode { get; private set; } = true;
 
+    /// <summary>No Estúdio o código já está ao lado: o botão "Código da cena" sai do cabeçalho.</summary>
+    public bool ShowCodeButton
+    {
+        get => _codeButton.Visibility == Visibility.Visible;
+        set => _codeButton.Visibility = value && Model.ProjectDirectory != null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
     /// <summary>O editor de texto, quando o Arquivo está aberto (para buscar, desfazer pelo menu etc.).</summary>
     public CodeEditor? ActiveTextEditor => IsDesignMode ? null : _editor;
 

@@ -107,6 +107,8 @@ public sealed class FakeDialogs : IDialogService
     public List<string> OpenedUrls { get; } = [];
     public void OpenUrl(string url) => OpenedUrls.Add(url);
     public string? TextAnswer { get; set; }
+    public string? TemplateAnswer { get; set; } = "Blank";
+    public string? AskScreenTemplate(string scene, string? projectDirectory) => TemplateAnswer;
     public string? AskText(string title, string message, string initial, Func<string, string?>? validate = null) => TextAnswer;
 }
 

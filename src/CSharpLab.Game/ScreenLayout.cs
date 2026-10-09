@@ -2,7 +2,7 @@ using System.Windows;
 
 namespace CSharpLab.GameEngine;
 
-// Uma tela desenhada na aba Tela (arquivo Screens/<Cena>.json). O jogo e o editor visual usam este modelo.
+// Uma tela desenhada no Estúdio (arquivo Screens/<Cena>.json). O jogo e o editor visual usam este modelo.
 
 internal enum PieceType { Text, Button, Bar, Image, Box, Input, Messages, List }
 
@@ -41,6 +41,10 @@ internal sealed class Piece
     public bool? Border { get; set; }
     public Corner? Corner { get; set; }
     public ButtonStyle? Style { get; set; }
+    /// <summary>Cor da letra do botão (null: automática, a que aparece bem em cima do fundo).</summary>
+    public Color? TextColor { get; set; }
+    public BarStyle? BarStyle { get; set; }
+    public BarText? BarText { get; set; }
     /// <summary>false: o botão (ou campo, ou imagem) fica apagado e não responde.</summary>
     public bool Enabled { get; set; } = true;
 
@@ -84,11 +88,15 @@ internal sealed class Piece
     {
         nameof(Text) => type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.List,
         nameof(Size) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages,
-        nameof(Bold) or nameof(Align) or nameof(Italic) or nameof(Shadow) or nameof(Scroll) => type is PieceType.Text,
-        nameof(Font) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages,
+        nameof(Align) or nameof(Italic) or nameof(Scroll) => type is PieceType.Text,
+        nameof(Bold) => type is PieceType.Text or PieceType.Button,
+        nameof(Shadow) => type is PieceType.Text or PieceType.Button or PieceType.Box,
+        nameof(Font) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages or PieceType.Bar,
         nameof(Color) or nameof(Shade) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages or PieceType.List),
-        nameof(Opacity) or nameof(Border) or nameof(Corner) => type is PieceType.Box,
-        nameof(Style) => type is PieceType.Button,
+        nameof(Opacity) or nameof(Border) => type is PieceType.Box,
+        nameof(Corner) => type is PieceType.Box or PieceType.Button or PieceType.Bar,
+        nameof(Style) or nameof(TextColor) => type is PieceType.Button,
+        nameof(BarStyle) or nameof(BarText) => type is PieceType.Bar,
         nameof(Shortcut) => type is PieceType.Button,
         nameof(Enabled) => type is PieceType.Button or PieceType.Input or PieceType.Image,
         nameof(Value) or nameof(Max) => type is PieceType.Bar,

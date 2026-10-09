@@ -21,9 +21,9 @@ internal static class ScreenFile
 
     private static readonly string[] PieceKeys =
         ["type", "name", "list", "x", "y", "width", "height", "text", "size", "bold", "italic", "shadow", "scroll", "font", "align", "color", "shade",
-         "opacity", "border", "corner", "style", "shortcut", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "visible"];
+         "opacity", "border", "corner", "style", "textcolor", "barstyle", "bartext", "shortcut", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "visible"];
 
-    public static string ValidColors => string.Join(", ", Enum.GetNames<Color>());
+    public static string ValidColors => Color.NamedList + " (ou o código de qualquer cor, como \"#8A2BE2\")";
 
     public static string ValidTypes => string.Join(", ", Enum.GetNames<PieceType>());
 
@@ -158,7 +158,10 @@ internal static class ScreenFile
                 "cardheight" => Number(value, label, key, v => piece.CardHeight = v, positive: true),
                 "gap" => Number(value, label, key, v => piece.Gap = Math.Max(0, v)),
                 "list" => Text(value, label, key, v => piece.List = string.IsNullOrWhiteSpace(v) ? null : v.Trim()),
-                "color" => ReadColor(value, label, v => piece.Color = v),
+                "color" => ReadColor(value, label, key, v => piece.Color = v),
+                "textcolor" => ReadColor(value, label, key, v => piece.TextColor = v),
+                "barstyle" => ReadEnum<BarStyle>(value, label, key, v => piece.BarStyle = v),
+                "bartext" => ReadEnum<BarText>(value, label, key, v => piece.BarText = v),
                 "font" => ReadEnum<Font>(value, label, key, v => piece.Font = v),
                 "shade" => ReadEnum<Shade>(value, label, key, v => piece.Shade = v),
                 "corner" => ReadEnum<Corner>(value, label, key, v => piece.Corner = v),
@@ -269,19 +272,19 @@ internal static class ScreenFile
         return null;
     }
 
-    private static string? ReadColor(JsonElement value, string label, Action<Color?> apply)
+    private static string? ReadColor(JsonElement value, string label, string key, Action<Color?> apply)
     {
         if (value.ValueKind == JsonValueKind.Null)
         {
             apply(null);
             return null;
         }
-        if (value.ValueKind == JsonValueKind.String && Enum.TryParse<Color>(value.GetString(), true, out var color) && Enum.IsDefined(color))
+        if (value.ValueKind == JsonValueKind.String && Color.TryParse(value.GetString(), out var color))
         {
             apply(color);
             return null;
         }
-        return $"{label}: \"color\" precisa ser uma destas cores: {ValidColors}.";
+        return $"{label}: \"{key}\" precisa ser uma destas cores: {ValidColors}.";
     }
 
     private static int? LineOf(string text, string needle)
@@ -355,6 +358,9 @@ internal static class ScreenFile
         if (p.Border is { } border && Piece.Supports(p.Type, nameof(Piece.Border))) parts.Add($"\"border\": {(border ? "true" : "false")}");
         if (p.Corner is { } corner and not Corner.Round && Piece.Supports(p.Type, nameof(Piece.Corner))) parts.Add($"\"corner\": \"{corner}\"");
         if (p.Style is { } style and not ButtonStyle.Filled && Piece.Supports(p.Type, nameof(Piece.Style))) parts.Add($"\"style\": \"{style}\"");
+        if (p.TextColor is { } textColor && Piece.Supports(p.Type, nameof(Piece.TextColor))) parts.Add($"\"textColor\": \"{textColor}\"");
+        if (p.BarStyle is { } barStyle and not BarStyle.Smooth && Piece.Supports(p.Type, nameof(Piece.BarStyle))) parts.Add($"\"barStyle\": \"{barStyle}\"");
+        if (p.BarText is { } barText and not BarText.Above && Piece.Supports(p.Type, nameof(Piece.BarText))) parts.Add($"\"barText\": \"{barText}\"");
         if (p.Shortcut != null && Piece.Supports(p.Type, nameof(Piece.Shortcut))) parts.Add($"\"shortcut\": {Quote(p.Shortcut)}");
         if (p.Value != null && p.Type == PieceType.Bar) parts.Add($"\"value\": {p.Value.Value.ToString(CultureInfo.InvariantCulture)}");
         if (p.Max != null && p.Type == PieceType.Bar) parts.Add($"\"max\": {p.Max.Value.ToString(CultureInfo.InvariantCulture)}");

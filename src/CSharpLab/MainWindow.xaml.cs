@@ -26,6 +26,7 @@ public partial class MainWindow : Window
         vm.Terminal = Terminal;
         Terminal.Bind(vm);
         Editors.Bind(vm);
+        Studio.Bind(vm);
         vm.ShutdownForUpdateRequested += () =>
         {
             _closingForUpdate = true;
@@ -81,6 +82,14 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.IsExplorerVisible):
                 ApplyExplorerLayout();
                 break;
+            case nameof(MainViewModel.IsStudioOpen):
+                ApplyStudio();
+                break;
+            case nameof(MainViewModel.ActiveDocument):
+                // Uma tela do jogo aberta pelo explorador (ou por um link) aparece no Estúdio.
+                if (!_vm.IsStudioOpen && _vm.ActiveDocument is { LivesInStudio: true, FilePath: { } screen })
+                    _vm.OpenStudio(System.IO.Path.GetFileNameWithoutExtension(screen));
+                break;
             case nameof(MainViewModel.IsPanelOpen):
             case nameof(MainViewModel.PanelTab):
             case nameof(MainViewModel.IsPanelMaximized):
@@ -91,7 +100,8 @@ public partial class MainWindow : Window
 
     private void ApplyExplorerLayout()
     {
-        bool visible = _vm.IsExplorerVisible;
+        // O Estúdio tem a própria lista (as cenas): o explorador sai para sobrar espaço.
+        bool visible = _vm.IsExplorerVisible && !_vm.IsStudioOpen;
         ExplorerColumn.Width = visible ? new GridLength(_vm.ExplorerWidth) : new GridLength(0);
         ExplorerSplitterColumn.Width = visible ? new GridLength(4) : new GridLength(0);
         ExplorerPane.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
@@ -173,6 +183,13 @@ public partial class MainWindow : Window
     {
         if (!IsActive) return;
         var focused = Keyboard.FocusedElement as DependencyObject;
+        if (_vm.IsStudioOpen)
+        {
+            if (focused is TextBox || focused != null && Studio.IsAncestorOf(focused)) return;
+            if (Terminal.WasLastUsed && Terminal.IsVisible) Terminal.FocusTerminal();
+            else if (focused is null or Button or Window or ListBoxItem) Studio.FocusActive();
+            return;
+        }
         if (focused is TextBox || focused != null && Editors.IsAncestorOf(focused)) return;
         if (Terminal.WasLastUsed && Terminal.IsVisible) Terminal.FocusTerminal();
         else if (focused is null or Button or Window or ListBoxItem) Editors.FocusActive();
@@ -237,9 +254,16 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>O editor de texto onde o menu age: o do Estúdio, quando ele está aberto, ou o da aba ativa.</summary>
+    private Editor.CodeEditor? CurrentEditor => _vm.IsStudioOpen ? Studio.MenuEditor : Editors.ActiveEditor;
+
+    /// <summary>A tela onde Desfazer/Refazer agem (no Estúdio, quando foi ela a última a receber o teclado).</summary>
+    private Screens.ScreenEditorView? CurrentScreen => _vm.IsStudioOpen ? Studio.ActiveScreen : Editors.ActiveScreen;
+
     private void OpenFind(bool replace)
     {
-        if (Editors.ActiveEditor is { } editor) Editors.FindBar.Open(editor, replace);
+        if (CurrentEditor is not { } editor) return;
+        (_vm.IsStudioOpen ? Studio.FindBar : Editors.FindBar).Open(editor, replace);
     }
 
     private void OnFind(object sender, RoutedEventArgs e) => OpenFind(replace: false);
@@ -247,7 +271,7 @@ public partial class MainWindow : Window
 
     private async void OnFormat(object sender, RoutedEventArgs e)
     {
-        if (Editors.ActiveEditor is { } editor)
+        if (CurrentEditor is { } editor)
         {
             if (_vm.Language == null)
             {
@@ -261,7 +285,7 @@ public partial class MainWindow : Window
     /// <summary>Executa uma ação no editor ativo e devolve o foco a ele.</summary>
     private void WithEditor(Action<Editor.CodeEditor> action)
     {
-        if (Editors.ActiveEditor is not { } editor) return;
+        if (CurrentEditor is not { } editor) return;
         editor.TextArea.Focus();
         action(editor);
     }
@@ -277,7 +301,7 @@ public partial class MainWindow : Window
 
     private void OnShowCompletion(object sender, RoutedEventArgs e)
     {
-        if (Editors.ActiveEditor is { } editor)
+        if (CurrentEditor is { } editor)
         {
             editor.TextArea.Focus();
             editor.ShowCompletion();
@@ -286,7 +310,7 @@ public partial class MainWindow : Window
 
     private void Exec(RoutedUICommand command)
     {
-        if (Editors.ActiveEditor is { } editor && command.CanExecute(null, editor.TextArea))
+        if (CurrentEditor is { } editor && command.CanExecute(null, editor.TextArea))
         {
             command.Execute(null, editor.TextArea);
             editor.TextArea.Focus();
@@ -295,13 +319,13 @@ public partial class MainWindow : Window
 
     private void OnUndo(object sender, RoutedEventArgs e)
     {
-        if (Editors.ActiveScreen is { } screen) screen.Model.Undo();
+        if (CurrentScreen is { } screen) screen.Model.Undo();
         else Exec(ApplicationCommands.Undo);
     }
 
     private void OnRedo(object sender, RoutedEventArgs e)
     {
-        if (Editors.ActiveScreen is { } screen) screen.Model.Redo();
+        if (CurrentScreen is { } screen) screen.Model.Redo();
         else Exec(ApplicationCommands.Redo);
     }
     private void OnCut(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Cut);
@@ -328,25 +352,52 @@ public partial class MainWindow : Window
         _guide.Show();
     }
 
-    // ================================================================ cenas do jogo
+    // ================================================================ Estúdio do jogo
 
     private void OnScenesButton(object sender, RoutedEventArgs e)
     {
+        if (_vm.IsStudioOpen)
+        {
+            _vm.CloseStudio();
+            return;
+        }
         Editors.ActiveEditor?.ClosePopups();
-        ScenesMenu.Show(ScenesMenu.Build(_vm, CurrentScene()), ScenesButton);
+        _vm.OpenStudio(CurrentScene());
+    }
+
+    /// <summary>Abre ou fecha o Estúdio no lugar das abas (e do explorador).</summary>
+    private void ApplyStudio()
+    {
+        bool open = _vm.IsStudioOpen;
+        if (open)
+        {
+            Editors.Suspended = true;
+            EditorArea.Visibility = Visibility.Collapsed;
+            Studio.Visibility = Visibility.Visible;
+            ApplyExplorerLayout();
+            Studio.Open(null);
+        }
+        else
+        {
+            Studio.Leave();
+            Studio.Visibility = Visibility.Collapsed;
+            EditorArea.Visibility = Visibility.Visible;
+            Editors.Suspended = false;
+            ApplyExplorerLayout();
+            Editors.FocusActive();
+        }
     }
 
     /// <summary>A cena da aba ativa: a tela aberta, ou o game.Scene onde está o cursor do código.</summary>
-    private SceneContext? CurrentScene()
+    private string? CurrentScene()
     {
         if (_vm.ActiveDocument is { IsScreen: true, FilePath: { } screen })
-            return new SceneContext(System.IO.Path.GetFileNameWithoutExtension(screen), OnScreen: true);
+            return System.IO.Path.GetFileNameWithoutExtension(screen);
         if (Editors.ActiveEditor is { Doc.IsCSharp: true } editor)
         {
             try
             {
-                if (Core.Language.GameAssist.SceneAt(editor.Syntax.Root, editor.CaretOffset) is { } scene)
-                    return new SceneContext(scene.Name, OnScreen: false);
+                return Core.Language.GameAssist.SceneAt(editor.Syntax.Root, editor.CaretOffset)?.Name;
             }
             catch
             {

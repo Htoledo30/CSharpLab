@@ -298,7 +298,7 @@ public static partial class PortugueseDocs
         m[game + ".Image"] = D("Image = imagem. Mostra uma imagem (png ou jpg) da pasta Assets do projeto.", "game.Image(\"goblin.png\");");
         m[game + ".Start"] = D("Start = começar. Abre a janela do jogo na primeira cena. Fica sempre na última linha.", "game.Start(\"Start\");");
         m[game + ".CurrentScene"] = D("CurrentScene = cena atual. O nome da cena que está na tela.");
-        m[game + ".Find"] = D("Find = encontrar. Pega uma peça desenhada na aba Tela pelo nome, para mudar ela pelo código com =.",
+        m[game + ".Find"] = D("Find = encontrar. Pega uma peça desenhada no Estúdio pelo nome, para mudar ela pelo código com =.",
             "game.Find(\"Story\").Text = \"Um goblin aparece!\";\ngame.Find(\"Attack\").OnClick(() => enemyHealth -= 10);");
 
         m[game + ".Background"] = D("Background = fundo. A imagem de fundo da tela desenhada (pasta Assets). Mude pelo código para a mesma tela servir a lugares diferentes.",
@@ -307,12 +307,29 @@ public static partial class PortugueseDocs
             "game.OnEnter(() =>\n{\n    enemyHealth = 30;\n    game.Write(\"Um goblin aparece!\");\n});");
         m[game + ".Wait"] = D("Wait = esperar. Dentro de um clique, mostra a tela como está e espera um pouco (em segundos) antes de continuar: você ataca e o inimigo responde logo depois.",
             "game.Write(\"Você atacou!\");\ngame.Wait(0.6);\ngame.Write(\"O goblin revida!\", Color.Red);");
+        m[game + ".Clear"] = D("Clear = limpar. Dentro de um clique (ou do OnEnter), apaga as mensagens que a cena já mostrou, como o Console.Clear() do terminal. O que for escrito depois aparece normalmente.",
+            "game.Clear();\ngame.Write(\"Você achou 5 moedas!\");");
+        m[game + ".Pause"] = D("Pause = pausar. Dentro de um clique, espera o jogador apertar Continuar (ou Enter) e depois segue na linha de baixo: o \"aperte Enter para continuar\" do terminal. Wait espera um tempo; Pause espera o jogador.",
+            "game.Write(\"Você encontrou uma chave!\");\ngame.Pause();\ngame.Clear();");
+        m[game + ".Read"] = D("Read = ler. Dentro de um clique, pergunta e espera o jogador escrever; a resposta volta como texto. É o Console.ReadLine() do jogo.",
+            "string answer = game.Read(\"Quantas moedas você aposta?\");\nif (int.TryParse(answer, out int bet)) gold -= bet;");
+        m[game + ".Choose"] = D("Choose = escolher. Dentro de um clique, mostra uma pergunta com um botão para cada opção e devolve o texto da escolhida (bom para um switch). Teclas 1 a 9 também escolhem.",
+            "string choice = game.Choose(\"Abrir o baú?\", \"Sim\", \"Não\");\nif (choice == \"Sim\") gold += 10;");
+        m[game + ".OnKey"] = D("OnKey = ao apertar uma tecla. Dentro da cena: recebe cada tecla que o jogador aperta (compare com ConsoleKey, como no terminal). Segurar a tecla repete.",
+            "game.OnKey(key =>\n{\n    if (key == ConsoleKey.D) x++;\n    else if (key == ConsoleKey.A) x--;\n});");
+        m[game + ".Close"] = D("Close = fechar. Termina o jogo e fecha a janela (bom para um botão Sair).", "game.Find(\"Quit\").OnClick(() => game.Close());");
         m[game + ".WindowTitle"] = D("WindowTitle = título da janela. O nome do jogo, mostrado no alto da janela.");
+        m[game + ".Save"] = D("Save = salvar. Guarda um valor com um nome (número, texto, true/false, lista ou um objeto inteiro). Continua salvo depois de fechar o jogo.",
+            "game.Save(\"gold\", gold);\ngame.Save(\"hero\", hero);");
+        m[game + ".Load"] = D("Load = carregar. Pega um valor salvo com game.Save; sem nada salvo, volta o valor que você der (o do jogo novo).",
+            "int gold = game.Load(\"gold\", 50);\nHero hero = game.Load(\"hero\", new Hero());");
+        m[game + ".HasSave"] = D("HasSave = tem jogo salvo. true se o game.Save já guardou alguma coisa.", "game.Find(\"Continue\").Visible = game.HasSave;");
+        m[game + ".DeleteSave"] = D("DeleteSave = apagar o jogo salvo. Começa tudo do zero.", "game.DeleteSave();");
 
         const string item = "CSharpLab.GameEngine.Item";
-        m[item] = D("Item = peça. Uma peça desenhada na aba Tela (texto, botão, barra, imagem…). Mude as propriedades dela com =.",
+        m[item] = D("Item = peça. Uma peça desenhada no Estúdio (texto, botão, barra, imagem…). Mude as propriedades dela com =.",
             "var story = game.Find(\"Story\");\nstory.Text = \"Olá!\";\nstory.Color = Color.Gold;");
-        m[item + ".Name"] = D("Name = nome. O nome da peça na aba Tela.");
+        m[item + ".Name"] = D("Name = nome. O nome da peça no Estúdio.");
         m[item + ".Text"] = D("Text = texto. O texto de um Texto ou Botão, o rótulo de uma Barra ou a pergunta de um Campo de escrita.",
             "game.Find(\"Story\").Text = $\"Ouro: {gold}\";");
         m[item + ".Value"] = D("Value = valor. Quanto a Barra tem agora.", "game.Find(\"PlayerHealth\").Value = health;");
@@ -335,17 +352,23 @@ public static partial class PortugueseDocs
         m[item + ".Shade"] = D("Shade = tom. A cor mais escura (Shade.Dark) ou mais clara (Shade.Light).", "game.Find(\"BossFrame\").Shade = Shade.Dark;");
         m[item + ".Opacity"] = D("Opacity = preenchimento da Caixa, de 0 (invisível) a 100 (cheia).", "game.Find(\"Panel\").Opacity = 60;");
         m[item + ".Border"] = D("Border = borda. true mostra a borda da Caixa; false tira.", "game.Find(\"Panel\").Border = true;");
-        m[item + ".Corner"] = D("Corner = canto. Os cantos da Caixa: Corner.Round (redondos), Corner.Square (retos) ou Corner.Circle (círculo).",
+        m[item + ".Corner"] = D("Corner = canto. Cantos da Caixa, do Botão e da Barra: Corner.Round (redondos), Corner.Square (retos) ou Corner.Circle (na Caixa, círculo; no Botão e na Barra, pontas redondas como uma pílula).",
             "game.Find(\"Portrait\").Corner = Corner.Circle;");
-        m[item + ".Font"] = D("Font = fonte, o desenho das letras: Font.Normal, Font.Fantasy (fantasia), Font.Book (livro antigo) ou Font.Hand (à mão).",
+        m[item + ".Font"] = D("Font = fonte, o desenho das letras: Font.Normal, Fantasy (fantasia), Book (livro), Hand (à mão), Strong (forte), Classic (clássica), Elegant (elegante), Fun (divertida), Retro (retrô) ou Tech (técnica).",
             "game.Find(\"Title\").Font = Font.Fantasy;");
-        m[item + ".Bold"] = D("Bold = negrito. true deixa as letras do Texto mais grossas.", "game.Find(\"Title\").Bold = true;");
+        m[item + ".Bold"] = D("Bold = negrito. true deixa as letras do Texto (ou do Botão) mais grossas.", "game.Find(\"Title\").Bold = true;");
         m[item + ".Italic"] = D("Italic = itálico. true deixa as letras do Texto inclinadas.", "game.Find(\"Letter\").Italic = true;");
         m[item + ".Scroll"] = D("Scroll = rolagem. true dá uma barra de rolagem ao Texto: texto comprido (uma carta, a história) não é cortado, o jogador rola com a roda do mouse.",
             "game.Find(\"Letter\").Scroll = true;");
-        m[item + ".Shadow"] = D("Shadow = sombra. true põe uma sombra atrás das letras, para ler bem em cima de qualquer fundo.", "game.Find(\"Title\").Shadow = true;");
-        m[item + ".Style"] = D("Style = estilo do botão: ButtonStyle.Filled (cheio), ButtonStyle.Outline (contorno) ou ButtonStyle.Text (só texto).",
+        m[item + ".Shadow"] = D("Shadow = sombra. No Texto, uma sombra atrás das letras (para ler em cima de qualquer fundo); no Botão e na Caixa, uma sombra embaixo da peça.", "game.Find(\"Title\").Shadow = true;");
+        m[item + ".Style"] = D("Style = estilo do botão: ButtonStyle.Filled (cheio), Gradient (degradê), Soft (suave), Outline (contorno) ou Text (só texto).",
             "game.Find(\"Back\").Style = ButtonStyle.Text;");
+        m[item + ".TextColor"] = D("TextColor = cor da letra do botão. Sem escolher, é automática (a que aparece bem em cima do fundo).",
+            "game.Find(\"Buy\").TextColor = Color.Gold;");
+        m[item + ".BarStyle"] = D("BarStyle = estilo da barra: BarStyle.Smooth (lisa), BarStyle.Shine (brilhante) ou BarStyle.Blocks (em blocos).",
+            "game.Find(\"Mana\").BarStyle = BarStyle.Shine;");
+        m[item + ".BarText"] = D("BarText = onde ficam o nome e o número da barra: BarText.Above (em cima), BarText.Inside (dentro) ou BarText.None (sem texto).",
+            "game.Find(\"Health\").BarText = BarText.Inside;");
         m[item + ".Show"] = D("Show = mostrar. Enche a Lista com um cartão para cada item; entre as chaves, você diz o que vai em cada cartão.",
             "game.Find(\"Weapons\").Show(weapons, (card, weapon) =>\n{\n    card.Find(\"Name\").Text = weapon.Name;\n    card.Find(\"Buy\").OnClick(() => Buy(weapon));\n});");
         m[item + ".Shake"] = D("Shake = tremer. A peça treme um pouquinho (bom para quem levou um golpe).", "game.Find(\"EnemyIcon\").Shake();");
@@ -361,34 +384,61 @@ public static partial class PortugueseDocs
         m[card + ".ToString"] = D("Mostra a lista e o número do cartão, como \"Weapons, cartão 2\".");
 
         const string engine = "CSharpLab.GameEngine.";
-        m[engine + "Color"] = D("Color = cor: White, Gray, Red, Green, Blue, Gold, Purple, Orange.", "game.Write(\"Cuidado!\", Color.Red);");
+        m[engine + "Color"] = D("Color = cor. Com nome (combinam com o tema): White, Gray, Black, Red, Pink, Orange, Gold, Green, Cyan, Blue, Purple, Brown. Qualquer outra: Color.Hex(\"#8A2BE2\") ou Color.Rgb(138, 43, 226).",
+            "game.Write(\"Cuidado!\", Color.Red);\ngame.Find(\"Mana\").Color = Color.Hex(\"#3FA9F5\");");
         foreach (var (name, text) in new[]
                  {
-                     ("White", "branco"), ("Gray", "cinza"), ("Red", "vermelho"), ("Green", "verde"),
-                     ("Blue", "azul"), ("Gold", "dourado"), ("Purple", "roxo"), ("Orange", "laranja"),
+                     ("White", "branco"), ("Gray", "cinza"), ("Black", "preto"), ("Red", "vermelho"), ("Pink", "rosa"),
+                     ("Orange", "laranja"), ("Gold", "dourado"), ("Green", "verde"), ("Cyan", "ciano (azul-piscina)"),
+                     ("Blue", "azul"), ("Purple", "roxo"), ("Brown", "marrom"),
                  })
             m[engine + "Color." + name] = D($"{name} = {text}.");
+        m[engine + "Color.Hex"] = D("Hex = qualquer cor pelo código dela, como nos sites de cores: \"#RRGGBB\" (vermelho, verde e azul, de 00 a FF).",
+            "game.Find(\"Mana\").Color = Color.Hex(\"#3FA9F5\");");
+        m[engine + "Color.Rgb"] = D("Rgb = qualquer cor misturando vermelho, verde e azul, cada um de 0 a 255.",
+            "game.Find(\"Potion\").Color = Color.Rgb(255, 102, 204);");
+        m[engine + "Color.Equals"] = D("Equals = é igual. A mesma cor (o mesmo nome, ou o mesmo código).");
+        m[engine + "Color.GetHashCode"] = D("Um número que resume a cor (o C# usa para guardar cores em listas e dicionários).");
+        m[engine + "Color.ToString"] = D("O nome da cor (\"Red\") ou o código dela (\"#8A2BE2\").");
 
         m[engine + "Shade"] = D("Shade = tom: Shade.Normal, Shade.Dark (escuro) ou Shade.Light (claro).", "game.Find(\"BossFrame\").Shade = Shade.Dark;");
         m[engine + "Shade.Normal"] = D("Normal: a cor como ela é.");
         m[engine + "Shade.Dark"] = D("Dark = escuro: vermelho escuro, azul escuro… Bom para molduras e fundos.");
         m[engine + "Shade.Light"] = D("Light = claro: a cor mais clarinha.");
 
-        m[engine + "Corner"] = D("Corner = canto da Caixa: Corner.Round (redondos), Corner.Square (retos) ou Corner.Circle (círculo).", "game.Find(\"Portrait\").Corner = Corner.Circle;");
+        m[engine + "Corner"] = D("Corner = canto da Caixa, do Botão ou da Barra: Corner.Round (redondos), Corner.Square (retos) ou Corner.Circle (círculo, ou pílula no Botão e na Barra).", "game.Find(\"Portrait\").Corner = Corner.Circle;");
         m[engine + "Corner.Round"] = D("Round = redondo: cantos arredondados (o normal).");
         m[engine + "Corner.Square"] = D("Square = quadrado: cantos retos, em ângulo.");
-        m[engine + "Corner.Circle"] = D("Circle = círculo: numa caixa quadrada vira um círculo (retratos redondos).");
+        m[engine + "Corner.Circle"] = D("Circle = círculo: numa caixa quadrada vira um círculo (retratos redondos); no Botão e na Barra, pontas todas redondas.");
 
         m[engine + "Font"] = D("Font = fonte, o desenho das letras. Todas vêm com o Windows.", "game.Find(\"Title\").Font = Font.Fantasy;");
         m[engine + "Font.Normal"] = D("Normal: a letra limpa e fácil de ler.");
         m[engine + "Font.Fantasy"] = D("Fantasy = fantasia: letra caprichada, de conto de fadas. Boa para títulos.");
         m[engine + "Font.Book"] = D("Book = livro: letra de livro antigo, boa para pergaminhos e histórias.");
         m[engine + "Font.Hand"] = D("Hand = mão: parece escrita com caneta. Boa para bilhetes e diários.");
+        m[engine + "Font.Strong"] = D("Strong = forte: letra alta e grossa, de cartaz. Boa para VITÓRIA!, GAME OVER e números de dano.");
+        m[engine + "Font.Classic"] = D("Classic = clássica: letra de jornal antigo, séria e bonita. Boa para histórias e diálogos.");
+        m[engine + "Font.Elegant"] = D("Elegant = elegante: letra cursiva, de convite. Boa para nomes de reinos e cartas reais.");
+        m[engine + "Font.Fun"] = D("Fun = divertida: letra de quadrinho. Boa para jogos engraçados e falas.");
+        m[engine + "Font.Retro"] = D("Retro = retrô: letra de computador antigo. Boa para terminais e jogos de nave.");
+        m[engine + "Font.Tech"] = D("Tech = técnica: letra reta e moderna, de painel. Boa para placares e menus.");
 
-        m[engine + "ButtonStyle"] = D("ButtonStyle = estilo do botão: Filled (cheio), Outline (contorno) ou Text (só texto).", "game.Find(\"Back\").Style = ButtonStyle.Outline;");
+        m[engine + "ButtonStyle"] = D("ButtonStyle = estilo do botão: Filled (cheio), Gradient (degradê), Soft (suave), Outline (contorno) ou Text (só texto).", "game.Find(\"Back\").Style = ButtonStyle.Outline;");
+        m[engine + "ButtonStyle.Gradient"] = D("Gradient = degradê: claro em cima e escuro embaixo, com borda. Parece botão de videogame.");
+        m[engine + "ButtonStyle.Soft"] = D("Soft = suave: fundo clarinho da cor, sem borda. Bom para opções e abas.");
         m[engine + "ButtonStyle.Filled"] = D("Filled = cheio: fundo colorido. Para a ação principal (Atacar).");
         m[engine + "ButtonStyle.Outline"] = D("Outline = contorno: só a borda colorida. Para ações secundárias.");
         m[engine + "ButtonStyle.Text"] = D("Text = texto: sem fundo nem borda. Para ações discretas (Voltar).");
+
+        m[engine + "BarStyle"] = D("BarStyle = estilo da barra: Smooth (lisa), Shine (brilhante) ou Blocks (em blocos).", "game.Find(\"Mana\").BarStyle = BarStyle.Shine;");
+        m[engine + "BarStyle.Smooth"] = D("Smooth = lisa: uma cor só (o normal).");
+        m[engine + "BarStyle.Shine"] = D("Shine = brilho: degradê com brilho e fundo da mesma cor. Boa para mana e magia.");
+        m[engine + "BarStyle.Blocks"] = D("Blocks = blocos: a barra em pedaços, um por ponto (até 20). Boa para corações, energia e munição.");
+
+        m[engine + "BarText"] = D("BarText = texto da barra: onde ficam o nome e o número. Above (em cima), Inside (dentro) ou None (sem texto).", "game.Find(\"Health\").BarText = BarText.Inside;");
+        m[engine + "BarText.Above"] = D("Above = em cima: \"Vida\" e \"30 / 50\" em cima da barra (o normal).");
+        m[engine + "BarText.Inside"] = D("Inside = dentro: o nome e o número dentro da barra, como nos jogos de luta.");
+        m[engine + "BarText.None"] = D("None = nenhum: só a barra, sem texto.");
 
         m[engine + "GameException"] = D("Erro do motor do jogo. A mensagem explica em português o que fazer.");
     }

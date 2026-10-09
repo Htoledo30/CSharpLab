@@ -45,12 +45,16 @@ $lock = $null
 $stage = $null
 $backup = $null
 $oldMoved = $false
+$oldCopied = $false
+$old = $null
 $installed = $false
 $canRelaunch = $false
 $pathsValidated = $false
 $exitCode = 1
 try {
     $UpdatesRoot = Full-Path $UpdatesRoot
+    # Este processo não pode ficar "dentro" da pasta que vai ser trocada.
+    if (Test-Path -LiteralPath $UpdatesRoot) { Set-Location -LiteralPath $UpdatesRoot }
     $Source = Full-Path $Source
     $Target = Full-Path $Target
     if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Versão inválida.' }
@@ -108,11 +112,37 @@ try {
     Get-ChildItem -LiteralPath $Source -Force | Copy-Item -Destination $stage -Recurse -Force
     Verify-Files $stage $manifest.Files $false
     $manifest.Files | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $stage '.csharplab-package.json') -Encoding UTF8
+    $inPlace = $false
     if (Test-Path -LiteralPath $Target) {
-        Move-Item -LiteralPath $Target -Destination $backup
-        $oldMoved = $true
+        # O antivírus ou o indexador podem segurar a pasta por um instante: tenta de novo antes de desistir.
+        for ($try = 1; -not $oldMoved -and -not $inPlace; $try++) {
+            try { Move-Item -LiteralPath $Target -Destination $backup; $oldMoved = $true }
+            catch {
+                if ($try -lt 10) { Start-Sleep -Milliseconds 500 }
+                else { Write-Log ('A pasta não pôde ser trocada inteira: ' + $_.Exception.Message); $inPlace = $true }
+            }
+        }
     }
-    Move-Item -LiteralPath $stage -Destination $Target
+    if ($inPlace) {
+        # Algum programa está "dentro" da pasta (uma janela do Explorer, um terminal…): troca arquivo por
+        # arquivo, guardando antes uma cópia para voltar atrás se algo der errado.
+        Copy-Item -LiteralPath $Target -Destination $backup -Recurse
+        $oldCopied = $true
+        Get-ChildItem -LiteralPath $stage -Force | Copy-Item -Destination $Target -Recurse -Force
+        if ($old) {
+            foreach ($file in $old.PSObject.Properties) {
+                if (-not $manifest.Files.PSObject.Properties[$file.Name]) {
+                    $oldFile = Inside-Path $Target $file.Name
+                    if (Test-Path -LiteralPath $oldFile -PathType Leaf) { Remove-Item -LiteralPath $oldFile -Force }
+                }
+            }
+        }
+        Verify-Files $Target $manifest.Files $false
+        Write-Log 'Arquivos trocados um por um.'
+    }
+    else {
+        Move-Item -LiteralPath $stage -Destination $Target
+    }
     $installed = $true
     $exitCode = 0
     Write-Log "Atualizado para $Version."
@@ -133,6 +163,10 @@ catch {
             Move-Item -LiteralPath $backup -Destination $Target
             Write-Log 'Versão anterior restaurada.'
         }
+        elseif ($oldCopied -and -not $installed) {
+            Get-ChildItem -LiteralPath $backup -Force | Copy-Item -Destination $Target -Recurse -Force
+            Write-Log 'Versão anterior restaurada.'
+        }
         if ($UpdatesRoot -and (Test-Path -LiteralPath $UpdatesRoot)) {
             @{ Version = $Version; Message = $failureMessage } | ConvertTo-Json |
                 Set-Content -LiteralPath (Join-Path $UpdatesRoot 'falha.json') -Encoding UTF8
@@ -150,6 +184,6 @@ finally {
     if ($lock) { $lock.Dispose() }
 }
 if ($Relaunch -and $canRelaunch -and (Test-Path -LiteralPath (Join-Path $Target 'CSharpLab.exe'))) {
-    Start-Process -FilePath (Join-Path $Target 'CSharpLab.exe') -WorkingDirectory $Target -WindowStyle Hidden
+    Start-Process -FilePath (Join-Path $Target 'CSharpLab.exe') -WorkingDirectory ([Environment]::GetFolderPath('UserProfile')) -WindowStyle Hidden
 }
 exit $exitCode

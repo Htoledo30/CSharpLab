@@ -19,7 +19,7 @@ public static class Examples
         new("TicTacToe", "Jogo da velha", "Array de duas dimensões e for dentro de for"),
         new("RpgBattle", "Batalha RPG", "Classes e objetos, em dois arquivos"),
         new("Snake", "Cobrinha", "Jogo em tempo real: teclas, cores e posição na tela"),
-        new("RpgScreens", "RPG com botões", "Telas desenhadas na aba Tela; o código diz o que cada botão faz", IsGame: true),
+        new("RpgScreens", "RPG com botões", "Telas desenhadas no Estúdio; o código diz o que cada botão faz", IsGame: true),
         new("RpgAdventure", "RPG completo: A Coroa Perdida", "Classes, loja, níveis, eventos com escolhas, um enigma e o chefe final", IsGame: true),
         new("RpgButtons", "RPG só com código", "As mesmas ideias sem desenhar: game.Title, game.Button, game.Bar", IsGame: true),
     ];

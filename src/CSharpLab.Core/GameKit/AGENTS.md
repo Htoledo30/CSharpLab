@@ -95,6 +95,15 @@ game.Start("Name");
 | `game.CurrentScene` | Nome da cena atual. |
 | `game.Background = "tower.png";` | Troca a imagem de fundo da tela (pasta `Assets/`). Começa com o `background` do arquivo da tela. |
 | `game.Wait(0.6);` | **Só dentro de um clique.** Mostra a tela como está e espera (0 a 5 s) antes do resto do clique: o herói ataca, o inimigo responde depois. O jogador não clica durante a pausa. |
+| `game.Pause();` | **Só dentro de um clique.** Mostra a tela e espera o jogador apertar Continuar (ou Enter, Espaço, clique na tela); depois o código segue na linha de baixo. É o "aperte Enter para continuar" do terminal. `game.Pause("Abrir o baú")` muda o texto do botão. |
+| `string answer = game.Read("Pergunta?");` | **Só dentro de um clique.** Pergunta e espera o jogador escrever (resposta sem espaços nas pontas, nunca vazia). É o `Console.ReadLine()`. |
+| `string choice = game.Choose("Pergunta?", "Sim", "Não");` | **Só dentro de um clique.** De 2 a 6 opções em botões (teclas 1 a 9 também); volta o texto da escolhida. Bom com `switch`. |
+| `game.OnKey(key => { if (key == ConsoleKey.D) x++; });` | **Direto na cena.** Recebe as teclas como `ConsoleKey` (A–Z, D0–D9, setas `LeftArrow`…, `Spacebar`, `Enter`, `Escape`, F1–F12). Segurar repete. Atalhos de botões têm prioridade. |
+| `game.Close();` | Termina o jogo e fecha a janela; dentro de um clique, o resto dele não roda. |
+| `game.Clear();` | **Só dentro de um clique ou do `OnEnter`.** Apaga as mensagens que a cena já mostrou (a peça `Messages` fica vazia), como o `Console.Clear()`. O `game.Write` que vier depois aparece normalmente. |
+| `game.Save("gold", gold);` | Salva um valor com um nome (número, texto, `bool`, lista ou objeto inteiro). Fica salvo depois de fechar o jogo (`Documentos\CSharp Lab\Saves\<jogo>.json`). |
+| `int gold = game.Load("gold", 50);` | Pega o valor salvo; sem nada salvo, volta o valor dado (o do jogo novo). Funciona com classes: `Hero hero = game.Load("hero", new Hero());`. |
+| `game.HasSave` / `game.DeleteSave();` | Tem jogo salvo? / Apaga o jogo salvo (Novo jogo). |
 | `game.Start("Start");` | Abre a janela na primeira cena. **Sempre a última linha.** |
 
 | Propriedade (`game.Find("X").`) | Peças que têm |
@@ -102,10 +111,14 @@ game.Start("Name");
 | `Text` | Text, Button, Bar (rótulo), Input (pergunta) |
 | `Value`, `Max` | Bar |
 | `Color`, `Shade` | Text, Button, Bar, Box |
-| `Opacity` (0 a 100), `Border`, `Corner` | Box |
-| `Font` | Text, Button, Input, Messages |
-| `Bold`, `Italic`, `Shadow`, `Scroll` | Text (`Scroll = true`: texto comprido rola em vez de ser cortado) |
-| `Style` | Button |
+| `Opacity` (0 a 100), `Border` | Box |
+| `Corner` | Box, Button, Bar (`Circle` no Botão e na Barra = pontas redondas, pílula) |
+| `Font` | Text, Button, Bar, Input, Messages |
+| `Italic`, `Scroll` | Text (`Scroll = true`: texto comprido rola em vez de ser cortado) |
+| `Bold` | Text, Button |
+| `Shadow` | Text (sombra atrás das letras), Button e Box (sombra embaixo da peça) |
+| `Style`, `TextColor` (cor da letra; sem escolher, automática) | Button |
+| `BarStyle`, `BarText` | Bar |
 | `Shortcut` | Button: tecla que executa o mesmo `OnClick` (`"Space"`, `"Enter"`, `"Escape"`, `"Up"`, `"Down"`, `"Left"`, `"Right"`, `"A"` a `"Z"` ou `"D0"` a `"D9"`; `""` tira o atalho) |
 | `Enabled` (`false`: apagado e sem clique) | Button, Input, Image |
 | `Image` | Image |
@@ -115,14 +128,27 @@ game.Start("Name");
 | `Show(items, (card, item) => { })` | List |
 | `Shake()` (tremer), `Flash()` (piscar) | todas |
 
-Cores (`Color`): `White`, `Gray`, `Red`, `Green`, `Blue`, `Gold`, `Purple`, `Orange`.
+Cores com nome (`Color`, combinam com o tema): `White`, `Gray`, `Black`, `Red`, `Pink`, `Orange`, `Gold`, `Green`, `Cyan`,
+`Blue`, `Purple`, `Brown`. Qualquer outra cor: `Color.Hex("#8A2BE2")` ou `Color.Rgb(138, 43, 226)` (no arquivo da tela,
+`"color": "#8A2BE2"`).
 Tom (`Shade`): `Normal`, `Dark`, `Light`. Cantos (`Corner`): `Round`, `Square`, `Circle`.
-Fontes (`Font`, todas do Windows): `Normal`, `Fantasy` (títulos de fantasia), `Book` (livro antigo, pergaminho), `Hand` (escrita à mão).
-Estilo de botão (`ButtonStyle`): `Filled` (cheio, a ação principal), `Outline` (contorno, secundária), `Text` (só texto, discreta).
+Fontes (`Font`, todas do Windows): `Normal`, `Fantasy` (títulos de fantasia), `Book` (livro antigo, pergaminho), `Hand` (escrita à mão),
+`Strong` (cartaz: VITÓRIA!, dano), `Classic` (jornal antigo), `Elegant` (cursiva), `Fun` (quadrinho), `Retro` (computador antigo), `Tech` (painel moderno).
+Estilo de botão (`ButtonStyle`): `Filled` (cheio, a ação principal), `Gradient` (degradê de videogame), `Soft` (fundo clarinho),
+`Outline` (contorno, secundária), `Text` (só texto, discreta).
+Estilo de barra (`BarStyle`): `Smooth` (lisa), `Shine` (brilhante, boa para mana), `Blocks` (em blocos, um por ponto até 20: corações, energia).
+Texto da barra (`BarText`): `Above` (em cima), `Inside` (dentro, como em jogo de luta), `None` (só a barra).
+
+```csharp
+var mana = game.Find("Mana");
+mana.Color = Color.Hex("#3FA9F5");
+mana.BarStyle = BarStyle.Shine;
+game.Find("Buy").TextColor = Color.Gold;
+```
 
 ### Atalho do botão: clicar ou pressionar Espaço
 
-Na aba Tela, selecione o botão e escolha **Atalho → Espaço**. No código, escreva o `OnClick` normalmente:
+No Estúdio, selecione o botão e escolha **Atalho → Espaço**. No código, escreva o `OnClick` normalmente:
 clicar ou pressionar Espaço executa a mesma ação. Também dá para configurar a tecla pelo código, dentro da cena:
 
 ```csharp
@@ -236,7 +262,7 @@ O tema dá o padrão (fundo, painéis, as 8 cores, cantos, fontes de título/tex
 
 ## Regras
 
-1. **Não use `Console`** (`ReadLine`/`WriteLine`): é um jogo de janela. Use uma peça `Input` e `game.Write`.
+1. **Não use `Console`** (`ReadLine`/`WriteLine`): é um jogo de janela. Use `game.Write` para mostrar; para perguntar, uma peça `Input` ou, dentro de um clique, `game.Read`, `game.Choose` e `game.Pause`.
 2. Todo `game.Find("Nome")` precisa de uma peça com esse nome na tela da cena (o editor avisa se não tiver). Ao criar uma peça no código, crie também no `.json`.
 3. Ligue os cliques (`OnClick`, `OnAnswer`) **dentro da cena** da tela. `Scene` nunca fica dentro de outra cena.
 4. **Mudança de estado nunca solta na cena** (`+=`, `++`, `.Add(...)`, sorteio com `Random`): vai no `game.OnEnter` (uma vez por visita) ou no `OnClick` (a escolha). Solta, ela se repete a cada clique.

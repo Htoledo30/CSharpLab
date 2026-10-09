@@ -101,9 +101,9 @@ public sealed class StylesAndListTests : IDisposable
     [InlineData("""{ "type": "Text", "name": "A", "list": "Nope" }""", "não tem uma Lista com esse nome")]
     [InlineData("""{ "type": "Messages", "name": "A", "list": "Weapons" }""", "não pode ficar dentro de uma Lista")]
     [InlineData("""{ "type": "Text", "name": "A", "list": "Box1" }""", "é Caixa, não Lista")]
-    [InlineData("""{ "type": "Text", "name": "A", "font": "Comic" }""", "Normal, Fantasy, Book ou Hand")]
+    [InlineData("""{ "type": "Text", "name": "A", "font": "Comic" }""", "Normal, Fantasy, Book, Hand, Strong, Classic, Elegant, Fun, Retro ou Tech")]
     [InlineData("""{ "type": "Box", "name": "A", "opacity": 140 }""", "vai de 0 a 100")]
-    [InlineData("""{ "type": "Button", "name": "A", "style": "Big" }""", "Filled, Outline ou Text")]
+    [InlineData("""{ "type": "Button", "name": "A", "style": "Big" }""", "Filled, Outline, Text, Gradient ou Soft")]
     public void Erros_das_chaves_novas_em_portugues(string piece, string expected)
     {
         var json = "{ \"pieces\": [ { \"type\": \"List\", \"name\": \"Weapons\" }, { \"type\": \"Box\", \"name\": \"Box1\" }, " + piece + " ] }";

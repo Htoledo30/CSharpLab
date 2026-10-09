@@ -30,7 +30,7 @@ internal sealed class Screen
     public List<BarItem> Bars { get; } = [];
     public List<ButtonItem> Buttons { get; } = [];
 
-    /// <summary>Cena desenhada na aba Tela (null: a cena monta a tela sozinha, com Write, Button…).</summary>
+    /// <summary>Cena desenhada no Estúdio (null: a cena monta a tela sozinha, com Write, Button…).</summary>
     public DesignedScene? Designed { get; set; }
 
     /// <summary>
@@ -149,4 +149,16 @@ internal interface IGameView
 
     /// <summary>game.Wait: mostra a tela por um tempinho antes do resto do clique (nos testes, não espera).</summary>
     void Pause(double seconds) { }
+
+    /// <summary>game.Pause: espera o jogador apertar o botão (nos testes, continua na hora).</summary>
+    void WaitForPlayer(string button) { }
+
+    /// <summary>game.Read: pergunta e espera a resposta (nos testes, uma resposta vazia).</summary>
+    string ReadAnswer(string question) => "";
+
+    /// <summary>game.Choose: mostra as opções e devolve a posição da escolhida (nos testes, a primeira).</summary>
+    int ChooseOption(string question, IReadOnlyList<string> options) => 0;
+
+    /// <summary>game.Close: fecha a janela.</summary>
+    void CloseGame() { }
 }

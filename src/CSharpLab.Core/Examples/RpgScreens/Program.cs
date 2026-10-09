@@ -1,4 +1,4 @@
-// RPG com botões: as telas estão na pasta Screens, uma por cena (abra pelo botão Cenas, lá em cima).
+// RPG com botões: as telas estão na pasta Screens, uma por cena (abra pelo botão Estúdio, lá em cima).
 // Aqui o código não cria botões: ele pega as peças desenhadas pelo nome, com game.Find,
 // e diz o que muda na tela e o que cada botão faz.
 

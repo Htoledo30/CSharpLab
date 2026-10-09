@@ -98,10 +98,10 @@ public sealed partial class ExplorerNode : ObservableObject
         return (IsDirectory, name) switch
         {
             (true, "lib") => "O motor dos jogos (CSharpLab.Game). O CSharp Lab atualiza sozinho: não precisa mexer.",
-            (true, "screens") => "As telas desenhadas: cada arquivo é uma cena e abre na aba Tela.",
+            (true, "screens") => "As telas desenhadas: cada arquivo é uma cena e abre no Estúdio.",
             (true, "assets") => "As imagens do jogo (.png, .jpg). Use nas peças Imagem ou em game.Image(\"arquivo.png\").",
             (false, "agents.md") => "Guia do motor para IAs (Codex e outras). Pode ignorar.",
-            (false, "gamestyle.json") => "O tema do jogo (Clássico, Fantasia, Livro ou Moderno). Escolha na aba Tela, sem nenhuma peça selecionada.",
+            (false, "gamestyle.json") => "O tema do jogo (Clássico, Fantasia, Livro ou Moderno). Escolha no Estúdio, sem nenhuma peça selecionada.",
             (false, "claude.md") => "Guia do motor para o Claude (aponta para o AGENTS.md). Pode ignorar.",
             _ => null,
         };

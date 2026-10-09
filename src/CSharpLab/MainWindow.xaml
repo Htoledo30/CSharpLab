@@ -81,6 +81,15 @@
                                 </StackPanel>
                             </MenuItem.Header>
                         </MenuItem>
+                        <MenuItem Command="{Binding ExportGameCommand}" AutomationProperties.Name="Exportar o jogo…"
+                                  Visibility="{Binding HasGame, Converter={StaticResource BoolToVis}}">
+                            <MenuItem.Header>
+                                <StackPanel Margin="0,2">
+                                    <TextBlock Text="Exportar o jogo (.exe)…" />
+                                    <TextBlock Text="Um .exe e um .zip para mandar aos amigos (roda sem instalar nada)" FontSize="11" Foreground="{StaticResource TextMuted}" />
+                                </StackPanel>
+                            </MenuItem.Header>
+                        </MenuItem>
                         <Separator />
                         <MenuItem Command="{Binding OpenFolderDialogCommand}" AutomationProperties.Name="Abrir pasta…">
                             <MenuItem.Header>
@@ -204,9 +213,10 @@
                            IsHitTestVisible="False" Margin="12,0" />
 
                 <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- Cenas do jogo: abre a tela (ou o código) de cada cena. Só aparece em jogos com botões. -->
-                <Button x:Name="ScenesButton" Click="OnScenesButton" ToolTip="Cenas do jogo: abrir a tela ou o código de uma cena"
-                        AutomationProperties.Name="Cenas do jogo" WindowChrome.IsHitTestVisibleInChrome="True"
+                <!-- Estúdio do jogo: todas as cenas, com a tela e o código lado a lado. Só aparece em jogos com botões. -->
+                <Button x:Name="ScenesButton" Click="OnScenesButton"
+                        ToolTip="Estúdio do jogo: todas as cenas, com a tela e o código lado a lado (abre e fecha)"
+                        AutomationProperties.Name="Estúdio do jogo" WindowChrome.IsHitTestVisibleInChrome="True"
                         Height="26" Margin="0,0,8,0" Padding="10,0,9,0" Cursor="Hand" Focusable="False"
                         Visibility="{Binding HasGame, Converter={StaticResource BoolToVis}}">
                     <Button.Style>
@@ -224,6 +234,10 @@
                                             <Trigger Property="IsMouseOver" Value="True">
                                                 <Setter TargetName="Bd" Property="Background" Value="{StaticResource BgHover}" />
                                             </Trigger>
+                                            <DataTrigger Binding="{Binding IsStudioOpen}" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource AccentSoft}" />
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}" />
+                                            </DataTrigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
                                 </Setter.Value>
@@ -232,9 +246,7 @@
                     </Button.Style>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Style="{StaticResource Icon}" Text="&#xE7F4;" FontSize="12" Margin="0,1,7,0" Foreground="{StaticResource Accent}" />
-                        <TextBlock Text="Cenas" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
-                        <TextBlock Style="{StaticResource Icon}" Text="{StaticResource IconChevronDown}" FontSize="8" Margin="7,1,0,0"
-                                   Foreground="{StaticResource TextMuted}" />
+                        <TextBlock Text="Estúdio" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
 
@@ -357,7 +369,7 @@
                     </Grid.RowDefinitions>
 
                     <!-- Abas + editor -->
-                    <Grid Background="{StaticResource BgEditor}">
+                    <Grid x:Name="EditorArea" Background="{StaticResource BgEditor}">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="36" />
                             <RowDefinition Height="*" />
@@ -401,6 +413,11 @@
                                                 </ControlTemplate>
                                             </Setter.Value>
                                         </Setter>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding LivesInStudio}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
                                     </Style>
                                 </ListBox.ItemContainerStyle>
                                 <ListBox.ItemTemplate>
@@ -493,6 +510,9 @@
                             </DockPanel>
                         </Border>
                     </Grid>
+
+                    <!-- Estúdio do jogo: fica no lugar das abas enquanto está aberto -->
+                    <views:StudioView x:Name="Studio" Visibility="Collapsed" />
 
                     <GridSplitter x:Name="PanelSplitter" Grid.Row="1" Style="{StaticResource Splitter}" HorizontalAlignment="Stretch"
                                   VerticalAlignment="Stretch" ResizeBehavior="PreviousAndNext" ResizeDirection="Rows"

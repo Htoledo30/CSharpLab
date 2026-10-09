@@ -1,5 +1,7 @@
+using System.Windows;
 using System.Windows.Controls;
 using CSharpLab.GameEngine;
+using System.Windows.Media;
 
 namespace CSharpLab.Tests;
 
@@ -68,6 +70,31 @@ public sealed class TextFitTests
         story.Scroll = null;
         element = ScreenRenderer.Create(story, new RenderContext { Live = true });
         Assert.IsType<TextBlock>(((Border)element).Child);
+    });
+
+    [Fact]
+    public void Texto_por_cima_do_botao_deixa_o_clique_passar() => OnSta(() =>
+    {
+        var context = new RenderContext { Live = true, Click = _ => { }, IsClickable = _ => true };
+        var button = ScreenRenderer.Create(new Piece { Type = PieceType.Button, Name = "Attack", Width = 200, Height = 60, Text = "" }, context);
+        var label = ScreenRenderer.Create(new Piece { Type = PieceType.Text, Name = "Label", Width = 200, Height = 60, Text = "⚔ Atacar" }, context);
+        var stage = new Canvas { Width = 200, Height = 60 };
+        stage.Children.Add(button);
+        stage.Children.Add(label);   // o Texto fica na frente
+        stage.Measure(new Size(200, 60));
+        stage.Arrange(new Rect(0, 0, 200, 60));
+
+        // Igual ao mouse: pula o que tem IsHitTestVisible = false e pega o primeiro que sobra, de frente para trás.
+        DependencyObject? hit = null;
+        VisualTreeHelper.HitTest(stage,
+            target => target is UIElement { IsHitTestVisible: false } ? HitTestFilterBehavior.ContinueSkipSelfAndChildren : HitTestFilterBehavior.Continue,
+            result => { hit = result.VisualHit; return HitTestResultBehavior.Stop; },
+            new PointHitTestParameters(new Point(100, 30)));
+        while (hit != null && hit != button && hit != label) hit = VisualTreeHelper.GetParent(hit);
+        Assert.Same(button, hit);
+
+        // Texto com rolagem continua recebendo a roda do mouse.
+        Assert.True(ScreenRenderer.Create(new Piece { Type = PieceType.Text, Name = "Story", Width = 200, Height = 60, Text = Long, Scroll = true }, context).IsHitTestVisible);
     });
 
     [Fact]

@@ -24,13 +24,13 @@ public sealed class GuideWindow : Window
         new("Jogue",
             "Aperte F5 (ou Executar, lá em cima). Clique nos botões do jogo. Para voltar, feche a janela do jogo."),
         new("Mude a tela",
-            "Na aba Start.json, arraste o botão \"Procurar moedas\" para outro lugar e puxe os quadradinhos para mudar o tamanho. No painel da direita, troque o texto e a cor. Aperte F5 de novo para ver."),
+            "Clique em Estúdio, lá em cima. Na cena Start, arraste o botão \"Procurar moedas\" para outro lugar e puxe os quadradinhos para mudar o tamanho. No painel ao lado da tela, troque o texto e a cor. Aperte F5 de novo para ver."),
         new("Crie um botão que faz algo",
-            "Em Peças, à esquerda, clique em Botão. No painel, dê o nome `Rest` e o texto \"Descansar\". Em Ao clicar, use Escrever o que ele faz e escreva entre as chaves:",
+            "Em Peças, ao lado da tela, clique em Botão. No painel, dê o nome `Rest` e o texto \"Descansar\". Em Ao clicar, use Escrever o que ele faz: o código aparece à direita. Escreva entre as chaves:",
             "gold -= 1;\ngame.Write(\"Você descansou.\");",
             "O `gold` é a variável do ouro, lá no topo do Program.cs. Aperte F5 e teste."),
         new("Uma cena nova",
-            "Use Cenas → Nova tela do jogo… e chame de `Cave`. Volte ao código do botão `Rest` e troque o que está entre as chaves por:",
+            "No Estúdio, clique no + ao lado de CENAS e chame de `Cave`. Volte para a cena Start, ache o código do botão `Rest` à direita e troque o que está entre as chaves por:",
             "game.GoTo(\"Cave\");",
             "Agora o botão leva para a caverna. Desenhe a tela dela como quiser."),
     ];
@@ -196,7 +196,7 @@ public sealed class GuideWindow : Window
 
     private static FrameworkElement Finish()
     {
-        var text = Rich("Pronto: você já sabe o essencial. A tela fica na aba Tela; o que acontece fica no código, dentro de cada `game.Scene`. Para ir e voltar entre os dois, use o botão Cenas.");
+        var text = Rich("Pronto: você já sabe o essencial. No Estúdio, a tela fica no meio e o que acontece fica no código à direita, dentro de cada `game.Scene`. Para voltar às abas, use Voltar ao editor.");
         text.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
         var box = new Border { Child = text, Padding = new Thickness(14, 12, 14, 12), CornerRadius = new CornerRadius(8) };
         box.SetResourceReference(Border.BackgroundProperty, "AccentSoft");

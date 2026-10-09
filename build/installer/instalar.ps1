@@ -22,7 +22,8 @@ $shell = New-Object -ComObject WScript.Shell
 function New-Shortcut([string]$path) {
     $lnk = $shell.CreateShortcut($path)
     $lnk.TargetPath = $exe
-    $lnk.WorkingDirectory = $target
+    # Começa na pasta do usuário: um programa "dentro" da pasta do aplicativo trava a atualização.
+    $lnk.WorkingDirectory = [Environment]::GetFolderPath("UserProfile")
     $lnk.IconLocation = "$exe,0"
     $lnk.Description = "CSharp Lab — editor de C#"
     $lnk.Save()

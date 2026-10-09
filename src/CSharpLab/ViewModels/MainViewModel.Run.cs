@@ -85,6 +85,14 @@ public sealed partial class MainViewModel
             var launch = await BuildOrReuseAsync(project, ct);
             if (launch == null) return;
             ct.ThrowIfCancellationRequested();
+            if (_playFrom is { } scene)
+            {
+                var env = new Dictionary<string, string?>(launch.Environment ?? new Dictionary<string, string?>(), StringComparer.OrdinalIgnoreCase)
+                {
+                    [GameEngine.Game.StartSceneVariable] = scene,
+                };
+                launch = launch with { Environment = env };
+            }
             await RunInTerminalAsync(project, launch, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -104,6 +112,7 @@ public sealed partial class MainViewModel
             s?.Dispose();
             runCts.Dispose();
             _runCts = null;
+            _playFrom = null;
             RunState = RunState.Idle;
         }
     }

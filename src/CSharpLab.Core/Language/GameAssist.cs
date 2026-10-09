@@ -141,6 +141,93 @@ public static class GameAssist
     }
 
     /// <summary>
+    /// A peça do código onde está o cursor: o game.Find("nome") mais de dentro que contém a posição, contando
+    /// também o que vem depois dele (game.Find("Attack").OnClick(() => { … }) inteiro é do "Attack").
+    /// Null fora de um game.Find.
+    /// </summary>
+    public static (string? Scene, string Name)? PieceAt(SyntaxNode root, int position)
+    {
+        if (position < 0 || root.FullSpan.End == 0) return null;
+        var token = root.FindToken(Math.Min(position, root.FullSpan.End - 1));
+        for (var node = token.Parent; node != null; node = node.Parent)
+        {
+            var find = node switch
+            {
+                InvocationExpressionSyntax call when IsFind(call) => call,
+                InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Expression: InvocationExpressionSyntax inner } } when IsFind(inner) => inner,
+                MemberAccessExpressionSyntax { Expression: InvocationExpressionSyntax inner } when IsFind(inner) => inner,
+                _ => null,
+            };
+            if (find != null)
+            {
+                var literal = (LiteralExpressionSyntax)find.ArgumentList.Arguments[0].Expression;
+                return (SceneOf(find), literal.Token.ValueText);
+            }
+            if (node is InvocationExpressionSyntax { Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Scene" } }) return null;
+        }
+        return null;
+
+        static bool IsFind(InvocationExpressionSyntax call) =>
+            call.Expression is MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Find" } &&
+            call.ArgumentList.Arguments is [{ Expression: LiteralExpressionSyntax literal }] &&
+            literal.IsKind(SyntaxKind.StringLiteralExpression) && literal.Token.ValueText.Length > 0;
+    }
+
+    /// <summary>As idas de uma cena para outra (game.GoTo("Nome") dentro do código de cada cena), sem repetir.</summary>
+    public static IReadOnlyList<(string From, string To)> SceneLinks(SyntaxNode root)
+    {
+        var links = new List<(string, string)>();
+        foreach (var call in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            if (call is not
+                {
+                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "GoTo" },
+                    ArgumentList.Arguments: [{ Expression: LiteralExpressionSyntax literal }],
+                } || !literal.IsKind(SyntaxKind.StringLiteralExpression) || literal.Token.ValueText.Length == 0)
+                continue;
+            foreach (var from in ScenesReaching(root, call, depth: 0))
+            {
+                var link = (from, literal.Token.ValueText);
+                if (!links.Contains(link)) links.Add(link);
+            }
+        }
+        return links;
+    }
+
+    /// <summary>
+    /// As cenas de onde este código roda: a cena que contém ele, ou, se ele está numa função (void Win() { … }),
+    /// as cenas que chamam essa função (e quem chama quem chama, até 3 níveis).
+    /// </summary>
+    private static IEnumerable<string> ScenesReaching(SyntaxNode root, SyntaxNode node, int depth)
+    {
+        if (SceneOf(node) is { } scene)
+        {
+            yield return scene;
+            yield break;
+        }
+        if (depth >= 3) yield break;
+        var function = node.Ancestors().FirstOrDefault(a => a is LocalFunctionStatementSyntax or MethodDeclarationSyntax);
+        var name = function switch
+        {
+            LocalFunctionStatementSyntax local => local.Identifier.ValueText,
+            MethodDeclarationSyntax method => method.Identifier.ValueText,
+            _ => null,
+        };
+        if (name == null) yield break;
+        foreach (var call in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
+        {
+            var called = call.Expression switch
+            {
+                IdentifierNameSyntax id => id.Identifier.ValueText,
+                MemberAccessExpressionSyntax member => member.Name.Identifier.ValueText,
+                _ => null,
+            };
+            if (called != name || function!.Span.Contains(call.Span)) continue;
+            foreach (var from in ScenesReaching(root, call, depth + 1)) yield return from;
+        }
+    }
+
+    /// <summary>
     /// Cada game.Find("nome") da peça dentro da cena, dizendo se ali o código liga o evento dela
     /// (ex.: game.Find("Attack").OnClick(...)).
     /// </summary>
@@ -314,7 +401,7 @@ public static class GameAssist
                 continue;
             yield return (BuildInDrawnSceneId,
                 $"A cena \"{scene}\" tem tela desenhada, então o {receiver}.{method} não funciona nela. " +
-                $"Ponha {piece} na aba Tela e mude pelo código com {receiver}.Find(\"Nome\").",
+                $"Ponha {piece} no Estúdio e mude pelo código com {receiver}.Find(\"Nome\").",
                 access.Name.GetLocation());
         }
     }

@@ -151,7 +151,7 @@ public sealed class PiecePalette : Border
     }
 
     /// <summary>Um desenhinho de cada peça (sem depender de fontes de ícones).</summary>
-    private static FrameworkElement Icon(PieceType type)
+    internal static FrameworkElement Icon(PieceType type)
     {
         var canvas = new Canvas { Width = 22, Height = 16, SnapsToDevicePixels = true };
         void Add(UIElement e, double x, double y)

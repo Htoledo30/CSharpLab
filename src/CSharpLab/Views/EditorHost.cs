@@ -35,6 +35,35 @@ public sealed class EditorHost : Grid
 
     public FindReplaceBar FindBar { get; }
 
+    /// <summary>
+    /// Com o Estúdio aberto, as abas ficam escondidas: nada de criar editores para elas até ele fechar
+    /// (o Estúdio tem os próprios editores dos arquivos do jogo).
+    /// </summary>
+    public bool Suspended
+    {
+        get => _suspended;
+        set
+        {
+            if (_suspended == value) return;
+            _suspended = value;
+            if (value)
+            {
+                FindBar.Close();
+                foreach (var view in _editors.Values)
+                {
+                    if (view is CodeEditor editor) editor.ClosePopups();
+                    else if (view is ScreenEditorView screen) screen.ClosePopups();
+                }
+            }
+            else
+            {
+                ShowActive();
+            }
+        }
+    }
+
+    private bool _suspended;
+
     private FrameworkElement? ActiveView => _vm?.ActiveDocument is { } d && _editors.TryGetValue(d, out var e) ? e : null;
 
     /// <summary>O editor de texto da aba ativa (null quando ela mostra o editor visual de uma tela).</summary>
@@ -45,7 +74,7 @@ public sealed class EditorHost : Grid
         _ => null,
     };
 
-    /// <summary>O editor visual da aba ativa, quando ela é uma tela na aba Tela.</summary>
+    /// <summary>O editor visual da aba ativa, quando ela é uma tela no Estúdio.</summary>
     public ScreenEditorView? ActiveScreen => ActiveView is ScreenEditorView { IsDesignMode: true } screen ? screen : null;
 
     public void Bind(MainViewModel vm)
@@ -55,6 +84,7 @@ public sealed class EditorHost : Grid
         vm.PropertyChanged += OnVmPropertyChanged;
         vm.GoToRequested += (doc, line, column, offset) =>
         {
+            if (_suspended) return;
             ShowActive();
             if (!_editors.TryGetValue(doc, out var view)) return;
             if (view is ScreenEditorView screen)
@@ -70,6 +100,7 @@ public sealed class EditorHost : Grid
         vm.FocusEditorRequested += FocusActive;
         vm.ScreenDesignRequested += doc =>
         {
+            if (_suspended) return;
             ShowActive();
             if (_editors.TryGetValue(doc, out var view) && view is ScreenEditorView screen) screen.ShowDesign();
         };
@@ -96,6 +127,7 @@ public sealed class EditorHost : Grid
 
     private void ShowActive()
     {
+        if (_suspended) return;
         var active = _vm?.ActiveDocument;
         if (active != null && !_editors.ContainsKey(active))
         {
@@ -119,6 +151,7 @@ public sealed class EditorHost : Grid
 
     public void FocusActive()
     {
+        if (_suspended) return;
         if (ActiveView is ScreenEditorView screen)
         {
             screen.FocusActive();

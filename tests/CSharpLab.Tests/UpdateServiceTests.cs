@@ -200,6 +200,39 @@ public sealed class UpdateServiceTests : IDisposable
     }
 
     [Fact]
+    public void Aplicador_nao_fica_dentro_da_pasta_do_aplicativo()
+    {
+        var target = OldInstallation();
+        var start = UpdateService.CreateApplierStartInfo(_dir, new Version(1, 1, 0), false, Environment.ProcessId, target);
+        Assert.False(string.IsNullOrEmpty(start.WorkingDirectory));
+        Assert.False(Path.GetFullPath(start.WorkingDirectory).StartsWith(target, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task Pasta_aberta_por_outro_programa_troca_arquivo_por_arquivo()
+    {
+        var staged = await UpdateService.DownloadAndStageAsync(Package(), null, CancellationToken.None);
+        var target = OldInstallation();
+        // Um terminal "parado" dentro da pasta: o Windows não deixa mover a pasta inteira.
+        var start = new ProcessStartInfo("powershell.exe") { UseShellExecute = false, CreateNoWindow = true, WorkingDirectory = target };
+        start.ArgumentList.Add("-NoProfile");
+        start.ArgumentList.Add("-Command");
+        start.ArgumentList.Add("Start-Sleep -Seconds 60");
+        using var holder = Process.Start(start)!;
+        try
+        {
+            Assert.Equal(0, await Apply(staged, target));
+            Assert.Equal("nova versão 1.1.0", File.ReadAllText(Path.Combine(target, "CSharpLab.exe")));
+            Assert.Equal("desinstalador", File.ReadAllText(Path.Combine(target, "desinstalar.ps1")));
+            Assert.Equal("trabalho pessoal", File.ReadAllText(Path.Combine(target, "meu-projeto.cs")));
+            Assert.False(File.Exists(Path.Combine(target, "obsoleto.dll")));
+            Assert.Null(UpdateService.TakeApplyFailure());
+            Assert.DoesNotContain(Directory.EnumerateDirectories(_dir), d => Path.GetFileName(d).Contains(".backup-"));
+        }
+        finally { if (!holder.HasExited) holder.Kill(entireProcessTree: true); }
+    }
+
+    [Fact]
     public async Task Falha_na_troca_restaura_a_versao_anterior()
     {
         var staged = await UpdateService.DownloadAndStageAsync(Package(), null, CancellationToken.None);

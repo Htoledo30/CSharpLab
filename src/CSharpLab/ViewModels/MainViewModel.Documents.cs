@@ -93,6 +93,7 @@ public sealed partial class MainViewModel
             ? Documents[0]
             : null;
 
+        doc.LivesInStudio = doc.IsScreen && BelongsToGame(doc);
         Documents.Add(doc);
         doc.TextChanged += OnDocumentTextChanged;
         doc.PropertyChanged += OnDocumentPropertyChanged;
