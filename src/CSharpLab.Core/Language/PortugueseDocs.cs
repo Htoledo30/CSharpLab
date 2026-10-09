@@ -356,14 +356,15 @@ public static partial class PortugueseDocs
             "game.Find(\"Portrait\").Corner = Corner.Circle;");
         m[item + ".Font"] = D("Font = fonte, o desenho das letras: Font.Normal, Fantasy (fantasia), Book (livro), Hand (à mão), Strong (forte), Classic (clássica), Elegant (elegante), Fun (divertida), Retro (retrô) ou Tech (técnica).",
             "game.Find(\"Title\").Font = Font.Fantasy;");
-        m[item + ".Bold"] = D("Bold = negrito. true deixa as letras do Texto (ou do Botão) mais grossas.", "game.Find(\"Title\").Bold = true;");
-        m[item + ".Italic"] = D("Italic = itálico. true deixa as letras do Texto inclinadas.", "game.Find(\"Letter\").Italic = true;");
+        m[item + ".Bold"] = D("Bold = negrito. true deixa as letras mais grossas (em qualquer peça com letras).", "game.Find(\"Title\").Bold = true;");
+        m[item + ".Italic"] = D("Italic = itálico. true deixa as letras inclinadas (em qualquer peça com letras).", "game.Find(\"Letter\").Italic = true;");
         m[item + ".Scroll"] = D("Scroll = rolagem. true dá uma barra de rolagem ao Texto: texto comprido (uma carta, a história) não é cortado, o jogador rola com a roda do mouse.",
             "game.Find(\"Letter\").Scroll = true;");
-        m[item + ".Shadow"] = D("Shadow = sombra. No Texto, uma sombra atrás das letras (para ler em cima de qualquer fundo); no Botão e na Caixa, uma sombra embaixo da peça.", "game.Find(\"Title\").Shadow = true;");
+        m[item + ".Shadow"] = D("Shadow = sombra. No Texto, na Barra, no Campo de escrita, nas Mensagens e na Lista, uma sombra atrás das letras (para ler em cima de qualquer fundo); no Botão e na Caixa, uma sombra embaixo da peça.", "game.Find(\"Title\").Shadow = true;");
         m[item + ".Style"] = D("Style = estilo do botão: ButtonStyle.Filled (cheio), Gradient (degradê), Soft (suave), Outline (contorno) ou Text (só texto).",
             "game.Find(\"Back\").Style = ButtonStyle.Text;");
-        m[item + ".TextColor"] = D("TextColor = cor da letra do botão. Sem escolher, é automática (a que aparece bem em cima do fundo).",
+        m[item + ".TextShadow"] = D("TextShadow = sombra nas letras do Botão (o Shadow do botão é a sombra embaixo dele inteiro).", "game.Find(\"Attack\").TextShadow = true;");
+        m[item + ".TextColor"] = D("TextColor = cor da letra do Botão, da Barra, do Campo de escrita, das Mensagens e da Lista. Sem escolher, é automática. No Texto, a cor da letra é o Color.",
             "game.Find(\"Buy\").TextColor = Color.Gold;");
         m[item + ".BarStyle"] = D("BarStyle = estilo da barra: BarStyle.Smooth (lisa), BarStyle.Shine (brilhante) ou BarStyle.Blocks (em blocos).",
             "game.Find(\"Mana\").BarStyle = BarStyle.Shine;");

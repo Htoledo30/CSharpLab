@@ -147,14 +147,14 @@ public sealed class Item
         set => Check(nameof(Font)).Font = value == Font.Normal ? null : value;
     }
 
-    /// <summary>Bold = negrito. true deixa as letras do Texto (ou do Botão) mais grossas.</summary>
+    /// <summary>Bold = negrito. true deixa as letras mais grossas (em qualquer peça com letras; o nome da Barra já começa em negrito).</summary>
     public bool Bold
     {
-        get => Check(nameof(Bold)).Bold == true;
-        set => Check(nameof(Bold)).Bold = value ? true : null;
+        get => Check(nameof(Bold)).IsBold;
+        set => Check(nameof(Bold)).Bold = value == Piece.DefaultBold(Piece.Type) ? null : value;
     }
 
-    /// <summary>Italic = itálico. true deixa as letras do Texto inclinadas.</summary>
+    /// <summary>Italic = itálico. true deixa as letras inclinadas (em qualquer peça com letras).</summary>
     /// <example><code>game.Find("Letter").Italic = true;</code></example>
     public bool Italic
     {
@@ -174,7 +174,7 @@ public sealed class Item
     }
 
     /// <summary>
-    /// Shadow = sombra. No Texto, uma sombra atrás das letras (para ler bem em cima de qualquer fundo);
+    /// Shadow = sombra. No Texto, na Barra, no Campo de escrita, nas Mensagens e na Lista, uma sombra atrás das letras (para ler bem em cima de qualquer fundo);
     /// no Botão e na Caixa, uma sombra embaixo da peça, que parece saltar da tela.
     /// </summary>
     /// <example><code>game.Find("Title").Shadow = true;</code></example>
@@ -195,7 +195,20 @@ public sealed class Item
         set => Check(nameof(Style)).Style = value == ButtonStyle.Filled ? null : value;
     }
 
-    /// <summary>TextColor = cor da letra do botão. Sem escolher, ela é automática (a que aparece bem em cima do fundo).</summary>
+    /// <summary>
+    /// TextShadow = sombra nas letras do Botão (o Shadow do botão é a sombra embaixo dele inteiro).
+    /// </summary>
+    /// <example><code>game.Find("Attack").TextShadow = true;</code></example>
+    public bool TextShadow
+    {
+        get => Check(nameof(TextShadow)).TextShadow == true;
+        set => Check(nameof(TextShadow)).TextShadow = value ? true : null;
+    }
+
+    /// <summary>
+    /// TextColor = cor da letra do Botão, da Barra (o nome dela), do Campo de escrita (a pergunta), das Mensagens
+    /// (as que não têm cor) e da Lista vazia. Sem escolher, ela é automática. No Texto, a cor da letra é o Color.
+    /// </summary>
     /// <example><code>game.Find("Buy").TextColor = Color.Gold;</code></example>
     public Color TextColor
     {
@@ -375,12 +388,14 @@ public sealed class Item
             nameof(Color) or nameof(Shade) => $"Imagem, Campo de escrita, Mensagens e Lista não têm {property}",
             nameof(Opacity) or nameof(Border) => $"só a Caixa tem {property}",
             nameof(Corner) => "só Caixa, Botão e Barra têm Corner",
-            nameof(Italic) => "só o Texto tem Italic",
-            nameof(Bold) => "só Texto e Botão têm Bold",
-            nameof(Shadow) => "só Texto, Botão e Caixa têm Shadow",
-            nameof(Font) => "só Texto, Botão, Barra, Campo de escrita e Mensagens têm Font",
+            nameof(Italic) or nameof(Bold) or nameof(Font) =>
+                $"só as peças com letras (Texto, Botão, Barra, Campo de escrita, Mensagens e Lista) têm {property}",
+            nameof(Shadow) => "Imagem não tem Shadow",
+            nameof(TextShadow) => "só o Botão tem TextShadow (nas outras peças, a sombra das letras é o Shadow)",
             nameof(Style) => "só botões têm Style",
-            nameof(TextColor) => "só botões têm TextColor (no Texto, a cor da letra é o Color)",
+            nameof(TextColor) => Piece.Type == PieceType.Text
+                ? "no Texto, a cor da letra é o Color"
+                : "só as peças com letras têm TextColor",
             nameof(BarStyle) or nameof(BarText) => $"só barras têm {property}",
             nameof(Shortcut) => "só botões têm Shortcut (atalho de teclado)",
             nameof(Enabled) => "só botões, campos de escrita e imagens têm Enabled",

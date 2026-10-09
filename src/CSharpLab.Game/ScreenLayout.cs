@@ -33,6 +33,8 @@ internal sealed class Piece
     public Font? Font { get; set; }
     public bool? Italic { get; set; }
     public bool? Shadow { get; set; }
+    /// <summary>Só o Botão: sombra atrás das letras (o Shadow dele é a sombra do botão inteiro).</summary>
+    public bool? TextShadow { get; set; }
     /// <summary>Texto comprido: em vez de cortar o que não cabe, a peça ganha uma barra de rolagem.</summary>
     public bool? Scroll { get; set; }
     public Shade? Shade { get; set; }
@@ -68,9 +70,24 @@ internal sealed class Piece
     public double FontSize => Size ?? Type switch
     {
         PieceType.Button => 17,
-        PieceType.Bar or PieceType.Input or PieceType.Messages => 16,
+        PieceType.Bar or PieceType.Input or PieceType.Messages or PieceType.List => 16,
         _ => 20,
     };
+
+    /// <summary>As peças que têm letras: todas ganham as mesmas opções de letra (fonte, tamanho, negrito, itálico, alinhamento, sombra e cor).</summary>
+    public static bool HasLetters(PieceType type) =>
+        type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.Messages or PieceType.List;
+
+    /// <summary>Alinhamento quando o arquivo não diz nada: botão e lista vazia no centro, o resto à esquerda.</summary>
+    public static TextAlign DefaultAlign(PieceType type) => type is PieceType.Button or PieceType.List ? TextAlign.Center : TextAlign.Left;
+
+    /// <summary>Negrito quando o arquivo não diz nada: o nome da barra já vem em negrito.</summary>
+    public static bool DefaultBold(PieceType type) => type == PieceType.Bar;
+
+    public TextAlign LetterAlign => Align ?? DefaultAlign(Type);
+    public bool IsBold => Bold ?? DefaultBold(Type);
+    /// <summary>Sombra atrás das letras (no Botão é o TextShadow; nas outras peças, o Shadow).</summary>
+    public bool HasLetterShadow => (Type == PieceType.Button ? TextShadow : Shadow) == true;
 
     public int BarValue => Value ?? 100;
     public int BarMax => Max is > 0 ? Max.Value : 100;
@@ -87,15 +104,16 @@ internal sealed class Piece
     public static bool Supports(PieceType type, string property) => property switch
     {
         nameof(Text) => type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.List,
-        nameof(Size) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages,
-        nameof(Align) or nameof(Italic) or nameof(Scroll) => type is PieceType.Text,
-        nameof(Bold) => type is PieceType.Text or PieceType.Button,
-        nameof(Shadow) => type is PieceType.Text or PieceType.Button or PieceType.Box,
-        nameof(Font) => type is PieceType.Text or PieceType.Button or PieceType.Input or PieceType.Messages or PieceType.Bar,
+        nameof(Size) or nameof(Align) or nameof(Italic) or nameof(Bold) or nameof(Font) => HasLetters(type),
+        nameof(Scroll) => type is PieceType.Text,
+        nameof(Shadow) => HasLetters(type) || type is PieceType.Box,
+        nameof(TextShadow) => type is PieceType.Button,
         nameof(Color) or nameof(Shade) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages or PieceType.List),
         nameof(Opacity) or nameof(Border) => type is PieceType.Box,
         nameof(Corner) => type is PieceType.Box or PieceType.Button or PieceType.Bar,
-        nameof(Style) or nameof(TextColor) => type is PieceType.Button,
+        nameof(Style) => type is PieceType.Button,
+        // O Texto usa o Color como cor da letra; as outras peças com letras têm a cor da letra separada.
+        nameof(TextColor) => HasLetters(type) && type is not PieceType.Text,
         nameof(BarStyle) or nameof(BarText) => type is PieceType.Bar,
         nameof(Shortcut) => type is PieceType.Button,
         nameof(Enabled) => type is PieceType.Button or PieceType.Input or PieceType.Image,

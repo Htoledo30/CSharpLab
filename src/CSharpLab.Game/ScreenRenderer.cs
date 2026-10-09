@@ -105,6 +105,34 @@ internal static class ScreenRenderer
         Foreground = foreground ?? Theme.Text,
     };
 
+    /// <summary>
+    /// As opções de letra que toda peça com letras tem: negrito, itálico, alinhamento, cor e sombra.
+    /// (A fonte e o tamanho vêm do <see cref="Label"/>.)
+    /// </summary>
+    private static TextBlock Letters(TextBlock block, Piece piece, Brush defaultColor, FontWeight? bold = null)
+    {
+        block.FontWeight = piece.IsBold ? bold ?? FontWeights.SemiBold : FontWeights.Normal;
+        block.FontStyle = piece.Italic == true ? FontStyles.Italic : FontStyles.Normal;
+        block.TextAlignment = TextAlignmentOf(piece.LetterAlign);
+        block.Foreground = piece.TextColor is { } color ? Theme.Brush(color) : defaultColor;
+        if (piece.HasLetterShadow) block.Effect = TextShadow;
+        return block;
+    }
+
+    private static TextAlignment TextAlignmentOf(TextAlign align) => align switch
+    {
+        TextAlign.Center => TextAlignment.Center,
+        TextAlign.Right => TextAlignment.Right,
+        _ => TextAlignment.Left,
+    };
+
+    private static HorizontalAlignment HorizontalOf(TextAlign align) => align switch
+    {
+        TextAlign.Center => HorizontalAlignment.Center,
+        TextAlign.Right => HorizontalAlignment.Right,
+        _ => HorizontalAlignment.Left,
+    };
+
     /// <summary>Sombra escura atrás das letras: o texto fica legível em cima de qualquer fundo.</summary>
     /// <summary>Num tema claro (Livro), a sombra é clara: um brilho de papel atrás da tinta, em vez de uma mancha escura.</summary>
     private static DropShadowEffect TextShadow => Theme.Current.IsLight ? LightShadow : DarkShadow;
@@ -136,14 +164,9 @@ internal static class ScreenRenderer
     private static TextBlock TextBlockOf(Piece piece)
     {
         var block = Label(piece, piece.Text ?? "", piece.Color is { } c ? Theme.Brush(c, piece.Shade) : Theme.Text);
-        block.FontWeight = piece.Bold == true ? FontWeights.SemiBold : FontWeights.Normal;
+        block.FontWeight = piece.IsBold ? FontWeights.SemiBold : FontWeights.Normal;
         block.FontStyle = piece.Italic == true ? FontStyles.Italic : FontStyles.Normal;
-        block.TextAlignment = piece.Align switch
-        {
-            TextAlign.Center => TextAlignment.Center,
-            TextAlign.Right => TextAlignment.Right,
-            _ => TextAlignment.Left,
-        };
+        block.TextAlignment = TextAlignmentOf(piece.LetterAlign);
         bool fantasy = Theme.FontFor(piece) == Font.Fantasy;
         block.LineHeight = Math.Round(block.FontSize * (fantasy ? 1.1 : 1.4));
         if (fantasy) block.LineStackingStrategy = LineStackingStrategy.BlockLineHeight;
@@ -187,9 +210,11 @@ internal static class ScreenRenderer
     private static TextBlock ButtonLabel(Piece piece, Brush foreground)
     {
         var label = Label(piece, piece.Text ?? "", foreground);
-        label.TextAlignment = TextAlignment.Center;
+        label.TextAlignment = TextAlignmentOf(piece.LetterAlign);
         label.TextTrimming = TextTrimming.CharacterEllipsis;
-        if (piece.Bold == true) label.FontWeight = FontWeights.Bold;
+        label.FontWeight = piece.IsBold ? FontWeights.Bold : FontWeights.Normal;
+        label.FontStyle = piece.Italic == true ? FontStyles.Italic : FontStyles.Normal;
+        if (piece.HasLetterShadow) label.Effect = TextShadow;
         return label;
     }
 
@@ -199,6 +224,7 @@ internal static class ScreenRenderer
         var button = Theme.MakeButton(ButtonLabel(piece, look.Text), piece.Color, piece.Shade, piece.Style, piece.TextColor,
             Theme.ButtonCorners(piece.Corner, piece.Height));
         if (piece.Shadow == true) button.Effect = Theme.DropShadow;
+        button.HorizontalContentAlignment = HorizontalOf(piece.LetterAlign);
         button.IsEnabled = piece.Enabled;
         if (context.Live && context.Click != null)
             button.Click += (_, _) => context.Click(piece);
@@ -215,7 +241,7 @@ internal static class ScreenRenderer
         var place = piece.BarText ?? BarText.Above;
         var color = Theme.Rgb(piece.Color ?? Color.Green, piece.Shade);
         var font = Theme.FontOf(piece.Font ?? Theme.Current.BodyFont);
-        var size = Math.Min(piece.FontSize, 16) * Theme.FontScale(piece.Font ?? Theme.Current.BodyFont);
+        var size = piece.FontSize * Theme.FontScale(piece.Font ?? Theme.Current.BodyFont);
 
         // Em cima: o nome e o número numa linha, a barra embaixo. Dentro ou sem texto: a barra ocupa a peça toda.
         double trackHeight = place == BarText.Above ? Math.Clamp(piece.Height - 27, 6, 28) : Math.Max(4, piece.Height);
@@ -224,20 +250,12 @@ internal static class ScreenRenderer
 
         if (place == BarText.Above)
         {
-            var header = new DockPanel { Margin = new Thickness(0, 0, 0, 5), LastChildFill = true };
-            var amount = new TextBlock { Text = $"{value} / {max}", FontFamily = font, FontSize = size - 1, Foreground = Theme.Muted };
-            DockPanel.SetDock(amount, Dock.Right);
-            header.Children.Add(amount);
-            header.Children.Add(new TextBlock
-            {
-                Text = piece.Text ?? "",
-                FontFamily = font,
-                FontSize = size,
-                FontWeight = FontWeights.SemiBold,
-                Foreground = Theme.Text,
-                TextTrimming = TextTrimming.CharacterEllipsis,
-                Margin = new Thickness(0, 0, 8, 0),
-            });
+            var name = Letters(new TextBlock { Text = piece.Text ?? "", FontFamily = font, FontSize = size, TextTrimming = TextTrimming.CharacterEllipsis }, piece, Theme.Text);
+            var amount = Letters(new TextBlock { Text = $"{value} / {max}", FontFamily = font, FontSize = Math.Max(6, size - 1) }, piece, Theme.Muted);
+            amount.FontWeight = FontWeights.Normal;
+            if (piece.TextColor != null) amount.Opacity = 0.75;
+            var header = BarLine(name, amount, piece.LetterAlign);
+            header.Margin = new Thickness(0, 0, 0, 5);
             track.VerticalAlignment = VerticalAlignment.Top;
             var panel = new DockPanel { LastChildFill = true };
             DockPanel.SetDock(header, Dock.Top);
@@ -250,24 +268,39 @@ internal static class ScreenRenderer
         // Dentro: letra branca com sombra por cima da barra, como nos jogos de luta.
         var inside = new Grid();
         inside.Children.Add(track);
-        var line = new DockPanel { Margin = new Thickness(Math.Max(8, corners.TopLeft * 0.6), 0, Math.Max(8, corners.TopLeft * 0.6), 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
         var insideSize = Math.Clamp(trackHeight * 0.5, 10, Math.Max(10, piece.FontSize));
-        var number = new TextBlock { Text = $"{value} / {max}", FontFamily = font, FontSize = insideSize, FontWeight = FontWeights.SemiBold, Foreground = Brushes.White, Effect = DarkShadow };
-        DockPanel.SetDock(number, Dock.Right);
-        line.Children.Add(number);
-        line.Children.Add(new TextBlock
-        {
-            Text = piece.Text ?? "",
-            FontFamily = font,
-            FontSize = insideSize,
-            FontWeight = FontWeights.SemiBold,
-            Foreground = Brushes.White,
-            Effect = DarkShadow,
-            TextTrimming = TextTrimming.CharacterEllipsis,
-            Margin = new Thickness(0, 0, 8, 0),
-        });
+        var label = Letters(new TextBlock { Text = piece.Text ?? "", FontFamily = font, FontSize = insideSize, TextTrimming = TextTrimming.CharacterEllipsis }, piece, Brushes.White);
+        var number = Letters(new TextBlock { Text = $"{value} / {max}", FontFamily = font, FontSize = insideSize }, piece, Brushes.White);
+        // Dentro da barra a sombra escura é sempre usada: é ela que deixa a letra legível em cima da cor.
+        label.Effect = number.Effect = DarkShadow;
+        var line = BarLine(label, number, piece.LetterAlign);
+        line.Margin = new Thickness(Math.Max(8, corners.TopLeft * 0.6), 0, Math.Max(8, corners.TopLeft * 0.6), 0);
+        line.VerticalAlignment = VerticalAlignment.Center;
+        line.IsHitTestVisible = false;
         inside.Children.Add(line);
         return inside;
+    }
+
+    /// <summary>
+    /// O nome e o número da barra numa linha: à esquerda (nome na esquerda, número na direita), no centro
+    /// (os dois juntos no meio) ou à direita (espelhado: número na esquerda, nome na direita).
+    /// </summary>
+    private static FrameworkElement BarLine(TextBlock name, TextBlock number, TextAlign align)
+    {
+        if (align == TextAlign.Center)
+        {
+            name.Margin = new Thickness(0, 0, 8, 0);
+            var middle = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            middle.Children.Add(name);
+            middle.Children.Add(number);
+            return middle;
+        }
+        var line = new DockPanel { LastChildFill = true };
+        name.Margin = align == TextAlign.Right ? new Thickness(8, 0, 0, 0) : new Thickness(0, 0, 8, 0);
+        DockPanel.SetDock(number, align == TextAlign.Right ? Dock.Left : Dock.Right);
+        line.Children.Add(number);
+        line.Children.Add(name);
+        return line;
     }
 
     /// <summary>A barra inteira: o fundo e a parte cheia por cima (lisa ou com brilho).</summary>
@@ -425,7 +458,7 @@ internal static class ScreenRenderer
 
     private static FrameworkElement InputPiece(Piece piece, RenderContext context)
     {
-        var question = Label(piece, piece.Text ?? "");
+        var question = Letters(Label(piece, piece.Text ?? ""), piece, Theme.Text, FontWeights.SemiBold);
         question.Margin = new Thickness(0, 0, 0, 8);
         question.TextTrimming = TextTrimming.CharacterEllipsis;
 
@@ -492,7 +525,7 @@ internal static class ScreenRenderer
                 new("Exemplo: Você causou 7 de dano!", null, true),
             ];
         foreach (var line in lines)
-            list.Children.Add(MessageView(line, piece.FontSize, Theme.FontFor(piece)));
+            list.Children.Add(MessageView(line, piece.FontSize, piece.Font ?? Theme.Current.BodyFont, piece));
 
         // As mais novas ficam embaixo e à vista; as antigas, rolando para cima.
         var scroll = Scroller(list);
@@ -518,7 +551,7 @@ internal static class ScreenRenderer
     }
 
     /// <summary>Uma mensagem: normal, destacada (do último clique) ou apagada (de cliques anteriores).</summary>
-    public static FrameworkElement MessageView(MessageLine line, double fontSize, Font? font = null)
+    public static FrameworkElement MessageView(MessageLine line, double fontSize, Font? font = null, Piece? letters = null)
     {
         var block = new TextBlock
         {
@@ -527,8 +560,11 @@ internal static class ScreenRenderer
             FontSize = fontSize * Theme.FontScale(font),
             LineHeight = Math.Round(fontSize * 1.45),
             TextWrapping = TextWrapping.Wrap,
-            Foreground = line.Color is { } c ? Theme.Brush(c) : Theme.Text,
         };
+        // As opções de letra da peça Mensagens; a cor do game.Write("...", Color.Red) vale mais que a cor da peça.
+        if (letters != null) Letters(block, letters, Theme.Text);
+        if (line.Color is { } c) block.Foreground = Theme.Brush(c);
+        else if (letters?.TextColor == null) block.Foreground = Theme.Text;
         if (!line.IsNews)
         {
             block.Margin = new Thickness(0, 0, 0, 6);
@@ -566,19 +602,11 @@ internal static class ScreenRenderer
         {
             if (!string.IsNullOrWhiteSpace(piece.Text))
             {
-                root.Children.Add(new TextBlock
-                {
-                    Text = piece.Text,
-                    FontFamily = Theme.BodyFamily,
-                    FontSize = 16,
-                    FontStyle = FontStyles.Italic,
-                    Foreground = Theme.Muted,
-                    TextWrapping = TextWrapping.Wrap,
-                    TextAlignment = TextAlignment.Center,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(12),
-                });
+                var empty = Letters(Label(piece, piece.Text), piece, Theme.Muted);
+                empty.HorizontalAlignment = HorizontalOf(piece.LetterAlign);
+                empty.VerticalAlignment = VerticalAlignment.Center;
+                empty.Margin = new Thickness(12);
+                root.Children.Add(empty);
             }
             return root;
         }

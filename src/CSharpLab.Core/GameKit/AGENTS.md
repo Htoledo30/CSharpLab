@@ -113,11 +113,12 @@ game.Start("Name");
 | `Color`, `Shade` | Text, Button, Bar, Box |
 | `Opacity` (0 a 100), `Border` | Box |
 | `Corner` | Box, Button, Bar (`Circle` no Botão e na Barra = pontas redondas, pílula) |
-| `Font` | Text, Button, Bar, Input, Messages |
-| `Italic`, `Scroll` | Text (`Scroll = true`: texto comprido rola em vez de ser cortado) |
-| `Bold` | Text, Button |
-| `Shadow` | Text (sombra atrás das letras), Button e Box (sombra embaixo da peça) |
-| `Style`, `TextColor` (cor da letra; sem escolher, automática) | Button |
+| `Font`, `Bold`, `Italic` | todas as peças com letras: Text, Button, Bar (nome e número), Input (pergunta), Messages, List (texto de vazia). O nome da Bar já começa em negrito |
+| `TextColor` (cor da letra; sem escolher, automática) | Button, Bar, Input, Messages (as linhas sem cor no Write), List. No Text, a cor da letra é o `Color` |
+| `Shadow` | Text, Bar, Input, Messages, List: sombra atrás das letras. Button e Box: sombra embaixo da peça |
+| `TextShadow` | Button: sombra atrás das letras do botão |
+| `Scroll` | Text (`Scroll = true`: texto comprido rola em vez de ser cortado) |
+| `Style` | Button |
 | `BarStyle`, `BarText` | Bar |
 | `Shortcut` | Button: tecla que executa o mesmo `OnClick` (`"Space"`, `"Enter"`, `"Escape"`, `"Up"`, `"Down"`, `"Left"`, `"Right"`, `"A"` a `"Z"` ou `"D0"` a `"D9"`; `""` tira o atalho) |
 | `Enabled` (`false`: apagado e sem clique) | Button, Input, Image |
@@ -229,7 +230,9 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 | `x`, `y`, `width`, `height` | Posição e tamanho (números) |
 | `text` | Texto da peça, em português (na Lista: o texto de quando está vazia) |
 | `size` | Tamanho da letra (Text: 20; Button: 17) |
-| `bold`, `italic`, `shadow`, `scroll` / `align` | Só Text: `true` / `Left`, `Center`, `Right`. `scroll`: barra de rolagem para texto comprido |
+| `font`, `size`, `bold`, `italic`, `align`, `textColor` | Toda peça com letras (Text, Button, Bar, Input, Messages, List). `align`: `Left`, `Center`, `Right` (padrão: Button e List no centro, o resto à esquerda). `bold` da Bar começa `true`. No Text, a cor da letra é o `color` |
+| `shadow` / `textShadow` | Sombra nas letras (`textShadow` no Button; o `shadow` do Button e da Box é a sombra embaixo da peça) |
+| `scroll` | Só Text: barra de rolagem para texto comprido |
 | `font` | `Normal`, `Fantasy`, `Book`, `Hand` (Text, Button, Input, Messages) |
 | `color` | Uma das cores acima |
 | `shade` | `Normal`, `Dark`, `Light` (tom da cor) |

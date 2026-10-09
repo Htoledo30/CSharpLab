@@ -49,7 +49,7 @@ public sealed class PersonalizationPanelTests
             view.Model.Select("Attack");
             await Settle(window);
             var text = PanelText();
-            foreach (var expected in new[] { "ESTILO", "Degradê", "Suave", "Contorno", "CANTOS", "Pílula", "Sombra embaixo", "COR DO BOTÃO", "COR DA LETRA", "Forte", "Retrô", "Técnica" })
+            foreach (var expected in new[] { "ESTILO", "Degradê", "Suave", "Contorno", "CANTOS", "Pílula", "Sombra embaixo", "COR DO BOTÃO", "LETRA", "Cor da letra", "Sombra nas letras", "Forte", "Retrô", "Técnica" })
                 Assert.Contains(expected, text);
             Save(view.Properties, "csharplab-painel-botao.png");
 

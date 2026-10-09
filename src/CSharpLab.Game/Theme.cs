@@ -230,6 +230,7 @@ internal static class Theme
         var look = LookOf(color, shade, style, textColor);
         var button = new Button
         {
+            HorizontalContentAlignment = HorizontalAlignment.Center,
             Content = content,
             Template = ButtonTemplate,
             Cursor = Cursors.Hand,
@@ -267,7 +268,7 @@ internal static class Theme
         border.SetValue(Border.PaddingProperty, new Thickness(18, 8, 18, 8));
         var presenter = new FrameworkElementFactory(typeof(ContentPresenter));
         presenter.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
-        presenter.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+        presenter.SetValue(FrameworkElement.HorizontalAlignmentProperty, new TemplateBindingExtension(Control.HorizontalContentAlignmentProperty));
         border.AppendChild(presenter);
 
         var template = new ControlTemplate(typeof(Button)) { VisualTree = border };

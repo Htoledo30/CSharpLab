@@ -122,11 +122,11 @@ public sealed class PersonalizationTests : IDisposable
         Assert.Equal(Color.Pink, button.TextColor);
         Assert.True(button.Shadow);
 
-        // Texto não tem TextColor nem BarStyle: o erro diz quem tem.
+        // Texto não tem TextColor (nele a cor da letra é o Color): o erro explica.
         var game2 = new Game("Teste") { Screens = new ScreenLibrary { Roots = [_dir] } };
         game2.Scene("Hud", () => game2.Find("Info").TextColor = Color.Red);
         var error = Assert.Throws<GameException>(() => game2.Begin("Hud", new FakeView()));
-        Assert.Contains("só botões têm TextColor", error.Message);
+        Assert.Contains("no Texto, a cor da letra é o Color", error.Message);
     }
 
     /// <summary>

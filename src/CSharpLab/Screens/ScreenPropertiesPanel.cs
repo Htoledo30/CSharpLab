@@ -446,7 +446,7 @@ public sealed class ScreenPropertiesPanel : Border
 
         if (Piece.Supports(type, nameof(Piece.Color)))
         {
-            _content.Children.Add(Section(type switch { PieceType.Button => "COR DO BOTÃO", PieceType.Bar => "COR DA BARRA", PieceType.Box => "COR DA CAIXA", _ => "COR" }));
+            _content.Children.Add(Section(type switch { PieceType.Button => "COR DO BOTÃO", PieceType.Bar => "COR DA BARRA", PieceType.Box => "COR DA CAIXA", PieceType.Text => "COR DA LETRA", _ => "COR" }));
             _content.Children.Add(ColorField(() => Current()?.Color, v => Edit(p => p.Color = v, "color")));
             var shade = Segmented(
                 [(Shade.Normal, "Normal", "A cor como ela é"), (Shade.Dark, "Escuro", "A cor mais escura (vermelho escuro, azul escuro…)"), (Shade.Light, "Claro", "A cor mais clarinha")],
@@ -455,68 +455,64 @@ public sealed class ScreenPropertiesPanel : Border
             _content.Children.Add(shade);
         }
 
-        if (Piece.Supports(type, nameof(Piece.TextColor)))
+        if (Piece.HasLetters(type))
         {
-            _content.Children.Add(Section("COR DA LETRA"));
-            _content.Children.Add(ColorField(() => Current()?.TextColor, v => Edit(p => p.TextColor = v, "textcolor"),
-                "Automática: escura num botão claro, branca num botão escuro"));
-        }
+            // As mesmas opções de letra em toda peça que tem texto: fonte, tamanho, negrito, itálico,
+            // alinhamento, sombra e cor da letra.
+            _content.Children.Add(Section(type switch
+            {
+                PieceType.Bar => "LETRA (NOME E NÚMERO)",
+                PieceType.Input => "LETRA (PERGUNTA)",
+                PieceType.List => "LETRA (QUANDO VAZIA)",
+                _ => "LETRA",
+            }));
+            var fonts = FontField(() => Current()?.Font ?? GameFont.Normal, v => Edit(p => p.Font = v == GameFont.Normal ? null : v, "font"));
+            fonts.Margin = new Thickness(0, 0, 0, 8);
+            _content.Children.Add(fonts);
 
-        if (Piece.Supports(type, nameof(Piece.Size)) || Piece.Supports(type, nameof(Piece.Bold)) || Piece.Supports(type, nameof(Piece.Font)))
-        {
-            _content.Children.Add(Section("LETRA"));
-            if (Piece.Supports(type, nameof(Piece.Font)))
-            {
-                var fonts = FontField(() => Current()?.Font ?? GameFont.Normal, v => Edit(p => p.Font = v == GameFont.Normal ? null : v, "font"));
-                fonts.Margin = new Thickness(0, 0, 0, 8);
-                _content.Children.Add(fonts);
-            }
             var row = new DockPanel();
-            if (Piece.Supports(type, nameof(Piece.Size)))
-            {
-                var size = NumberField(() => Current()?.FontSize ?? 20, v => Edit(p => p.Size = v, "size"), 8, 120);
-                size.Width = 64;
-                size.ToolTip = "Tamanho da letra (roda do mouse muda)";
-                DockPanel.SetDock(size, Dock.Left);
-                row.Children.Add(size);
-            }
-            if (Piece.Supports(type, nameof(Piece.Bold)))
-            {
-                var bold = Toggle("B", "Negrito", () => Current()?.Bold == true, v => Edit(p => p.Bold = v ? true : null, "bold"), bold: true);
-                bold.Margin = new Thickness(8, 0, 0, 0);
-                DockPanel.SetDock(bold, Dock.Left);
-                row.Children.Add(bold);
-                if (Piece.Supports(type, nameof(Piece.Italic)))
-                {
-                    var italic = Toggle("I", "Itálico", () => Current()?.Italic == true, v => Edit(p => p.Italic = v ? true : null, "italic"), bold: false);
-                    italic.FontStyle = FontStyles.Italic;
-                    italic.FontFamily = new FontFamily("Georgia");
-                    italic.Margin = new Thickness(2, 0, 0, 0);
-                    DockPanel.SetDock(italic, Dock.Left);
-                    row.Children.Add(italic);
-                }
-                if (Piece.Supports(type, nameof(Piece.Align)))
-                {
-                    var align = AlignField(() => Current()?.Align ?? TextAlign.Left, v => Edit(p => p.Align = v == TextAlign.Left ? null : v, "align"));
-                    align.HorizontalAlignment = HorizontalAlignment.Right;
-                    row.Children.Add(align);
-                }
-                else
-                {
-                    row.Children.Add(new Border());
-                }
-            }
-            else
-            {
-                row.Children.Add(new Border());
-            }
-            if (row.Children.Count > 0) _content.Children.Add(row);
-            if (type == PieceType.Text && Piece.Supports(type, nameof(Piece.Shadow)))
-            {
-                var shadow = SwitchRow("Sombra nas letras", "Uma sombra escura atrás do texto: fica legível em cima de qualquer fundo.",
+            var size = NumberField(() => Current()?.FontSize ?? 20, v => Edit(p => p.Size = v, "size"), 8, 120);
+            size.Width = 64;
+            size.ToolTip = "Tamanho da letra (roda do mouse muda)";
+            DockPanel.SetDock(size, Dock.Left);
+            row.Children.Add(size);
+            var bold = Toggle("B", "Negrito", () => Current()?.IsBold == true,
+                v => Edit(p => p.Bold = v == Piece.DefaultBold(p.Type) ? null : v, "bold"), bold: true);
+            bold.Margin = new Thickness(8, 0, 0, 0);
+            DockPanel.SetDock(bold, Dock.Left);
+            row.Children.Add(bold);
+            var italic = Toggle("I", "Itálico", () => Current()?.Italic == true, v => Edit(p => p.Italic = v ? true : null, "italic"), bold: false);
+            italic.FontStyle = FontStyles.Italic;
+            italic.FontFamily = new FontFamily("Georgia");
+            italic.Margin = new Thickness(2, 0, 0, 0);
+            DockPanel.SetDock(italic, Dock.Left);
+            row.Children.Add(italic);
+            var align = AlignField(() => Current()?.LetterAlign ?? TextAlign.Left,
+                v => Edit(p => p.Align = v == Piece.DefaultAlign(p.Type) ? null : v, "align"));
+            align.HorizontalAlignment = HorizontalAlignment.Right;
+            row.Children.Add(align);
+            _content.Children.Add(row);
+
+            // No Botão a sombra das letras é o TextShadow (o Shadow dele é a sombra embaixo do botão).
+            var letterShadow = type == PieceType.Button
+                ? SwitchRow("Sombra nas letras", "Uma sombra atrás das letras do botão.",
+                    () => Current()?.TextShadow == true, v => Edit(p => p.TextShadow = v ? true : null, "textshadow"))
+                : SwitchRow("Sombra nas letras", "Uma sombra atrás das letras: ficam legíveis em cima de qualquer fundo.",
                     () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
-                shadow.Margin = new Thickness(0, 10, 0, 0);
-                _content.Children.Add(shadow);
+            letterShadow.Margin = new Thickness(0, 10, 0, 0);
+            _content.Children.Add(letterShadow);
+
+            if (Piece.Supports(type, nameof(Piece.TextColor)))
+            {
+                var label = new TextBlock { Text = "Cor da letra", FontSize = 11, Margin = new Thickness(0, 12, 0, 6) };
+                label.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+                _content.Children.Add(label);
+                _content.Children.Add(ColorField(() => Current()?.TextColor, v => Edit(p => p.TextColor = v, "textcolor"), type switch
+                {
+                    PieceType.Button => "Automática: escura num botão claro, branca num botão escuro",
+                    PieceType.Messages => "Automática (as mensagens com cor no game.Write continuam com a cor delas)",
+                    _ => "Automática (a do tema)",
+                }));
             }
         }
 
