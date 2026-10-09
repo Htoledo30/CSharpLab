@@ -358,12 +358,19 @@ public sealed class ScreenPropertiesPanel : Border
             }
         }
 
-        // Botão e campo de escrita: logo depois do texto, o que eles fazem (fica no código; o painel mostra onde).
-        bool showsHandler = type is PieceType.Button or PieceType.Input && CodeLinks != null && _model.ProjectDirectory != null;
+        // Logo depois do texto, o que a peça faz no código (o painel mostra onde, ou escreve a linha dela):
+        // botão e campo de escrita, o OnClick/OnAnswer; as outras peças, a linha que muda elas.
+        bool linksCode = CodeLinks != null && _model.ProjectDirectory != null;
+        bool showsHandler = type is PieceType.Button or PieceType.Input && linksCode;
         if (showsHandler)
         {
             _content.Children.Add(Section(type == PieceType.Button ? "AO CLICAR" : "AO RESPONDER"));
             _content.Children.Add(HandlerField(type == PieceType.Button ? "OnClick" : "OnAnswer", inCard: piece.List != null));
+        }
+        else if (linksCode)
+        {
+            _content.Children.Add(Section("NO CÓDIGO"));
+            _content.Children.Add(PieceCodeField(type, inCard: piece.List != null));
         }
 
         if (type == PieceType.Button)
@@ -559,7 +566,7 @@ public sealed class ScreenPropertiesPanel : Border
             _content.Children.Add(enabled);
         }
 
-        if (showsHandler) return;   // o código dele já aparece em "Ao clicar"
+        if (linksCode) return;   // o código dela já aparece lá em cima ("Ao clicar" ou "No código")
 
         _content.Children.Add(Section("NO CÓDIGO"));
         var code = CodeBox(ScreenDesignerModel.CodeExample(piece));
@@ -660,6 +667,68 @@ public sealed class ScreenPropertiesPanel : Border
                     found != null ? $"Usado em {where}" : null, showAction: true,
                     $"Escreve {snippet} na cena \"{_model.SceneName}\". O que acontece, você escreve entre as chaves.");
             }
+        };
+        return card.Element;
+    }
+
+    /// <summary>
+    /// Onde o código usa a peça: "Já está no código — Program.cs, linha 34" com o caminho até lá, ou
+    /// "Usar no código", que escreve a linha da peça na cena (ex.: game.Find("Health").Value = ;) e põe o
+    /// cursor onde vai o valor. O que vai ali (a variável, o texto) é a pessoa que escreve.
+    /// </summary>
+    private FrameworkElement PieceCodeField(PieceType type, bool inCard)
+    {
+        var card = new CodeStatusCard(this, type switch
+        {
+            PieceType.Bar => "Ligar a barra a uma variável",
+            PieceType.Text => "Mudar o texto pelo código",
+            PieceType.Image => "Trocar a imagem pelo código",
+            PieceType.List => "Encher a lista pelo código",
+            PieceType.Messages => "Escrever uma mensagem",
+            _ => "Usar no código",
+        });
+        PieceCode? found = null;
+        card.LinkClicked += () =>
+        {
+            if (found != null) CodeLinks?.GoToPieceCode(found);
+        };
+        card.ActionClicked += () =>
+        {
+            if (CodeLinks != null && _model.ProjectDirectory is { } dir && _shownName is { } name &&
+                _model.Layout?.Find(name) is { } piece && ScreenDesignerModel.CodeToWrite(piece, _model.Layout) is { } statement)
+                CodeLinks.WritePieceStatement(dir, _model.SceneName, name, statement);
+        };
+
+        _refreshCode = () =>
+        {
+            if (CodeLinks == null || _model.ProjectDirectory is not { } dir || _shownName is not { } name) return;
+            var piece = _model.Layout?.Find(name);
+            var statement = piece != null ? ScreenDesignerModel.CodeToWrite(piece, _model.Layout) : null;
+            var shown = statement?.Replace(Core.Language.GameAssist.CaretMarker, type switch
+            {
+                PieceType.Bar => "health",
+                PieceType.Box => "true",
+                PieceType.List => "items",
+                _ => "...",
+            }).Split('\n')[0];
+            if (type == PieceType.Messages)
+            {
+                card.Show(ok: true, "Mostra o que o game.Write escreve", null, showAction: true,
+                    "Escreve game.Write(\"\"); no fim da cena. A mensagem, você escreve entre as aspas.");
+                return;
+            }
+            found = CodeLinks.FindPieceCode(dir, _model.SceneName, name, "");
+            string where = found != null ? $"{System.IO.Path.GetFileName(found.File)}, linha {found.Line}" : "";
+            if (found != null)
+                card.Show(ok: true, "Já está no código", where, showAction: false,
+                    inCard ? "Ali, dentro do Show da lista, cada cartão muda essa peça."
+                           : "Ali o código muda esta peça. Clique para ir até lá.");
+            else if (inCard)
+                card.Show(ok: false, "Ainda não aparece no código", null, showAction: false,
+                    $"É uma peça de cartão: ela muda dentro do Show da lista, com card.Find(\"{name}\").");
+            else
+                card.Show(ok: false, "Ainda não aparece no código", null, showAction: statement != null,
+                    $"Escreve {shown} na cena \"{_model.SceneName}\" e deixa o cursor onde vai o que é seu.");
         };
         return card.Element;
     }

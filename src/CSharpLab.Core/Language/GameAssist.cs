@@ -254,7 +254,39 @@ public static class GameAssist
     /// Null se a cena não existe no código ou não tem chaves (escrita numa linha só).
     /// </summary>
     /// <param name="parameter">O que vem antes do "=>": "()" no OnClick, "answer" no OnAnswer.</param>
-    public static TextInsertion? HandlerInsertion(SyntaxNode root, string scene, string name, string handler, string parameter, string newLine)
+    public static TextInsertion? HandlerInsertion(SyntaxNode root, string scene, string name, string handler, string parameter, string newLine) =>
+        SceneEndInsertion(root, scene, newLine, (receiver, inner) =>
+        {
+            string head = $"{inner}{receiver}.Find(\"{name}\").{handler}({parameter} =>{newLine}{inner}{{{newLine}{inner}    ";
+            string tail = $"{newLine}{inner}}});";
+            return (head + tail, head.Length);
+        });
+
+    /// <summary>Onde fica o cursor no código que <see cref="StatementInsertion"/> escreve.</summary>
+    public const string CaretMarker = "$0";
+
+    /// <summary>
+    /// Como escrever uma instrução (ex.: game.Find("Health").Value = ;) no fim do código da cena, com o recuo
+    /// certo. O "game." do texto vira a variável do jogo daquela cena; as linhas de baixo ganham o mesmo recuo;
+    /// o cursor fica onde está o <see cref="CaretMarker"/>. Null se a cena não existe no código ou não tem chaves.
+    /// </summary>
+    public static TextInsertion? StatementInsertion(SyntaxNode root, string scene, string statement, string newLine) =>
+        SceneEndInsertion(root, scene, newLine, (receiver, inner) =>
+        {
+            var code = statement.Replace("\r\n", "\n");
+            if (code.StartsWith("game.", StringComparison.Ordinal)) code = receiver + code["game".Length..];
+            code = inner + code.Replace("\n", newLine + inner);
+            int caret = code.IndexOf(CaretMarker, StringComparison.Ordinal);
+            if (caret < 0) caret = code.Length;
+            else code = code.Remove(caret, CaretMarker.Length);
+            return (code, caret);
+        });
+
+    /// <summary>
+    /// Põe um pedaço de código no fim da cena (antes do "});" dela). <paramref name="build"/> recebe a variável do
+    /// jogo e o recuo das instruções da cena, e devolve o texto e onde o cursor fica nele.
+    /// </summary>
+    private static TextInsertion? SceneEndInsertion(SyntaxNode root, string scene, string newLine, Func<string, string, (string Text, int Caret)> build)
     {
         var calls = FindScenes(root);
         var target = calls.FirstOrDefault(s => s.Name == scene) ?? calls.FirstOrDefault(s => string.Equals(s.Name, scene, StringComparison.OrdinalIgnoreCase));
@@ -279,8 +311,7 @@ public static class GameAssist
                               text.Lines.GetLineFromPosition(block.Statements[0].SpanStart).LineNumber != text.Lines.GetLineFromPosition(block.OpenBraceToken.SpanStart).LineNumber;
         string inner = firstOnOwnLine ? IndentOf(block.Statements[0].SpanStart) : braceIndent + "    ";
 
-        string head = $"{inner}{receiver}.Find(\"{name}\").{handler}({parameter} =>{newLine}{inner}{{{newLine}{inner}    ";
-        string tail = $"{newLine}{inner}}});";
+        var (code, caret) = build(receiver.ToString(), inner);
         string separator = block.Statements.Count > 0 ? newLine : "";
 
         var close = block.CloseBraceToken.SpanStart;
@@ -289,14 +320,13 @@ public static class GameAssist
         if (braceAlone)
         {
             // Entra numa linha nova logo antes do "});" da cena.
-            var insert = separator + head + tail + newLine;
-            return new TextInsertion(closeLine.Start, 0, insert, separator.Length + head.Length);
+            return new TextInsertion(closeLine.Start, 0, separator + code + newLine, separator.Length + caret);
         }
         // "{ }" ou "{ game.Write(...); }" na mesma linha: o "}" desce para a linha de baixo
         // (os espaços antes dele saem junto).
         int from = block.CloseBraceToken.GetPreviousToken().Span.End;
-        var inline = newLine + separator + head + tail + newLine + braceIndent;
-        return new TextInsertion(from, close - from, inline, newLine.Length + separator.Length + head.Length);
+        var inline = newLine + separator + code + newLine + braceIndent;
+        return new TextInsertion(from, close - from, inline, newLine.Length + separator.Length + caret);
     }
 
     public const string RepeatsEveryClickId = "DICA09";

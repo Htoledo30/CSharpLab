@@ -302,6 +302,34 @@ public sealed class GameAssistTests : IDisposable
         Assert.Equal('\n', result[caret]);
     }
 
+    [Theory]
+    [InlineData("Fight", "    game.Find(\"Potion\").Visible = false;\n\n    game.Find(\"Health\").Value = ;\n});")]
+    [InlineData("Empty", "game.Scene(\"Empty\", () =>\n{\n    game.Find(\"Health\").Value = ;\n});")]
+    [InlineData("Inline", "game.Scene(\"Inline\", () => { game.Write(\"x\");\n\n    game.Find(\"Health\").Value = ;\n});")]
+    public void Usar_no_codigo_escreve_a_linha_da_peca_com_o_cursor_no_valor(string scene, string expected)
+    {
+        var code = HandlerCode.Replace("\r\n", "\n");
+        var root = CSharpSyntaxTree.ParseText(code).GetRoot();
+        var insertion = GameAssist.StatementInsertion(root, scene, "game.Find(\"Health\").Value = $0;", "\n")!;
+        var result = code.Remove(insertion.Offset, insertion.Length).Insert(insertion.Offset, insertion.Text);
+        Assert.Contains(expected, result);
+        // O cursor fica onde vai o valor: logo antes do ";".
+        int caret = insertion.Offset + insertion.Caret;
+        Assert.Equal("Value = ;", result[(caret - "Value = ".Length)..(caret + 1)]);
+    }
+
+    [Fact]
+    public void Usar_no_codigo_numa_lista_recua_as_linhas_e_usa_a_variavel_do_jogo()
+    {
+        const string code = "var g = new Game(\"T\");\ng.Scene(\"Shop\", () =>\n{\n    g.Write(\"Loja\");\n});\n";
+        var root = CSharpSyntaxTree.ParseText(code).GetRoot();
+        var insertion = GameAssist.StatementInsertion(root, "Shop",
+            "game.Find(\"Goods\").Show($0, (card, item) =>\n{\n    // Peças do cartão: Name.\n});", "\n")!;
+        var result = code.Remove(insertion.Offset, insertion.Length).Insert(insertion.Offset, insertion.Text);
+        Assert.Contains("    g.Find(\"Goods\").Show(, (card, item) =>\n    {\n        // Peças do cartão: Name.\n    });\n});", result);
+        Assert.Equal(result.IndexOf("Show(", StringComparison.Ordinal) + "Show(".Length, insertion.Offset + insertion.Caret);
+    }
+
     [Fact]
     public void Cena_numa_linha_so_sem_chaves_nao_recebe_OnClick()
     {

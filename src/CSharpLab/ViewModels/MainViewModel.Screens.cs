@@ -264,6 +264,36 @@ public sealed partial class MainViewModel
     /// Escreve game.Find("Nome").OnClick(() => { }); no fim do código da cena e põe o cursor entre as chaves:
     /// o que a peça faz, a pessoa escreve. Sem a cena no código, oferece escrever a cena primeiro.
     /// </summary>
+    /// <summary>
+    /// "Usar no código": escreve a linha da peça (ex.: game.Find("Health").Value = ;) no fim da cena e deixa o
+    /// cursor onde vai o que é da pessoa (o $0 da linha).
+    /// </summary>
+    public void WritePieceStatement(string projectDirectory, string scene, string piece, string statement)
+    {
+        var found = FindSceneInCode(projectDirectory, scene);
+        if (found == null)
+        {
+            GoToSceneCode(projectDirectory, scene);   // pergunta se pode escrever a cena
+            found = FindSceneInCode(projectDirectory, scene);
+            if (found == null) return;
+        }
+        var (file, sceneOffset) = found.Value;
+        var doc = OpenFile(file, activate: false);
+        if (doc == null) return;
+        var text = doc.Document.Text;
+        var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text).GetRoot();
+        var newLine = TextFileIO.DetectLineEnding(text) is "LF" ? "\n" : "\r\n";
+        if (Core.Language.GameAssist.StatementInsertion(root, scene, statement, newLine) is not { } insertion)
+        {
+            NavigateTo(doc, 1, 1, sceneOffset);
+            NotifyInfo($"A cena \"{scene}\" está escrita sem chaves. Coloque o código dela entre {{ }} e escreva ali: {statement.Replace(Core.Language.GameAssist.CaretMarker, "")}");
+            return;
+        }
+        doc.Document.Replace(insertion.Offset, insertion.Length, insertion.Text);
+        NavigateTo(doc, 1, 1, insertion.Offset + insertion.Caret);
+        NotifyInfo($"Pronto: o cursor está onde vai o que é seu, na linha do \"{piece}\" (ainda não salvo).");
+    }
+
     public void WritePieceHandler(string projectDirectory, string scene, string piece, string handler)
     {
         var parameter = handler == "OnAnswer" ? "answer" : "()";

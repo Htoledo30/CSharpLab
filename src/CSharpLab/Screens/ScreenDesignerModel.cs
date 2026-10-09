@@ -727,6 +727,35 @@ public sealed class ScreenDesignerModel : IDisposable
     // ------------------------------------------------------------------ código
 
     /// <summary>Exemplo de código para a peça, para a pessoa ver como ligar a tela ao programa.</summary>
+    /// <summary>
+    /// A linha que o botão "Usar no código" escreve no fim da cena, com $0 onde o cursor fica (ali vai o que
+    /// é da pessoa: o valor, o texto, a lista). Null para botões e campos (eles têm o OnClick/OnAnswer) e
+    /// para peças de cartão (essas mudam dentro do Show da Lista).
+    /// </summary>
+    internal static string? CodeToWrite(Piece piece, ScreenLayout? layout = null)
+    {
+        if (piece.List != null) return null;
+        var find = $"game.Find(\"{piece.Name}\")";
+        return piece.Type switch
+        {
+            PieceType.Text => $"{find}.Text = $\"$0\";",
+            PieceType.Bar => $"{find}.Value = $0;",
+            PieceType.Image => $"{find}.Image = \"$0\";",
+            PieceType.Box => $"{find}.Visible = $0;",
+            PieceType.Messages => "game.Write(\"$0\");",
+            PieceType.List => $"{find}.Show($0, (card, item) =>\n{{\n    {CardHint(piece, layout)}\n}});",
+            _ => null,
+        };
+    }
+
+    private static string CardHint(Piece list, ScreenLayout? layout)
+    {
+        var members = layout?.MembersOf(list.Name).Select(p => p.Name).ToList() ?? [];
+        return members.Count > 0
+            ? $"// Peças do cartão: {string.Join(", ", members)}. Exemplo: card.Find(\"{members[0]}\")..."
+            : "// Ponha as peças do item dentro do primeiro cartão da Lista, no Estúdio.";
+    }
+
     internal static string CodeExample(Piece piece)
     {
         var find = piece.List != null ? $"card.Find(\"{piece.Name}\")" : $"game.Find(\"{piece.Name}\")";

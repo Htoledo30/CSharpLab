@@ -489,6 +489,75 @@ public sealed class ScreenDesignerTests
     });
 
     /// <summary>
+    /// Barra, texto, imagem, lista: o painel diz se a peça já está no código e, se não está, "Usar no código"
+    /// escreve a linha dela na cena com o cursor onde vai o valor (como o "Escrever o que ele faz" dos botões).
+    /// A aba fica em %TEMP%\\csharplab-usar-no-codigo.png para conferir o visual.
+    /// </summary>
+    [Fact]
+    public void Painel_da_barra_escreve_a_linha_dela_na_cena() => Ui.Run(async () =>
+    {
+        using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
+        await vm.InitializeAsync();
+        var program = "var game = new Game(\"T\");\nint health = 80;\n" +
+                      "game.Scene(\"Fight\", () =>\n{\n    game.Find(\"Title\").Text = \"Luta\";\n});\n" +
+                      "game.Start(\"Fight\");\n";
+        var created = ProjectCreator.CreateGameProject(Ui.NewFolder("jogos"), "Torre", program);
+        Directory.CreateDirectory(Path.Combine(created.Directory, "Screens"));
+        var layout = ScreenLayout.CreateDefault("Fight");
+        layout.Pieces.Add(Piece.CreateDefault(PieceType.Bar, "Health", 300, 300));
+        var screen = Path.Combine(created.Directory, "Screens", "Fight.json");
+        File.WriteAllText(screen, ScreenFile.Serialize(layout));
+        await vm.OpenFolderAsync(created.Directory, created.ProjectPath, promptForUnsaved: false);
+        await Ui.WaitUntil(() => vm.Projects.Count > 0, 60_000, "projetos");
+
+        var view = new ScreenEditorView(vm.OpenFile(screen)!, vm);
+        var window = new Window { Content = view, Width = 1280, Height = 760, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Left = -10000, Top = -10000 };
+        window.Show();
+        try
+        {
+            string PanelText() => string.Join(" | ", Descendants(view.Properties).OfType<System.Windows.Controls.TextBlock>()
+                .Where(t => t.IsVisible).Select(t => t.Text));
+            System.Windows.Controls.Button? Action(string text) => Descendants(view.Properties).OfType<System.Windows.Controls.Button>()
+                .FirstOrDefault(b => b.IsVisible && b.Content as string == text);
+
+            view.Model.Select("Title");
+            window.UpdateLayout();
+            Assert.Contains("Já está no código", PanelText());
+
+            view.Model.Select("Health");
+            window.UpdateLayout();
+            Assert.Contains("Ainda não aparece no código", PanelText());
+            Assert.Contains("game.Find(\"Health\").Value = health;", PanelText());
+            var write = Action("Ligar a barra a uma variável")!;
+
+            int? caret = null;
+            vm.GoToRequested += (_, _, _, o) => caret = o;
+            write.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            var code = vm.FindDocument(created.ProgramPath)!.Document.Text.Replace("\r\n", "\n");
+            Assert.Contains("    game.Find(\"Title\").Text = \"Luta\";\n\n    game.Find(\"Health\").Value = ;\n});", code);
+            Assert.Equal(code.IndexOf("Value = ;", StringComparison.Ordinal) + "Value = ".Length, caret);
+
+            // Voltando para a tela: agora ela já está no código, com o caminho até a linha.
+            view.Model.Select("Title");
+            view.Model.Select("Health");
+            window.UpdateLayout();
+            Assert.Contains("Já está no código", PanelText());
+
+            var bitmap = new RenderTargetBitmap((int)view.ActualWidth, (int)view.ActualHeight, 96, 96, PixelFormats.Pbgra32);
+            bitmap.Render(view);
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(bitmap));
+            using var file = File.Create(Path.Combine(Path.GetTempPath(), "csharplab-usar-no-codigo.png"));
+            encoder.Save(file);
+        }
+        finally
+        {
+            window.Close();
+            view.Detach();
+        }
+    });
+
+    /// <summary>
     /// O botão Estúdio (ao lado do Executar) lista as cenas do jogo e troca entre a tela e o código da cena atual.
     /// O menu fica em %TEMP%\csharplab-menu-cenas.png para conferir o visual.
     /// </summary>
