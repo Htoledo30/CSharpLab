@@ -363,6 +363,11 @@ public static partial class PortugueseDocs
         m[item + ".Shadow"] = D("Shadow = sombra. No Texto, na Barra, no Campo de escrita, nas Mensagens e na Lista, uma sombra atrás das letras (para ler em cima de qualquer fundo); no Botão e na Caixa, uma sombra embaixo da peça.", "game.Find(\"Title\").Shadow = true;");
         m[item + ".Style"] = D("Style = estilo do botão: ButtonStyle.Filled (cheio), Gradient (degradê), Soft (suave), Outline (contorno) ou Text (só texto).",
             "game.Find(\"Back\").Style = ButtonStyle.Text;");
+        m[item + ".Write"] = D("Write = escrever. Escreve uma mensagem só nesta caixa de Mensagens (o game.Write escreve em todas que recebem o game.Write). Bom para uma caixa com o que você faz e outra com o que o inimigo faz.",
+            "game.Find(\"PlayerLog\").Write($\"Você causou {damage} de dano.\", Color.Green);\ngame.Find(\"EnemyLog\").Write($\"O goblin causou {hit} de dano.\", Color.Red);");
+        m[item + ".Clear"] = D("Clear = limpar. Apaga só as mensagens escritas nesta caixa de Mensagens (o game.Clear apaga todas).", "game.Find(\"EnemyLog\").Clear();");
+        m[item + ".GameWrite"] = D("GameWrite = recebe o game.Write. false: a caixa de Mensagens mostra só o que for escrito nela com game.Find(\"Nome\").Write.",
+            "game.Find(\"EnemyLog\").GameWrite = false;");
         m[item + ".TextShadow"] = D("TextShadow = sombra nas letras do Botão (o Shadow do botão é a sombra embaixo dele inteiro).", "game.Find(\"Attack\").TextShadow = true;");
         m[item + ".TextColor"] = D("TextColor = cor da letra do Botão, da Barra, do Campo de escrita, das Mensagens e da Lista. Sem escolher, é automática. No Texto, a cor da letra é o Color.",
             "game.Find(\"Buy\").TextColor = Color.Gold;");

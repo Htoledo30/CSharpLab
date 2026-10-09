@@ -28,6 +28,8 @@ internal sealed class RenderContext
     public Action<Piece>? Click { get; init; }
     public Action<Piece, string>? Answer { get; init; }
     public IReadOnlyList<MessageLine> Messages { get; init; } = [];
+    /// <summary>As mensagens de cada caixa de Mensagens, pelo nome (sem a caixa aqui, vale o <see cref="Messages"/>).</summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<MessageLine>>? MessagesByPiece { get; init; }
     /// <summary>Peças que respondem a clique (só as com OnClick no código ficam com a mãozinha).</summary>
     public Func<Piece, bool>? IsClickable { get; init; }
     /// <summary>No jogo: os cartões que o Show pôs em cada Lista.</summary>
@@ -518,12 +520,18 @@ internal static class ScreenRenderer
     {
         var list = new StackPanel();
         IReadOnlyList<MessageLine> lines = context.Live
-            ? context.Messages
-            :
-            [
-                new("As mensagens do game.Write aparecem aqui; as antigas ficam apagadas.", Color.Gray, false, IsOld: true),
-                new("Exemplo: Você causou 7 de dano!", null, true),
-            ];
+            ? context.MessagesByPiece?.GetValueOrDefault(piece.Name) ?? context.Messages
+            : piece.GameWrite
+                ?
+                [
+                    new("As mensagens do game.Write aparecem aqui; as antigas ficam apagadas.", Color.Gray, false, IsOld: true),
+                    new("Exemplo: Você causou 7 de dano!", null, true),
+                ]
+                :
+                [
+                    new($"Só o que for escrito com game.Find(\"{piece.Name}\").Write aparece aqui.", Color.Gray, false, IsOld: true),
+                    new("Exemplo: O goblin causou 4 de dano.", null, true),
+                ];
         foreach (var line in lines)
             list.Children.Add(MessageView(line, piece.FontSize, piece.Font ?? Theme.Current.BodyFont, piece));
 

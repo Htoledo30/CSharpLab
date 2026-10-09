@@ -742,7 +742,8 @@ public sealed class ScreenDesignerModel : IDisposable
             PieceType.Bar => $"{find}.Value = $0;",
             PieceType.Image => $"{find}.Image = \"$0\";",
             PieceType.Box => $"{find}.Visible = $0;",
-            PieceType.Messages => "game.Write(\"$0\");",
+            // Uma caixa que não recebe o game.Write só mostra o que for escrito nela.
+            PieceType.Messages => piece.GameWrite ? "game.Write(\"$0\");" : $"{find}.Write(\"$0\");",
             PieceType.List => $"{find}.Show($0, (card, item) =>\n{{\n    {CardHint(piece, layout)}\n}});",
             _ => null,
         };

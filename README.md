@@ -173,6 +173,7 @@ game.Start("Start");
 | `Choose` | escolher | Uma pergunta com botões: `string choice = game.Choose("Abrir o baú?", "Sim", "Não");`. |
 | `OnKey` | ao apertar | Na cena, recebe as teclas como no terminal: `game.OnKey(key => { if (key == ConsoleKey.D) x++; });`. |
 | `Close` | fechar | Termina o jogo (um botão Sair). |
+| `Find("Log").Write` | escrever numa caixa | Uma mensagem só para aquela caixa de Mensagens: `game.Find("EnemyLog").Write("O goblin atacou!");`. Desligue **Recebe o game.Write** na caixa para ela mostrar só as dela (uma caixa para você, outra para o inimigo). |
 | `Clear` | limpar | Dentro de um clique, apaga as mensagens que a cena já mostrou, como o `Console.Clear()`: `game.Clear();`. O que for escrito depois aparece normalmente. |
 | `Shake` / `Flash` | tremer / piscar | `game.Find("EnemyIcon").Shake();` treme a peça; `.Flash();` faz piscar. Bom ao levar dano. |
 | `Background` | fundo | A imagem de fundo da tela (pasta `Assets`), para a mesma tela servir a lugares diferentes: `game.Background = "tower.png";`. |

@@ -50,6 +50,9 @@ internal sealed class Piece
     /// <summary>false: o botão (ou campo, ou imagem) fica apagado e não responde.</summary>
     public bool Enabled { get; set; } = true;
 
+    /// <summary>Só Mensagens: false, a caixa não recebe o game.Write (só o que for escrito nela, com game.Find("Nome").Write).</summary>
+    public bool GameWrite { get; set; } = true;
+
     /// <summary>Tecla que executa o OnClick do botão (null: só o clique).</summary>
     public string? Shortcut { get; set; }
 
@@ -106,6 +109,7 @@ internal sealed class Piece
         nameof(Text) => type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.List,
         nameof(Size) or nameof(Align) or nameof(Italic) or nameof(Bold) or nameof(Font) => HasLetters(type),
         nameof(Scroll) => type is PieceType.Text,
+        nameof(GameWrite) => type is PieceType.Messages,
         nameof(Shadow) => HasLetters(type) || type is PieceType.Box,
         nameof(TextShadow) => type is PieceType.Button,
         nameof(Color) or nameof(Shade) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages or PieceType.List),

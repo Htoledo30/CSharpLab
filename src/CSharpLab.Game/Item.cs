@@ -279,6 +279,48 @@ public sealed class Item
     }
 
     /// <summary>
+    /// Write = escrever. Escreve uma mensagem só nesta caixa de Mensagens (o game.Write escreve em todas as que
+    /// recebem o game.Write). Bom para separar: uma caixa com o que você faz e outra com o que o inimigo faz.
+    /// </summary>
+    /// <param name="text">O texto. Exemplo: $"O goblin causou {damage} de dano."</param>
+    /// <param name="color">Cor opcional. Exemplo: Color.Red.</param>
+    /// <example>
+    /// <code>
+    /// game.Find("PlayerLog").Write($"Você causou {damage} de dano.", Color.Green);
+    /// game.Find("EnemyLog").Write($"O goblin causou {hit} de dano.", Color.Red);
+    /// </code>
+    /// </example>
+    public void Write(string text, Color? color = null)
+    {
+        if (Piece.Type != PieceType.Messages)
+            throw Wrong("Write", Piece.Type == PieceType.Text
+                ? "só a peça Mensagens tem Write; para mudar um Texto, use .Text = \"...\""
+                : "só a peça Mensagens tem Write");
+        var game = _owner?.Game ?? throw new GameException($"\"{Name}\" não está numa cena desenhada.");
+        game.WriteTo(Piece.Name, text ?? "", color);
+    }
+
+    /// <summary>Clear = limpar. Apaga só as mensagens escritas nesta caixa de Mensagens (o game.Clear apaga todas).</summary>
+    /// <example><code>game.Find("EnemyLog").Clear();</code></example>
+    public void Clear()
+    {
+        if (Piece.Type != PieceType.Messages) throw Wrong("Clear", "só a peça Mensagens tem Clear");
+        var game = _owner?.Game ?? throw new GameException($"\"{Name}\" não está numa cena desenhada.");
+        game.ClearTarget(Piece.Name);
+    }
+
+    /// <summary>
+    /// GameWrite = recebe o game.Write. false: esta caixa de Mensagens mostra só o que for escrito nela com
+    /// game.Find("Nome").Write (a caixa do inimigo, por exemplo).
+    /// </summary>
+    /// <example><code>game.Find("EnemyLog").GameWrite = false;</code></example>
+    public bool GameWrite
+    {
+        get => Check(nameof(GameWrite)).GameWrite;
+        set => Check(nameof(GameWrite)).GameWrite = value;
+    }
+
+    /// <summary>
     /// OnClick = ao clicar. O código entre as chaves roda quando o jogador clica no Botão (ou na Imagem).
     /// </summary>
     /// <example>
@@ -393,6 +435,7 @@ public sealed class Item
             nameof(Shadow) => "Imagem não tem Shadow",
             nameof(TextShadow) => "só o Botão tem TextShadow (nas outras peças, a sombra das letras é o Shadow)",
             nameof(Style) => "só botões têm Style",
+            nameof(GameWrite) => "só a peça Mensagens tem GameWrite",
             nameof(TextColor) => Piece.Type == PieceType.Text
                 ? "no Texto, a cor da letra é o Color"
                 : "só as peças com letras têm TextColor",

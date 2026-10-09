@@ -21,7 +21,7 @@ internal static class ScreenFile
 
     private static readonly string[] PieceKeys =
         ["type", "name", "list", "x", "y", "width", "height", "text", "size", "bold", "italic", "shadow", "textshadow", "scroll", "font", "align", "color", "shade",
-         "opacity", "border", "corner", "style", "textcolor", "barstyle", "bartext", "shortcut", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "visible"];
+         "opacity", "border", "corner", "style", "textcolor", "barstyle", "bartext", "shortcut", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "gamewrite", "visible"];
 
     public static string ValidColors => Color.NamedList + " (ou o código de qualquer cor, como \"#8A2BE2\")";
 
@@ -150,6 +150,7 @@ internal static class ScreenFile
                 "italic" => Boolean(value, label, key, v => piece.Italic = v),
                 "shadow" => Boolean(value, label, key, v => piece.Shadow = v),
                 "textshadow" => Boolean(value, label, key, v => piece.TextShadow = v),
+                "gamewrite" => Boolean(value, label, key, v => piece.GameWrite = v),
                 "scroll" => Boolean(value, label, key, v => piece.Scroll = v),
                 "border" => Boolean(value, label, key, v => piece.Border = v),
                 "visible" => Boolean(value, label, key, v => piece.Visible = v),
@@ -374,6 +375,7 @@ internal static class ScreenFile
             parts.Add($"\"gap\": {Round(p.CardGap)}");
         }
         if (!p.Enabled && Piece.Supports(p.Type, nameof(Piece.Enabled))) parts.Add("\"enabled\": false");
+        if (!p.GameWrite && Piece.Supports(p.Type, nameof(Piece.GameWrite))) parts.Add("\"gameWrite\": false");
         if (!p.Visible) parts.Add("\"visible\": false");
         return "{ " + string.Join(", ", parts) + " }";
     }

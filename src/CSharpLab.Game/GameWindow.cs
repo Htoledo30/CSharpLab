@@ -246,6 +246,7 @@ internal sealed partial class GameWindow : Window, IGameView
             Click = _game.ClickPiece,
             Answer = _game.AnswerPiece,
             Messages = messages,
+            MessagesByPiece = screen.MessagesByPiece,
             IsClickable = _game.IsClickable,
             Cards = _game.CardsOf,
             Created = (piece, element) => elements[piece] = element,
@@ -261,7 +262,7 @@ internal sealed partial class GameWindow : Window, IGameView
         {
             // As peças do cartão modelo aparecem dentro dos cartões da Lista.
             if (!piece.Visible || piece.List != null) continue;
-            hasMessagesPiece |= piece.Type == PieceType.Messages;
+            hasMessagesPiece |= piece.Type == PieceType.Messages && piece.GameWrite;
             var element = ScreenRenderer.Create(piece, context);
             Canvas.SetLeft(element, piece.X);
             Canvas.SetTop(element, piece.Y);

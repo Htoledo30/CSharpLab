@@ -23,7 +23,7 @@ public sealed partial class Game
     private const int MaxRedirects = 20;
 
     private readonly Dictionary<string, Action> _scenes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<(string Text, Color? Color)> _news = [];
+    private readonly List<(string Text, Color? Color, string? Target)> _news = [];
     private int _flushed;            // quantas mensagens do _news já foram para o histórico da cena
     private int _batch;              // cada clique (ou game.Wait) que escreveu algo é um lote de mensagens
     private int _highlight = -1;     // o lote destacado na peça Mensagens: o último do clique atual
@@ -217,7 +217,28 @@ public sealed partial class Game
         text ??= "";
         // No OnEnter, o que se escreve é novidade da chegada (como num clique), não um texto fixo da cena.
         if (_building != null && !_inEnter) _building.Items.Add(new TextItem(text, color, IsNews: false));
-        else _news.Add((text, color));
+        else _news.Add((text, color, null));
+    }
+
+    /// <summary>game.Find("Nome").Write: uma mensagem só para aquela caixa de Mensagens.</summary>
+    internal void WriteTo(string target, string text, Color? color)
+    {
+        if (_building != null && !_inEnter) _building.Items.Add(new TextItem(text, color, IsNews: false, target));
+        else _news.Add((text, color, target));
+    }
+
+    /// <summary>game.Find("Nome").Clear: apaga só as mensagens daquela caixa.</summary>
+    internal void ClearTarget(string target)
+    {
+        if (!_started || (_building != null && !_inEnter))
+            throw new GameException(
+                $"game.Find(\"{target}\").Clear funciona dentro de um clique ou do game.OnEnter: " +
+                $"game.Find(\"Attack\").OnClick(() => {{ game.Find(\"{target}\").Clear(); }}); Solto na cena, ele apagaria a caixa a cada clique.");
+        bool Mine((string Text, Color? Color, string? Target) n) => string.Equals(n.Target, target, StringComparison.OrdinalIgnoreCase);
+        int keptFlushed = _news.Take(_flushed).Count(n => !Mine(n));
+        _news.RemoveAll(Mine);
+        _flushed = keptFlushed;
+        _designed?.History.RemoveAll(h => string.Equals(h.Target, target, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -522,7 +543,7 @@ public sealed partial class Game
             if (_entering || _designed?.SceneName != _current)
             {
                 var layout = Screens.Load(_current);
-                _designed = layout != null ? new DesignedScene(_current, layout) : null;
+                _designed = layout != null ? new DesignedScene(_current, layout) { Game = this } : null;
             }
             // Chegou agora (game.Start, GoTo ou redirecionamento): o OnEnter roda neste desenho, e só nele.
             _arriving = _entering;
@@ -561,16 +582,30 @@ public sealed partial class Game
                 designed.AddHistory(_news.Skip(_flushed), _batch);
                 _flushed = _news.Count;
             }
-            var lines = screen.Items.OfType<TextItem>().Select(t => new MessageLine(t.Text, t.Color, false)).ToList();
-            foreach (var (line, batch) in designed.History)
-                lines.Add(line with { IsNews = batch == _highlight, IsOld = batch != _highlight });
-            screen.Messages = lines;
-            screen.Toast = designed.History.Where(h => h.Batch >= _actionFirstBatch).Select(h => h.Line with { IsNews = true }).ToList();
+            var statics = screen.Items.OfType<TextItem>().ToList();
+            // Cada caixa de Mensagens: o que foi escrito nela e, se ela recebe o game.Write, as mensagens gerais,
+            // na ordem em que foram escritas. Destacadas: as do último lote que chegou nela neste clique.
+            List<MessageLine> LinesFor(Func<string?, bool> takes)
+            {
+                var lines = statics.Where(t => takes(t.Target)).Select(t => new MessageLine(t.Text, t.Color, false)).ToList();
+                var history = designed.History.Where(h => takes(h.Target)).ToList();
+                int top = history.Count > 0 ? history.Max(h => h.Batch) : -1;
+                bool fresh = top >= _actionFirstBatch;
+                foreach (var (line, batch, _) in history)
+                    lines.Add(line with { IsNews = fresh && batch == top, IsOld = !(fresh && batch == top) });
+                return lines;
+            }
+            screen.Messages = LinesFor(target => target == null);
+            var byPiece = new Dictionary<string, IReadOnlyList<MessageLine>>(StringComparer.OrdinalIgnoreCase);
+            foreach (var box in designed.Layout.Pieces.Where(p => p.Type == PieceType.Messages))
+                byPiece[box.Name] = LinesFor(target => target == null ? box.GameWrite : string.Equals(target, box.Name, StringComparison.OrdinalIgnoreCase));
+            screen.MessagesByPiece = byPiece;
+            screen.Toast = designed.History.Where(h => h.Target == null && h.Batch >= _actionFirstBatch).Select(h => h.Line with { IsNews = true }).ToList();
             screen.Effects.AddRange(designed.TakeEffects());
         }
         else
         {
-            foreach (var (text, color) in _news)
+            foreach (var (text, color, _) in _news)
                 screen.Items.Add(new TextItem(text, color, IsNews: true));
         }
         _view.Show(screen);

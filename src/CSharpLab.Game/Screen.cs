@@ -5,7 +5,8 @@ namespace CSharpLab.GameEngine;
 internal abstract record ScreenItem;
 
 /// <summary>Texto da cena. <see cref="IsNews"/>: dito depois de um clique (destacado, some no próximo clique).</summary>
-internal sealed record TextItem(string Text, Color? Color, bool IsNews) : ScreenItem;
+/// <summary><see cref="Target"/>: a caixa de Mensagens que recebe (game.Find("Nome").Write); null: o game.Write, para todas.</summary>
+internal sealed record TextItem(string Text, Color? Color, bool IsNews, string? Target = null) : ScreenItem;
 
 internal sealed record ImageItem(string Path) : ScreenItem;
 
@@ -42,6 +43,12 @@ internal sealed class Screen
         get => _messages ?? Items.OfType<TextItem>().Select(t => new MessageLine(t.Text, t.Color, t.IsNews)).ToList();
         set => _messages = value;
     }
+
+    /// <summary>
+    /// As mensagens de cada caixa de Mensagens (pelo nome): as escritas nela com game.Find("Nome").Write e,
+    /// se ela recebe o game.Write, as gerais. Null nos testes que montam a tela na mão (aí vale o Messages).
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<MessageLine>>? MessagesByPiece { get; set; }
 
     /// <summary>As mensagens do clique atual, para o aviso por cima da tela quando ela não tem a peça Mensagens.</summary>
     public IReadOnlyList<MessageLine>? Toast { get; set; }
@@ -86,7 +93,11 @@ internal sealed class DesignedScene
     public ScreenLayout Layout { get; }
 
     /// <summary>As mensagens dos cliques nesta visita, com o número do lote (cada clique ou game.Wait é um lote).</summary>
-    public List<(MessageLine Line, int Batch)> History { get; } = [];
+    /// <summary>Target: a caixa de Mensagens que recebeu (game.Find("Nome").Write); null: o game.Write, para todas.</summary>
+    public List<(MessageLine Line, int Batch, string? Target)> History { get; } = [];
+
+    /// <summary>O jogo que mostra a cena (o Write de uma caixa de Mensagens escreve por ele).</summary>
+    public Game? Game { get; init; }
 
     public Item? Find(string name) => _items.GetValueOrDefault(name);
 
@@ -125,9 +136,9 @@ internal sealed class DesignedScene
         return effects;
     }
 
-    public void AddHistory(IEnumerable<(string Text, Color? Color)> lines, int batch)
+    public void AddHistory(IEnumerable<(string Text, Color? Color, string? Target)> lines, int batch)
     {
-        foreach (var (text, color) in lines) History.Add((new MessageLine(text, color, false), batch));
+        foreach (var (text, color, target) in lines) History.Add((new MessageLine(text, color, false), batch, target));
         if (History.Count > HistoryLimit) History.RemoveRange(0, History.Count - HistoryLimit);
     }
 

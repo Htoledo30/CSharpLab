@@ -455,6 +455,19 @@ public sealed class ScreenPropertiesPanel : Border
             _content.Children.Add(shade);
         }
 
+        if (type == PieceType.Messages)
+        {
+            _content.Children.Add(Section("O QUE APARECE AQUI"));
+            var shared = SwitchRow("Recebe o game.Write",
+                "Ligado: as mensagens do game.Write aparecem aqui. Desligado: só o que for escrito nesta caixa, " +
+                "com game.Find(\"Nome\").Write(...) — por exemplo, uma caixa só para o que o inimigo faz.",
+                () => Current()?.GameWrite != false, v => Edit(p => p.GameWrite = v, "gamewrite"));
+            _content.Children.Add(shared);
+            var how = Muted("Para escrever só nesta caixa: game.Find(\"" + name + "\").Write(\"...\");");
+            how.Margin = new Thickness(0, 6, 0, 0);
+            _content.Children.Add(how);
+        }
+
         if (Piece.HasLetters(type))
         {
             // As mesmas opções de letra em toda peça que tem texto: fonte, tamanho, negrito, itálico,
@@ -707,7 +720,7 @@ public sealed class ScreenPropertiesPanel : Border
                 PieceType.List => "items",
                 _ => "...",
             }).Split('\n')[0];
-            if (type == PieceType.Messages)
+            if (type == PieceType.Messages && piece?.GameWrite != false)
             {
                 card.Show(ok: true, "Mostra o que o game.Write escreve", null, showAction: true,
                     "Escreve game.Write(\"\"); no fim da cena. A mensagem, você escreve entre as aspas.");

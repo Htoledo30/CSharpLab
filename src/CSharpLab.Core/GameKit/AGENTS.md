@@ -117,6 +117,7 @@ game.Start("Name");
 | `TextColor` (cor da letra; sem escolher, automática) | Button, Bar, Input, Messages (as linhas sem cor no Write), List. No Text, a cor da letra é o `Color` |
 | `Shadow` | Text, Bar, Input, Messages, List: sombra atrás das letras. Button e Box: sombra embaixo da peça |
 | `TextShadow` | Button: sombra atrás das letras do botão |
+| `Write("texto", Color.X)`, `Clear()`, `GameWrite` | Messages: escreve/apaga só nesta caixa (`game.Write` vai para todas as caixas com `GameWrite` ligado; `GameWrite = false` = a caixa mostra só o próprio `Write`). Ex.: uma caixa para o jogador e outra para o inimigo |
 | `Scroll` | Text (`Scroll = true`: texto comprido rola em vez de ser cortado) |
 | `Style` | Button |
 | `BarStyle`, `BarText` | Bar |
@@ -231,6 +232,7 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 | `text` | Texto da peça, em português (na Lista: o texto de quando está vazia) |
 | `size` | Tamanho da letra (Text: 20; Button: 17) |
 | `font`, `size`, `bold`, `italic`, `align`, `textColor` | Toda peça com letras (Text, Button, Bar, Input, Messages, List). `align`: `Left`, `Center`, `Right` (padrão: Button e List no centro, o resto à esquerda). `bold` da Bar começa `true`. No Text, a cor da letra é o `color` |
+| `gameWrite` | Só Messages: `false` = não recebe o `game.Write`, só o `game.Find("Nome").Write(...)` |
 | `shadow` / `textShadow` | Sombra nas letras (`textShadow` no Button; o `shadow` do Button e da Box é a sombra embaixo da peça) |
 | `scroll` | Só Text: barra de rolagem para texto comprido |
 | `font` | `Normal`, `Fantasy`, `Book`, `Hand` (Text, Button, Input, Messages) |
