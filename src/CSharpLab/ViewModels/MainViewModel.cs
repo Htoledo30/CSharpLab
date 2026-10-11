@@ -94,7 +94,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy), nameof(IsRunning), nameof(RunButtonText), nameof(RunButtonToolTip),
-        nameof(RunTargetName), nameof(ShowTerminalHint))]
+        nameof(RunTargetName), nameof(ShowTerminalHint), nameof(CanUseExportButton))]
     public partial RunState RunState { get; set; }
 
     [ObservableProperty]
@@ -136,15 +136,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial string? RunInfo { get; set; }
 
-    public bool IsBusy => RunState != RunState.Idle;
+    public bool IsBusy => IsExporting || RunState != RunState.Idle;
     public bool IsRunning => RunState == RunState.Running;
-    public string RunButtonText => IsBusy ? "Parar" : "Executar";
+    public string RunButtonText => IsExporting ? ExportButtonText : IsBusy ? "Parar" : "Executar";
 
     /// <summary>Nome do projeto que o Executar vai rodar, mostrado no próprio botão.</summary>
     public string? RunTargetName => IsBusy ? null : RunProject?.Name;
 
     public string RunButtonToolTip =>
-        IsBusy ? "Parar a execução (Shift+F5)"
+        IsExportFinalizing ? "A troca está sendo finalizada. Aguarde."
+        : IsExporting ? "Cancelar a preparação da exportação (Shift+F5). A versão anterior será preservada."
+        : IsBusy ? "Parar a execução (Shift+F5)"
         : RunProject != null ? $"Salvar, compilar e executar o projeto \"{RunProject.Name}\" (F5)"
         : CurrentFolder == null ? "Executar este código. Na primeira vez, ele vira um projeto. (F5)"
         : HasMultipleProjects ? "Escolher qual projeto executar (F5)"
@@ -382,6 +384,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _projectLoadVersion++;
         _stopRequested = true;
         _runCts?.Cancel();
+        _exportCts?.Cancel();
         _updatesCts.Cancel();
         _diagnosticsTimer.Stop();
         _recoveryTimer.Stop();

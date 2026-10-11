@@ -99,7 +99,7 @@ public static class GameAssist
 
     /// <summary>
     /// O nome de cena entre aspas na posição: o "Fight" de game.Scene("Fight", …) (IsDeclaration)
-    /// ou de game.GoTo("Fight") e game.Start("Fight").
+    /// ou de game.GoTo("Fight"), game.Start("Fight") e game.Test("Fight", …).
     /// </summary>
     public static SceneReference? SceneReferenceAt(SyntaxNode root, int position)
     {
@@ -116,6 +116,7 @@ public static class GameAssist
         {
             "Scene" when list.Arguments.Count >= 2 => new SceneReference(token.ValueText, true),
             "GoTo" or "Start" when list.Arguments.Count == 1 => new SceneReference(token.ValueText, false),
+            "Test" when list.Arguments.Count == 2 => new SceneReference(token.ValueText, false),
             _ => null,
         };
     }

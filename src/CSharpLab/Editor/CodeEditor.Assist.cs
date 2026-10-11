@@ -228,6 +228,22 @@ public sealed partial class CodeEditor
         RenameTarget? target;
         try
         {
+            if (string.Equals(_vm.GameDirectoryOf(Doc.FilePath), _vm.GameDirectory, StringComparison.OrdinalIgnoreCase) &&
+                _vm.GameDirectory != null && GameAssist.SceneReferenceAt(Syntax.Root, caret) is { } scene &&
+                ls.GetDocument(Doc.LanguageKey) is { } source)
+            {
+                var version = Doc.Version;
+                var model = await source.GetSemanticModelAsync();
+                if (IsDetached || Doc.Version != version) return;
+                var call = model?.SyntaxTree.GetRoot().FindToken(Math.Min(caret, Math.Max(0, Doc.Document.TextLength - 1))).Parent?
+                    .AncestorsAndSelf().OfType<Microsoft.CodeAnalysis.CSharp.Syntax.InvocationExpressionSyntax>().FirstOrDefault();
+                if (call != null && model!.GetOperation(call) is Microsoft.CodeAnalysis.Operations.IInvocationOperation operation &&
+                    operation.TargetMethod.ContainingType.ToDisplayString() == "CSharpLab.GameEngine.Game")
+                {
+                    _vm.AskRenameScene(scene.Name);
+                    return;
+                }
+            }
             target = await Task.Run(() => ls.GetRenameTargetAsync(Doc.LanguageKey, caret, CancellationToken.None));
         }
         catch (Exception ex)

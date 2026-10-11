@@ -81,6 +81,10 @@
                                 </StackPanel>
                             </MenuItem.Header>
                         </MenuItem>
+                        <MenuItem Header="Cancelar exportação" Command="{Binding CancelExportCommand}"
+                                  Visibility="{Binding IsExporting, Converter={StaticResource BoolToVis}}"
+                                  IsEnabled="{Binding CanUseExportButton}"
+                                  InputGestureText="Shift+F5" />
                         <MenuItem Command="{Binding ExportGameCommand}" AutomationProperties.Name="Exportar o jogo…"
                                   Visibility="{Binding HasGame, Converter={StaticResource BoolToVis}}">
                             <MenuItem.Header>
@@ -188,6 +192,9 @@
                     <MenuItem Header="_Projeto">
                         <MenuItem Header="Executar" InputGestureText="F5" Command="{Binding RunCommand}"
                                   ToolTip="Salva os arquivos do projeto, compila e executa" />
+                        <MenuItem Header="Jogar esta cena" InputGestureText="Ctrl+F5" Click="OnPlayScene"
+                                  Visibility="{Binding HasGame, Converter={StaticResource BoolToVis}}"
+                                  ToolTip="Abre o jogo já na cena aberta (a tela, ou o game.Scene onde está o cursor). Se ela tiver um game.Test, os valores dele valem." />
                         <MenuItem Header="Parar" InputGestureText="Shift+F5" Command="{Binding StopCommand}" />
                         <Separator />
                         <MenuItem Header="Escolher projeto para executar…" Command="{Binding ChooseRunProjectCommand}"

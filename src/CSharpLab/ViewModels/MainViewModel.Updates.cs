@@ -132,7 +132,7 @@ public sealed partial class MainViewModel
     private void RestartToUpdate()
     {
         if (_stagedUpdate == null || IsBusy && !Dialogs.Confirm("Atualizar agora",
-                "Um programa está em execução e será encerrado.", "Encerrar e atualizar")) return;
+                IsExporting ? "A exportação será interrompida para atualizar o editor." : "Um programa está em execução e será encerrado.", "Encerrar e atualizar")) return;
         if (!ConfirmCloseAll(Documents)) return;
         _relaunchAfterUpdate = true;
         ShutdownForUpdateRequested?.Invoke();

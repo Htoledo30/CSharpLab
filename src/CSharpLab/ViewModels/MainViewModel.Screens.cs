@@ -400,49 +400,6 @@ public sealed partial class MainViewModel
         NotifyInfo($"A cena \"{name}\" foi escrita no Program.cs (ainda não salvo).");
     }
 
-    /// <summary>
-    /// Uma peça mudou de nome no Estúdio: troca os game.Find("antigo") daquela cena no código.
-    /// As abas alteradas ficam sem salvar (dá para desfazer). Retorna quantos lugares mudaram.
-    /// </summary>
-    public int RenamePieceInCode(string projectDirectory, string scene, string oldName, string newName)
-    {
-        int count = 0;
-        List<string> files;
-        try
-        {
-            files = Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
-                .Where(f => !ProjectLocator.IsInsideSkippedDirectory(f, projectDirectory))
-                .Take(300)
-                .ToList();
-        }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return 0;
-        }
-        foreach (var file in files)
-        {
-            var text = FindDocument(file)?.Document.Text ?? TryRead(file);
-            if (text == null || !text.Contains(oldName, StringComparison.OrdinalIgnoreCase)) continue;
-            var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text).GetRoot();
-            var spans = Core.Language.GameAssist.FindPieceReferences(root, scene, oldName);
-            if (spans.Count == 0) continue;
-            var doc = OpenFile(file, activate: false);
-            if (doc == null || doc.Document.Text != text) continue;
-            doc.Document.BeginUpdate();   // um passo só no desfazer
-            try
-            {
-                foreach (var span in spans.OrderByDescending(s => s.Start))
-                    doc.Document.Replace(span.Start, span.Length, newName);
-            }
-            finally
-            {
-                doc.Document.EndUpdate();
-            }
-            count += spans.Count;
-        }
-        return count;
-    }
-
     /// <summary>Os .cs do projeto, Program.cs primeiro (sem bin/obj).</summary>
     private static List<string> CodeFiles(string projectDirectory)
     {

@@ -66,17 +66,18 @@ public sealed class ExamplePlaytests : IDisposable
     }
 
     /// <summary>Cria o exemplo, compila o Program.cs dele e começa o jogo com a tela falsa.</summary>
-    private Player Load(string id)
+    private Player Load(string id) => LoadFolder(Examples.Create(Examples.All.Single(e => e.Id == id), _dir).Directory);
+
+    /// <summary>Compila o Program.cs da pasta e começa o jogo (playFrom: o "Jogar esta cena", Ctrl+F5).</summary>
+    private static Player LoadFolder(string directory, string? playFrom = null)
     {
-        var example = Examples.All.Single(e => e.Id == id);
-        var created = Examples.Create(example, _dir);
         var trees = new List<SyntaxTree>
         {
             CSharpSyntaxTree.ParseText(
                 "global using System; global using System.IO; global using System.Linq; global using System.Collections.Generic; " +
                 "global using System.Threading; global using System.Threading.Tasks; global using CSharpLab.GameEngine;"),
         };
-        trees.AddRange(Directory.EnumerateFiles(created.Directory, "*.cs").Select(f => CSharpSyntaxTree.ParseText(File.ReadAllText(f), path: f)));
+        trees.AddRange(Directory.EnumerateFiles(directory, "*.cs").Select(f => CSharpSyntaxTree.ParseText(File.ReadAllText(f), path: f)));
         var references = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator)
             .Select(p => MetadataReference.CreateFromFile(p));
         var compilation = CSharpCompilation.Create("Jogo" + Guid.NewGuid().ToString("N")[..6], trees, references,
@@ -89,8 +90,9 @@ public sealed class ExamplePlaytests : IDisposable
         Game? started = null;
         Game.StartForTests = (game, first) =>
         {
-            game.Screens = new ScreenLibrary { Roots = [created.Directory] };
-            Theme.ImageRoots = [created.Directory];   // as imagens da pasta Assets do jogo, para as fotos
+            game.Screens = new ScreenLibrary { Roots = [directory] };
+            game.PlayFrom = playFrom;
+            Theme.ImageRoots = [directory];   // as imagens da pasta Assets do jogo, para as fotos
             game.Begin(first, view);
             started = game;
         };
@@ -129,6 +131,28 @@ public sealed class ExamplePlaytests : IDisposable
         thread.Join();
         if (failure != null) throw new Exception("Falhou jogando: " + failure.Message, failure);
     }
+
+    /// <summary>O jogo novo: a floresta conta as visitas no OnEnter, e o Ctrl+F5 nela usa o game.Test.</summary>
+    [Fact]
+    public void Jogo_novo_tres_momentos_e_jogar_esta_cena() => OnSta(() =>
+    {
+        var folder = Path.Combine(_dir, "novo");
+        Directory.CreateDirectory(Path.Combine(folder, "Screens"));
+        File.WriteAllText(Path.Combine(folder, "Program.cs"), GameKit.StarterProgram);
+        foreach (var (name, text) in GameKit.StarterScreens) File.WriteAllText(Path.Combine(folder, "Screens", name), text);
+
+        var p = LoadFolder(folder);
+        Assert.Equal("Start", p.Scene);
+        p.Click("Forest");
+        Assert.EndsWith("(visita 1)", p.Text("Story"));
+        p.Click("Back");
+        p.Click("Forest");
+        Assert.EndsWith("(visita 2)", p.Text("Story"));
+
+        var test = LoadFolder(folder, playFrom: "Forest");
+        Assert.Equal("Forest", test.Scene);
+        Assert.EndsWith("(visita 10)", test.Text("Story"));
+    });
 
     [Fact]
     public void A_Coroa_Perdida_do_comeco_ao_fim() => OnSta(() =>

@@ -45,10 +45,19 @@ public sealed partial class Game
 
     /// <summary>Cria o jogo. O título aparece no alto da janela.</summary>
     /// <param name="title">Nome do jogo. Exemplo: "A Torre".</param>
-    public Game(string title)
+    public Game(string title) : this(title, GameSaveIdentity.Of(System.Reflection.Assembly.GetEntryAssembly())) { }
+
+    /// <summary>Cria um jogo com identificador fixo para os saves. O editor já fornece um identificador automaticamente.</summary>
+    /// <param name="title">Título da janela.</param>
+    /// <param name="saveId">Identificador exclusivo deste jogo. Preserve-o ao mudar o título ou distribuir atualizações.</param>
+    public Game(string title, string saveId)
     {
         WindowTitle = string.IsNullOrWhiteSpace(title) ? "Meu jogo" : title.Trim();
+        SaveId = GameSaveIdentity.Normalize(saveId);
     }
+
+    /// <summary>Identificador dos saves deste jogo. Mudar o título da janela não muda este identificador.</summary>
+    public string SaveId { get; }
 
     /// <summary>O nome do jogo, mostrado no alto da janela.</summary>
     public string WindowTitle { get; }
@@ -303,6 +312,8 @@ public sealed partial class Game
         {
             _inEnter = false;
         }
+        // "Jogar esta cena": os valores do game.Test valem por cima dos do OnEnter.
+        RunPendingTest();
     }
 
     /// <summary>Button = botão. Cria um botão; o código entre as chaves roda quando o jogador clica.</summary>
@@ -372,9 +383,8 @@ public sealed partial class Game
     /// <param name="firstScene">A cena que aparece primeiro. Exemplo: "Start".</param>
     public void Start(string firstScene)
     {
-        // "Jogar daqui", no Estúdio: o jogo começa na cena que está aberta lá (se ela existir no código).
-        if (Environment.GetEnvironmentVariable(StartSceneVariable) is { Length: > 0 } jump && _scenes.ContainsKey(jump))
-            firstScene = jump;
+        // "Jogar esta cena" (Ctrl+F5, ou "Jogar daqui" no Estúdio): o jogo começa na cena aberta no CSharp Lab.
+        PlayFrom ??= Environment.GetEnvironmentVariable(StartSceneVariable) is { Length: > 0 } jump ? jump : null;
         if (StartForTests is { } play)
         {
             play(this, firstScene);
@@ -412,6 +422,7 @@ public sealed partial class Game
         if (_scenes.Count == 0)
             throw new GameException("O jogo não tem nenhuma cena. Crie uma antes do Start: game.Scene(\"Start\", () => { game.Write(\"Olá!\"); });");
         _current = FindScene(firstScene);
+        PrepareTest();
         // O tema do jogo (GameStyle.json). Um arquivo com erro para aqui, com a explicação.
         _look = GameStyle.Load(Screens.Roots, out var styleError);
         if (styleError != null) throw new GameException(styleError);
@@ -553,6 +564,8 @@ public sealed partial class Game
             screen.Designed = _designed;
             _building = screen;
             _pendingScene = null;
+            int newsBefore = _news.Count;
+            bool testing = _arriving && _pendingTest != null;
             try
             {
                 _scenes[_current]();
@@ -561,6 +574,15 @@ public sealed partial class Game
             {
                 _building = null;
                 _arriving = false;
+            }
+            if (testing && _pendingTest != null)
+            {
+                // A cena não tem OnEnter: o game.Test roda agora e a cena é desenhada de novo, já com os valores dele.
+                RunPendingTest();
+                _news.RemoveRange(newsBefore, _news.Count - newsBefore);
+                _pendingScene = null;
+                _entering = true;
+                continue;
             }
             if (_pendingScene == null) break;
             // A cena mandou ir para outra (ex.: if (health <= 0) game.GoTo("GameOver")).

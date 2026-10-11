@@ -33,6 +33,7 @@ public sealed class ScreenEditorView : Grid
         _doc = doc;
         _vm = vm;
         Model = new ScreenDesignerModel(doc);
+        Model.RenameEdit = (oldName, newName, text) => vm.RenameScreenPiece(doc, Model.SceneName, oldName, newName, text);
         Stage = new ScreenStage(Model);
         Properties = new ScreenPropertiesPanel(Model) { CodeLinks = vm };
         Palette = new PiecePalette(Model);
@@ -74,7 +75,10 @@ public sealed class ScreenEditorView : Grid
         var title = new TextBlock { VerticalAlignment = VerticalAlignment.Center, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
         title.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
         title.Inlines.Add(new System.Windows.Documents.Run("Tela  "));
-        var scene = new System.Windows.Documents.Run($"cena \"{Model.SceneName}\"") { FontWeight = FontWeights.Normal };
+        var scene = new System.Windows.Documents.Run { FontWeight = FontWeights.Normal };
+        scene.SetBinding(System.Windows.Documents.Run.TextProperty,
+            new System.Windows.Data.Binding(nameof(DocumentViewModel.ScreenSceneName))
+            { Source = doc, Mode = System.Windows.Data.BindingMode.OneWay, StringFormat = "cena \"{0}\"" });
         scene.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextMuted");
         title.Inlines.Add(scene);
         header.Children.Add(title);
@@ -103,7 +107,6 @@ public sealed class ScreenEditorView : Grid
         Stage.EditTextRequested += Properties.FocusText;
         Palette.PieceAdded += FocusStage;
         Model.Changed += UpdateState;
-        Model.Renamed += OnRenamed;
         doc.Document.UndoStack.PropertyChanged += OnUndoStackChanged;
         SizeChanged += (_, e) => FitPanels(e.NewSize.Width);
         UpdateState();
@@ -250,17 +253,6 @@ public sealed class ScreenEditorView : Grid
         UpdateUndoButtons();
     }
 
-    /// <summary>O código que usava o nome antigo passa a usar o novo (game.Find da mesma cena).</summary>
-    private void OnRenamed(string oldName, string newName)
-    {
-        if (Model.ProjectDirectory == null) return;
-        int changed = _vm.RenamePieceInCode(Model.ProjectDirectory, Model.SceneName, oldName, newName);
-        if (changed > 0)
-            _vm.NotifyInfo(changed == 1
-                ? $"O game.Find(\"{oldName}\") do código também mudou para \"{newName}\" (ainda não salvo)."
-                : $"{changed} game.Find(\"{oldName}\") do código também mudaram para \"{newName}\" (ainda não salvos).");
-    }
-
     private void OnUndoStackChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) => UpdateUndoButtons();
 
     private void UpdateUndoButtons()
@@ -330,7 +322,7 @@ public sealed class ScreenEditorView : Grid
     public void Detach()
     {
         Model.Changed -= UpdateState;
-        Model.Renamed -= OnRenamed;
+        Model.RenameEdit = null;
         _doc.Document.UndoStack.PropertyChanged -= OnUndoStackChanged;
         Stage.EditTextRequested -= Properties.FocusText;
         Palette.PieceAdded -= FocusStage;

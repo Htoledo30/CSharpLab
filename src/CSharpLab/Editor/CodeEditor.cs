@@ -30,6 +30,8 @@ public sealed partial class CodeEditor : TextEditor
     private CancellationTokenSource? _semanticCts;
     private CancellationTokenSource? _contextCts;
     public bool IsDetached { get; private set; }
+    public new void Undo() => Doc.Undo();
+    public new void Redo() => Doc.Redo();
     private ToolTip? _hoverTip;
 
     public CodeEditor(DocumentViewModel doc, MainViewModel vm)
@@ -38,6 +40,12 @@ public sealed partial class CodeEditor : TextEditor
         _vm = vm;
         Syntax = new SyntaxCache(doc);
         Document = doc.Document;
+        TextArea.CommandBindings.Insert(0, new CommandBinding(ApplicationCommands.Undo,
+            (_, e) => { Doc.Undo(); e.Handled = true; },
+            (_, e) => { e.CanExecute = Doc.Document.UndoStack.CanUndo; e.Handled = true; }));
+        TextArea.CommandBindings.Insert(0, new CommandBinding(ApplicationCommands.Redo,
+            (_, e) => { Doc.Redo(); e.Handled = true; },
+            (_, e) => { e.CanExecute = Doc.Document.UndoStack.CanRedo; e.Handled = true; }));
 
         FontFamily = (FontFamily)Application.Current.FindResource("CodeFont");
         SetBinding(FontSizeProperty, new System.Windows.Data.Binding(nameof(MainViewModel.EditorFontSize)) { Source = vm });

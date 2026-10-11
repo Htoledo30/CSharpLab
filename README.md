@@ -76,16 +76,84 @@ dentro de outra cena faz a tela ir junto. Sem abas: para voltar ao editor de sem
   do `OnClick` dele, o botão fica selecionado na tela.
 - **Mapa do jogo** (no alto da lista de cenas): todas as cenas em miniatura, com setas de para onde cada uma leva
   (os `game.GoTo` do código, até os que ficam dentro de funções). Começa na cena do `game.Start`.
-- **Jogar daqui**: abre o jogo já na cena que está aberta. As variáveis começam com o valor do começo do código.
+- **Jogar daqui** (`Ctrl+F5`, também fora do Estúdio: a tela aberta ou o `game.Scene` onde está o cursor): abre o jogo
+  já nessa cena. As variáveis começam com o valor do começo do código, ou com o do `game.Test` da cena (veja abaixo).
 - **Modelos de tela**: a cena nova pode nascer Em branco, ou como Abertura, História, Escolhas, Combate ou Loja, com as
   peças arrumadas e o código já ligando os botões (com comentários do que falta você escrever).
 - **Exportar**: gera o `.exe` do jogo e um `.zip` em `Documentos\CSharp Lab\Jogos prontos`, que roda em qualquer
-  Windows sem instalar nada (também em **Arquivo → Exportar o jogo**).
+  Windows de 64 bits compatível com o .NET 10, sem instalar o .NET (também em **Arquivo → Exportar o jogo**).
+  O editor prepara e confere o novo pacote antes da troca. A versão anterior, incluindo arquivos extras,
+  fica em `Jogos prontos\Versões anteriores\<jogo>\<data e identificador>`: a pasta `jogo` contém o executável
+  antigo e `jogo.zip` contém o pacote antigo. Durante a preparação, **Cancelar exportação** ou **Shift+F5**
+  preserva a versão anterior. A troca final termina ou é desfeita; uma troca interrompida é recuperada na
+  próxima exportação do mesmo jogo. As versões anteriores ficam guardadas até você decidir removê-las.
+
+### Salvar o progresso com segurança
+
+Você continua usando C# simples:
+
+```csharp
+int gold = game.Load("gold", 50); // carrega; 50 é o valor de um jogo novo
+// Quando quiser guardar o progresso:
+game.Save("gold", gold);
+```
+
+Coloque o `Load` no início e o `Save` no ponto em que quiser guardar o progresso. O motor cuida da gravação:
+prepara um temporário, confere o formato e troca o arquivo atual mantendo uma cópia anterior. Salvar o mesmo
+valor novamente não regrava o arquivo nem descarta essa cópia.
+
+Cada projeto recebe um identificador fixo automaticamente. Dois projetos novos com o mesmo título têm
+saves separados; mudar o título, renomear o projeto ou exportá-lo mantém o progresso. Cópias e versões do
+mesmo projeto mantêm o identificador. Para criar outro jogo, use **Novo projeto**. Projetos feitos fora do
+editor podem informar um identificador exclusivo: `new Game("A Torre", "a-torre")`.
+
+Os arquivos ficam em `Documentos\CSharp Lab\Saves\<identificador>`: `save.json` é o atual,
+`save.anterior.json` é a cópia anterior e `Historico` guarda os arquivos preservados ao restaurar ou começar
+de novo. A cópia anterior corresponde à última gravação que mudou um valor, não a vários slots de jogador.
+
+Um save danificado gera uma explicação e bloqueia a sobrescrita. **A restauração é uma escolha sua**:
+`game.RestoreSave()` restaura a cópia anterior, se houver, e preserva o arquivo atual no histórico. Depois,
+use `game.Load` novamente para atualizar as variáveis. `game.DeleteSave()` arquiva o progresso e começa de
+novo; repetir esse comando não descarta a cópia disponível para restaurar.
+
+Saves de versões antigas usavam o título como nome de arquivo. Para aproveitar um deles, confira se pertence
+a este jogo e chame `game.ImportLegacySave()` antes de carregar. Se o título mudou, informe o antigo:
+`game.ImportLegacySave("Título antigo")`. O original permanece intacto e um save atual nunca é substituído
+pela importação. Essa escolha evita importar automaticamente o progresso de outro projeto com título igual.
 
 ### A tela
 
 Cada cena tem a sua tela em `Screens/<Cena>.json`. Ela abre no **Estúdio** (pelo botão ou pelo explorador).
 Para uma cena nova: o **+** ao lado de **CENAS**, no Estúdio (ou **Arquivo → Nova tela do jogo…**).
+
+**Renomear uma cena**: botão direito na cena da lista ou no mapa → **Renomear cena…**. No C#, `F2`
+com o cursor no nome entre aspas de `game.Scene`, `game.GoTo` ou `game.Start` também abre essa opção.
+Por exemplo, trocar `Fight` por `Battle` atualiza a cena, as idas até ela, o começo do jogo e
+`Screens/Fight.json` para `Screens/Battle.json`. O texto que aparece para o jogador fica como você escreveu.
+Renomear uma tela pelo explorador faz a mesma atualização; mantenha a extensão `.json`.
+
+**Desfazer junto**: `Ctrl+Z` devolve todos os arquivos afetados pela renomeação ao mesmo passo; `Ctrl+Y`
+refaz. Isso também vale ao mudar o nome de uma peça no painel da tela e ao renomear uma variável ou classe
+em vários arquivos. As edições anteriores de cada arquivo continuam no histórico. Se outro arquivo recebeu
+uma edição depois da renomeação, o editor explica qual edição você precisa desfazer primeiro. Uma nova
+edição depois de desfazer encerra a possibilidade de refazer a renomeação antiga.
+
+Use **Salvar tudo** (`Ctrl+Shift+S`) para guardar os arquivos alterados. O arquivo da tela muda de nome
+imediatamente; ao fechar ou trocar de projeto escolhendo **Não salvar**, esse nome acompanha o código
+que ficou salvo. Para fechar uma única aba envolvida em uma renomeação pendente, salve tudo ou desfaça
+primeiro. Como no histórico comum, fechar um arquivo encerra a possibilidade de desfazer as renomeações
+que dependem dele.
+
+Se você salvou apenas parte de uma renomeação, o editor impede descartar o restante e explica como
+concluir: salve tudo ou desfaça a renomeação e salve tudo. Assim o projeto não fica com nomes diferentes
+entre o código e a tela.
+
+Os nomes atualizados automaticamente são os escritos diretamente entre aspas nos métodos do motor.
+Se você usa variáveis, constantes ou expressões para os destinos, o editor pede que confira esse C# antes
+de aplicar a renomeação. Nomes repetidos, arquivos travados e mudanças externas são explicados sem
+sobrescrever arquivos ou aplicar só metade da renomeação.
+Para peças, `game.Find` em um método fora do bloco da cena também precisa de revisão: o editor não consegue
+determinar qual tela esse método vai usar e preserva seus nomes para você ajustar no C#.
 
 **Camadas**: a lista abaixo das cenas mostra todas as peças da tela, da frente (em cima) para trás (embaixo). Clicar
 seleciona, mesmo uma peça escondida atrás de outra; arrastar uma linha muda quem fica na frente. Peças que só enfeitam
@@ -177,6 +245,7 @@ game.Start("Start");
 | `Clear` | limpar | Dentro de um clique, apaga as mensagens que a cena já mostrou, como o `Console.Clear()`: `game.Clear();`. O que for escrito depois aparece normalmente. |
 | `Shake` / `Flash` | tremer / piscar | `game.Find("EnemyIcon").Shake();` treme a peça; `.Flash();` faz piscar. Bom ao levar dano. |
 | `Background` | fundo | A imagem de fundo da tela (pasta `Assets`), para a mesma tela servir a lugares diferentes: `game.Background = "tower.png";`. |
+| `Test` | testar | Valores para testar uma cena sem jogar tudo até ela: `game.Test("Fight", () => { health = 3; });`. Com a cena aberta, **Ctrl+F5** (Jogar esta cena) começa o jogo nela com esses valores. No F5 normal ele não roda. |
 | `Start` | começar | Abre a janela na primeira cena. Sempre na última linha. |
 
 Ao trocar de cena, a tela escurece e clareia sozinha.
@@ -204,6 +273,21 @@ game.Scene("Fight", () =>
 Um `gold += 10` ou um sorteio com `Random` solto na cena (fora do `OnEnter` e do `OnClick`) se repetiria a cada clique;
 o editor sublinha e explica. Voltar para a cena roda o `OnEnter` de novo: uma recompensa que só pode acontecer uma vez
 na aventura precisa de uma variável (`if (!gotKey) { ... gotKey = true; }`).
+
+**Testar uma cena sem jogar tudo até ela.** Abra a tela da cena (ou clique dentro do `game.Scene` dela no código) e
+aperte **Ctrl+F5**: o jogo já começa nela. Para escolher os valores do teste (uma luta com pouca vida, a loja com muito
+ouro), escreva um `game.Test` fora das cenas:
+
+```csharp
+game.Test("Fight", () =>
+{
+    health = 3;      // a luta começa com o herói quase morto
+    potions = 0;
+});
+```
+
+Ele roda só no Ctrl+F5 dessa cena, depois do `OnEnter` dela (os valores do teste ganham). No F5 de sempre e no jogo
+exportado, ele não roda: pode deixar no código.
 
 ### Personalizar: cores, letras, botões e barras
 
@@ -266,6 +350,7 @@ cópia do motor em `lib\` (funciona mesmo se a pasta mudar de lugar).
 | Salvar / Salvar tudo | `Ctrl+S` / `Ctrl+Shift+S` |
 | Fechar aba | `Ctrl+W` |
 | Executar / Parar | `F5` / `Shift+F5` |
+| Jogar só a cena aberta (jogos com botões) | `Ctrl+F5` |
 | Formatar documento | `Ctrl+Shift+F` ou `Alt+Shift+F` |
 | Mostrar sugestões | `Ctrl+Space` |
 | Buscar / Substituir | `Ctrl+F` / `Ctrl+H` |

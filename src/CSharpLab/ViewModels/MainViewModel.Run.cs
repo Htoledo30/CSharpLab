@@ -43,6 +43,7 @@ public sealed partial class MainViewModel
 
     public void StopRun()
     {
+        if (IsExporting) { CancelExport(); return; }
         switch (RunState)
         {
             case RunState.Preparing:
@@ -167,7 +168,7 @@ public sealed partial class MainViewModel
     private async Task<ProcessLaunch?> BuildOrReuseAsync(ProjectFile project, CancellationToken ct)
     {
         // Jogo com botões: se o CSharp Lab trouxe um motor mais novo, o jogo (e o guia para IAs) passa a usá-lo.
-        if (project.IsWindowApp) await Task.Run(() => GameKit.RefreshProject(project.Directory), ct);
+        if (project.IsWindowApp) await Task.Run(() => GameKit.RefreshProject(project.Directory, project.Path), ct);
         var fingerprint = await Task.Run(() => BuildService.InputFingerprint(project.Path), ct);
         if (_runCache.TryReuse(project.Path, fingerprint) is { } reused)
         {

@@ -58,7 +58,7 @@ public sealed partial class MainViewModel
 
     /// <summary>
     /// Aplica um renomear em todas as abas afetadas (abrindo as que faltam). Cada arquivo vira
-    /// uma única operação de desfazer; nada é salvo sozinho.
+    /// uma única operação conjunta de desfazer; nada é salvo sozinho.
     /// </summary>
     public bool ApplyRename(IReadOnlyList<RenameEdit> edits, IReadOnlyDictionary<string, int> versionsBefore)
     {
@@ -67,16 +67,18 @@ public sealed partial class MainViewModel
         {
             if (FindByKey(key) is { } open && open.Version != version) return false;
         }
+        var prepared = new List<(DocumentViewModel Doc, IReadOnlyList<Microsoft.CodeAnalysis.Text.TextChange> Changes)>();
         foreach (var edit in edits)
         {
+            var source = _ls?.GetDocument(edit.DocumentKey);
+            var expected = source != null && source.TryGetText(out var text) ? text.ToString() : null;
             var doc = FindOrOpen(edit.DocumentKey, edit.FilePath);
-            if (doc == null) continue;
-            using (doc.Document.RunUpdate())
-            {
-                foreach (var change in edit.Changes.OrderByDescending(c => c.Span.Start))
-                    doc.Document.Replace(change.Span.Start, change.Span.Length, change.NewText ?? "");
-            }
+            if (doc == null || edit.Changes.Any(c => c.Span.End > doc.Document.TextLength)) return false;
+            if (expected != null && expected != doc.Document.Text)
+                return false;
+            prepared.Add((doc, edit.Changes));
         }
+        LinkedDocumentEdit.Apply(prepared.Select(p => p.Doc).ToList(), () => ApplyTextChanges(prepared), Documents.Contains);
         return true;
     }
 

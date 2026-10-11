@@ -93,5 +93,11 @@ public sealed class EditorCommandsTests
         Assert.True(heroi.IsDirty);
         // Nada é gravado sem o usuário salvar.
         Assert.Equal("class Heroi { public int Vida; }", File.ReadAllText(Path.Combine(created.Directory, "Heroi.cs")));
+        editor.Undo();
+        Assert.Contains("h.Vida = 3;", program.Document.Text);
+        Assert.Equal("class Heroi { public int Vida; }", heroi.Document.Text);
+        heroi.Redo();
+        Assert.Contains("h.Pontos = 3;", program.Document.Text);
+        Assert.Equal("class Heroi { public int Pontos; }", heroi.Document.Text);
     });
 }

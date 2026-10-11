@@ -369,6 +369,22 @@ public sealed partial class ExplorerViewModel : ObservableObject
         try
         {
             var oldPath = node.FullPath;
+            if (!node.IsDirectory && Path.GetExtension(oldPath).Equals(".json", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(Path.GetFileName(Path.GetDirectoryName(oldPath)), "Screens", StringComparison.OrdinalIgnoreCase) &&
+                _main.GameDirectoryOf(oldPath) is { } gameDirectory)
+            {
+                var error = !Path.GetExtension(name).Equals(".json", StringComparison.OrdinalIgnoreCase)
+                    ? "A tela precisa continuar com a extensão .json. Mude só o nome da cena antes dela."
+                    : _main.RenameGameScene(gameDirectory, Path.GetFileNameWithoutExtension(oldPath), Path.GetFileNameWithoutExtension(name));
+                if (error != null)
+                {
+                    node.EditError = error;
+                    node.IsEditing = true;
+                    return false;
+                }
+                node.Rebase(Path.Combine(Path.GetDirectoryName(oldPath)!, name));
+                return true;
+            }
             var newPath = FileOperations.Rename(oldPath, name);
             node.Rebase(newPath);
             _main.OnPathRenamed(oldPath, newPath);

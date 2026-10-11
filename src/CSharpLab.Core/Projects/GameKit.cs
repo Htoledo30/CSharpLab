@@ -68,6 +68,11 @@ public static class GameKit
             "    <Nullable>enable</Nullable>",
             "  </PropertyGroup>",
             "",
+            "  <ItemGroup>",
+            "    <!-- Identificador dos saves: preserve este valor ao renomear ou exportar o jogo. -->",
+            $"    <AssemblyMetadata Include=\"{GameSaveIdentity.MetadataName}\" Value=\"{Guid.NewGuid():N}\" />",
+            "  </ItemGroup>",
+            "",
             "  <!-- Motor do jogo do CSharp Lab: game.Write, game.Button, game.Bar... -->",
             "  <ItemGroup>",
             $"    <Reference Include=\"{LibraryName}\">",
@@ -112,9 +117,15 @@ public static class GameKit
     /// Mantém o jogo em dia com o CSharp Lab: o motor em lib\ e o guia AGENTS.md (se a pessoa não o trocou por outro).
     /// Chamado antes de compilar.
     /// </summary>
-    public static void RefreshProject(string projectDirectory)
+    public static void RefreshProject(string projectDirectory, string? projectPath = null)
     {
-        RefreshLibrary(projectDirectory);
+        if (UsesEngine(projectDirectory))
+        {
+            var projects = projectPath != null ? [projectPath] : Directory.GetFiles(projectDirectory, "*.csproj");
+            foreach (var path in projects)
+                if (ProjectFile.Read(path).IsWindowApp) GameSaveIdentity.Ensure(path);
+        }
+        RefreshLibrary(projectDirectory, throwOnError: true);
         RefreshGuide(projectDirectory);
     }
 
@@ -122,7 +133,9 @@ public static class GameKit
     /// Se o CSharp Lab tem um motor mais novo que o do projeto (ou a mesma versão, compilada de novo),
     /// atualiza a cópia em lib\. Nunca troca por um mais antigo. Retorna true se atualizou.
     /// </summary>
-    public static bool RefreshLibrary(string projectDirectory)
+    public static bool RefreshLibrary(string projectDirectory) => RefreshLibrary(projectDirectory, throwOnError: false);
+
+    private static bool RefreshLibrary(string projectDirectory, bool throwOnError)
     {
         var target = LibraryPath(projectDirectory);
         var source = LibrarySource;
@@ -139,6 +152,8 @@ public static class GameKit
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or BadImageFormatException)
         {
             Settings.AppPaths.Log(ex, "Atualizando o motor do jogo");
+            if (throwOnError)
+                throw new UserFacingException("Não foi possível atualizar o motor deste jogo. Feche as janelas do jogo e confira a permissão da pasta lib antes de executar ou exportar. O editor não vai continuar usando um motor antigo sem avisar.");
             return false;
         }
     }

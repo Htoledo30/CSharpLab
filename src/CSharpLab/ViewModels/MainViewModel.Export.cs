@@ -1,30 +1,63 @@
 using System.Diagnostics;
 using System.IO;
-using System.IO.Compression;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CSharpLab.Core.Build;
 using CSharpLab.Core.Files;
 using CSharpLab.Core.Projects;
 using CSharpLab.Core.Settings;
 
 namespace CSharpLab.ViewModels;
 
-// Exportar o jogo: um .exe que roda em qualquer Windows, mesmo sem o .NET instalado, numa pasta e num .zip
-// prontos para mandar para os amigos.
 public sealed partial class MainViewModel
 {
-    /// <summary>Exportando agora (o botão fica esperando).</summary>
+    private CancellationTokenSource? _exportCts;
+
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBusy), nameof(RunButtonText), nameof(RunButtonToolTip), nameof(RunTargetName),
+        nameof(ExportButtonText), nameof(CanUseExportButton))]
     public partial bool IsExporting { get; set; }
 
-    /// <summary>Onde os jogos exportados ficam: Documentos\CSharp Lab\Jogos prontos.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RunButtonText), nameof(RunButtonToolTip), nameof(ExportButtonText), nameof(CanUseExportButton))]
+    public partial bool IsExportFinalizing { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(RunButtonText), nameof(ExportButtonText), nameof(CanUseExportButton))]
+    public partial bool IsExportCancelling { get; set; }
+
+    public string ExportButtonText => IsExportFinalizing ? "Finalizando…" : IsExportCancelling ? "Cancelando…" : IsExporting ? "Cancelar exportação" : "Exportar";
+    public bool CanUseExportButton => RunState == RunState.Idle && !IsExportFinalizing && !IsExportCancelling;
+
     public static string ExportFolder =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "CSharp Lab", "Jogos prontos");
+
+    internal IGameExporter Exporter { get; set; } = new GameExportService();
+    internal string ExportDestination { get; set; } = ExportFolder;
+    internal Action<string> RevealExport { get; set; } = zip =>
+        Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{zip}\"") { UseShellExecute = true });
+
+    // O botão do Estúdio continua clicável durante a preparação para permitir cancelar.
+    [RelayCommand]
+    private void ExportOrCancel()
+    {
+        if (IsExporting) CancelExport();
+        else ExportGameCommand.Execute(null);
+    }
+
+    [RelayCommand]
+    private void CancelExport()
+    {
+        if (!IsExporting || IsExportFinalizing || _exportCts == null || _exportCts.IsCancellationRequested) return;
+        _exportCts.Cancel();
+        IsExportCancelling = true;
+        StatusText = "Cancelando exportação…";
+    }
 
     [RelayCommand]
     private async Task ExportGame()
     {
-        if (IsExporting) return;
+        if (_disposed || IsExporting) return;
         if (GameProject is not { } project)
         {
             Dialogs.ShowError("Exportar o jogo", "Abra a pasta de um jogo com botões para exportar.");
@@ -32,56 +65,72 @@ public sealed partial class MainViewModel
         }
         if (IsBusy)
         {
-            NotifyInfo("O jogo está rodando. Feche a janela dele (ou aperte Parar) e exporte de novo.");
+            NotifyInfo("Feche o jogo (ou aperte Parar) antes de exportar.");
             return;
         }
-        if (!SaveProjectFiles(project)) return;
 
-        var output = Path.Combine(ExportFolder, project.Name);
-        var zip = output + ".zip";
+        using var exportCts = _exportCts = new CancellationTokenSource();
+        var ct = exportCts.Token;
         IsExporting = true;
-        StatusText = "Exportando o jogo… (a primeira vez demora uns minutos: o .NET vai junto, para rodar em qualquer PC)";
+        StatusText = "Preparando exportação…";
         try
         {
-            if (Directory.Exists(output)) Directory.Delete(output, recursive: true);
-            var result = await Dotnet.RunAsync(
-            [
-                "publish", project.Path, "-c", "Release", "-r", "win-x64", "--self-contained", "true",
-                "-p:PublishSingleFile=true", "-p:IncludeNativeLibrariesForSelfExtract=true", "-p:EnableCompressionInSingleFile=true",
-                "-p:DebugType=None", "-p:GenerateDocumentationFile=false", "-o", output, "-nologo", "-v:q",
-            ], project.Directory);
-            if (result.ExitCode != 0)
+            if (!await EnsureSdkAsync(project, ct))
             {
-                StatusText = "";
-                Dialogs.ShowError("Não deu para exportar o jogo",
-                    "O jogo precisa compilar sem erros (aperte Executar para ver). Se for a primeira exportação, confira a internet: o .NET para o jogo é baixado uma vez.",
-                    LastLines(result.Combined, 30));
+                if (!_disposed) StatusText = "Exportação não iniciada. Confira o aviso sobre o SDK do .NET.";
                 return;
             }
-            // A explicação do motor (para o autocomplete) não serve para quem só joga.
-            var docs = Path.Combine(output, "CSharpLab.Game.xml");
-            if (File.Exists(docs)) File.Delete(docs);
-            if (File.Exists(zip)) File.Delete(zip);
-            ZipFile.CreateFromDirectory(output, zip, CompressionLevel.Optimal, includeBaseDirectory: true);
-            StatusText = "";
-            NotifyInfo($"Pronto! O jogo está em {output} ({project.Name}.exe). Para mandar para os amigos, use o {project.Name}.zip.");
-            try { Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{zip}\"") { UseShellExecute = true }); }
+            ct.ThrowIfCancellationRequested();
+            if (!SaveProjectFiles(project))
+            {
+                StatusText = "Exportação cancelada: um arquivo não foi salvo.";
+                return;
+            }
+            await Task.Run(() => GameKit.RefreshProject(project.Directory, project.Path), ct);
+            ct.ThrowIfCancellationRequested();
+            var progress = new Progress<GameExportStage>(stage =>
+            {
+                if (_disposed || _exportCts != exportCts || ct.IsCancellationRequested) return;
+                IsExportFinalizing = stage == GameExportStage.Installing;
+                StatusText = stage switch
+                {
+                    GameExportStage.Preparing => "Preparando exportação…",
+                    GameExportStage.Compiling => "Compilando o jogo… Na primeira exportação, o .NET também é baixado e isso pode levar alguns minutos.",
+                    GameExportStage.CreatingZip => "Criando o ZIP do jogo…",
+                    GameExportStage.CheckingZip => "Conferindo os arquivos do ZIP…",
+                    _ => "Guardando a versão anterior e finalizando…",
+                };
+            });
+            var result = await Exporter.ExportAsync(project, ExportDestination, progress, ct);
+            if (_disposed) return;
+            StatusText = "Exportação concluída.";
+            var backup = result.PreviousVersion == null ? "" : " A versão anterior foi guardada na pasta \"Versões anteriores\" de Jogos prontos.";
+            NotifyInfo($"Pronto! Para jogar, abra {Path.GetFileName(result.Executable)} em {result.Folder}. Para compartilhar, use {Path.GetFileName(result.Zip)}.{backup}");
+            try { RevealExport(result.Zip); }
             catch (Exception ex) { AppPaths.Log(ex, "Abrindo a pasta do jogo exportado"); }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            StatusText = "";
-            Dialogs.ShowError("Não deu para exportar o jogo", FileErrors.Describe(ex, output));
+            if (!_disposed) StatusText = "Exportação cancelada. A versão anterior foi preservada.";
+        }
+        catch (Exception ex)
+        {
+            AppPaths.Log(ex, "Exportando o jogo");
+            if (!_disposed)
+            {
+                StatusText = "Não foi possível concluir a exportação.";
+                if (ex is GameExportException exportError)
+                    Dialogs.ShowError("Não deu para exportar o jogo", exportError.Message, exportError.Details);
+                else
+                    Dialogs.ShowError("Não deu para exportar o jogo", FileErrors.Describe(ex, ExportDestination));
+            }
         }
         finally
         {
+            _exportCts = null;
+            IsExportFinalizing = false;
+            IsExportCancelling = false;
             IsExporting = false;
         }
-    }
-
-    private static string LastLines(string text, int count)
-    {
-        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return string.Join("\n", lines.Skip(Math.Max(0, lines.Length - count)));
     }
 }

@@ -23,7 +23,7 @@ Mais:
 - Ao **entrar** numa cena, as peças começam como no arquivo. Depois guardam o que o código mudou, até o jogador sair da cena.
 - `game.Write` vai para a peça `Messages` da tela: ela guarda as mensagens da visita à cena, com as do último clique destacadas e as antigas apagadas. Sem a peça `Messages`, as do clique aparecem num aviso por cima da tela.
 - Ao trocar de cena, a tela escurece e clareia sozinha.
-- Rodar: F5 no CSharp Lab (ou `dotnet run`).
+- Rodar: F5 no CSharp Lab (ou `dotnet run`). **Ctrl+F5 joga só a cena aberta** (a tela, ou o `game.Scene` onde está o cursor); o `game.Test` dela escolhe os valores do teste.
 
 **Padrão para cena nova:** crie a tela `Screens/<Cena>.json` e a `game.Scene` com o mesmo nome, que pega as peças com `game.Find`.
 
@@ -92,6 +92,7 @@ game.Start("Name");
 | `game.OnEnter(() => { ... });` | **Direto dentro da cena.** Roda uma vez cada vez que o jogador chega nela (não nos cliques). O `game.Write` daqui vira mensagem nova. |
 | `game.Write("texto");` / `game.Write("texto", Color.Red);` | Mensagem para o jogador, com cor opcional. |
 | `game.GoTo("Name");` | Troca de cena (em botões e dentro de cenas). |
+| `game.Test("Name", () => { health = 3; });` | **Fora das cenas, antes do `game.Start`.** Valores para testar a cena com Ctrl+F5 (Jogar esta cena): roda antes dela (depois do `OnEnter`). No F5 normal e no jogo exportado não roda. Um por cena. |
 | `game.CurrentScene` | Nome da cena atual. |
 | `game.Background = "tower.png";` | Troca a imagem de fundo da tela (pasta `Assets/`). Começa com o `background` do arquivo da tela. |
 | `game.Wait(0.6);` | **Só dentro de um clique.** Mostra a tela como está e espera (0 a 5 s) antes do resto do clique: o herói ataca, o inimigo responde depois. O jogador não clica durante a pausa. |
@@ -101,9 +102,11 @@ game.Start("Name");
 | `game.OnKey(key => { if (key == ConsoleKey.D) x++; });` | **Direto na cena.** Recebe as teclas como `ConsoleKey` (A–Z, D0–D9, setas `LeftArrow`…, `Spacebar`, `Enter`, `Escape`, F1–F12). Segurar repete. Atalhos de botões têm prioridade. |
 | `game.Close();` | Termina o jogo e fecha a janela; dentro de um clique, o resto dele não roda. |
 | `game.Clear();` | **Só dentro de um clique ou do `OnEnter`.** Apaga as mensagens que a cena já mostrou (a peça `Messages` fica vazia), como o `Console.Clear()`. O `game.Write` que vier depois aparece normalmente. |
-| `game.Save("gold", gold);` | Salva um valor com um nome (número, texto, `bool`, lista ou objeto inteiro). Fica salvo depois de fechar o jogo (`Documentos\CSharp Lab\Saves\<jogo>.json`). |
+| `game.Save("gold", gold);` | Salva um valor (número, texto, `bool`, lista ou objeto inteiro), com gravação segura e cópia anterior. Fica em `Documentos\CSharp Lab\Saves\<identificador>\save.json`. O identificador do projeto é automático e não muda com o título. |
 | `int gold = game.Load("gold", 50);` | Pega o valor salvo; sem nada salvo, volta o valor dado (o do jogo novo). Funciona com classes: `Hero hero = game.Load("hero", new Hero());`. |
-| `game.HasSave` / `game.DeleteSave();` | Tem jogo salvo? / Apaga o jogo salvo (Novo jogo). |
+| `game.HasSave` / `game.DeleteSave();` | Tem progresso salvo? / Arquiva o progresso e começa de novo. Save danificado gera uma explicação e não é sobrescrito silenciosamente. |
+| `game.RestoreSave();` | Restaura a cópia anterior por escolha sua e preserva o atual no histórico. Retorna `false` se não houver cópia; depois, use `Load` novamente para atualizar as variáveis. |
+| `game.ImportLegacySave();` | Copia um save do formato antigo, sem alterar o original. Confira se pertence ao jogo; use antes de `Load`. Se o título mudou, informe o antigo: `game.ImportLegacySave("Título antigo")`. |
 | `game.Start("Start");` | Abre a janela na primeira cena. **Sempre a última linha.** |
 
 | Propriedade (`game.Find("X").`) | Peças que têm |

@@ -16,6 +16,11 @@ public sealed partial class DocumentViewModel : ObservableObject
     private bool _forceDirty;
     private SourceText _sourceText;
     private int _changesSinceBaseline;
+    private static long _nextHistoryRevision;
+    internal long HistoryRevision { get; private set; }
+    private long _savedHistoryRevision;
+    internal List<LinkedDocumentEdit> LinkedEdits { get; } = [];
+    internal Action<string>? HistoryError { get; set; }
 
     public DocumentViewModel(string text, string? filePath, Encoding encoding, FileStamp? stamp, int untitledNumber = 0, string? recoveryId = null)
     {
@@ -94,6 +99,7 @@ public sealed partial class DocumentViewModel : ObservableObject
     public string ToolTip => FilePath ?? "Rascunho ainda não salvo";
 
     public string FileName => FilePath != null ? Path.GetFileName(FilePath) : Title;
+    public string? ScreenSceneName => IsScreen ? Path.GetFileNameWithoutExtension(FilePath) : null;
 
     public string EncodingName => TextFileIO.DescribeEncoding(Encoding);
 
@@ -125,6 +131,7 @@ public sealed partial class DocumentViewModel : ObservableObject
         OnPropertyChanged(nameof(IsUntitled));
         OnPropertyChanged(nameof(IsCSharp));
         OnPropertyChanged(nameof(FileName));
+        OnPropertyChanged(nameof(ScreenSceneName));
     }
 
     private void OnDocumentChanged(object? sender, DocumentChangeEventArgs e)
@@ -140,6 +147,7 @@ public sealed partial class DocumentViewModel : ObservableObject
             _changesSinceBaseline = 0;
         }
         Version++;
+        if (Document.UndoStack.AcceptChanges) AdvanceHistory();
         UpdateDirty();
         TextChanged?.Invoke(this);
     }
@@ -163,7 +171,48 @@ public sealed partial class DocumentViewModel : ObservableObject
         _diskHash = Hash(text);
     }
 
-    private void UpdateDirty() => IsDirty = _forceDirty || !Document.UndoStack.IsOriginalFile;
+    private void UpdateDirty() => IsDirty = _forceDirty || HistoryRevision != _savedHistoryRevision;
+
+    // O estado salvo pertence ao arquivo, mesmo quando uma ação muda vários documentos.
+    internal void AdvanceHistory()
+    {
+        foreach (var edit in LinkedEdits) edit.OnNewEdit(this);
+        var previous = HistoryRevision;
+        HistoryRevision = Interlocked.Increment(ref _nextHistoryRevision);
+        Document.UndoStack.PushOptional(new HistoryRevisionEdit(this, previous, HistoryRevision));
+        UpdateDirty();
+    }
+
+    private sealed class HistoryRevisionEdit(DocumentViewModel doc, long before, long after) : IUndoableOperation
+    {
+        public void Undo() { doc.HistoryRevision = before; doc.UpdateDirty(); }
+        public void Redo() { doc.HistoryRevision = after; doc.UpdateDirty(); }
+    }
+
+    public void Undo() => PlayHistory(redo: false);
+    public void Redo() => PlayHistory(redo: true);
+
+    private void PlayHistory(bool redo)
+    {
+        var stack = Document.UndoStack;
+        if (redo ? !stack.CanRedo : !stack.CanUndo) return;
+        var linked = LinkedEdits.LastOrDefault(e => e.IsNext(this, redo));
+        if (linked?.Problem(redo) is { } problem)
+        {
+            HistoryError?.Invoke(problem);
+            return;
+        }
+        try
+        {
+            // A mudança no disco acontece antes de consumir qualquer passo do histórico.
+            linked?.Prepare(redo);
+            if (redo) stack.Redo(); else stack.Undo();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            HistoryError?.Invoke(ex.Message);
+        }
+    }
 
     /// <summary>Marca como alterado mesmo sem histórico de edição (texto recuperado, arquivo excluído).</summary>
     public void ForceDirty()
@@ -177,8 +226,10 @@ public sealed partial class DocumentViewModel : ObservableObject
         DiskStamp = stamp;
         _diskHash = Hash(Document.Text);
         _forceDirty = false;
+        _savedHistoryRevision = HistoryRevision;
         Document.UndoStack.MarkAsOriginalFile();
         UpdateDirty();
+        foreach (var edit in LinkedEdits) edit.OnSaved();
     }
 
     /// <summary>Recarrega do disco mantendo o desfazer possível e o cursor próximo.</summary>

@@ -68,7 +68,7 @@ public sealed class SceneMapView : Grid
         Arrows = links;
         _hint.Text = scenes.Count == 0
             ? "O jogo ainda não tem cenas."
-            : "Cada seta é um game.GoTo(\"…\") no código. Clique numa cena para abrir. As cenas sem seta chegando ficam na última coluna.";
+            : "Cada seta é um game.GoTo(\"…\") no código. Clique numa cena para abrir; use o botão direito para renomear. As cenas sem seta chegando ficam na última coluna.";
 
         // Colunas: a distância (em idas) desde a cena do começo. Quem não é alcançado fica numa coluna no fim.
         var start = scenes.FirstOrDefault(s => s.IsStart)?.Name ?? names.FirstOrDefault();
@@ -162,6 +162,14 @@ public sealed class SceneMapView : Grid
             e.Handled = true;
         };
         System.Windows.Automation.AutomationProperties.SetName(card, "Cena " + scene.Name);
+        var rename = new MenuItem { Header = "Renomear cena…", InputGestureText = "F2" };
+        rename.Click += (_, _) => vm.AskRenameScene(scene.Name);
+        card.ContextMenu = new ContextMenu { Items = { rename } };
+        card.Focusable = true;
+        card.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.F2) { vm.AskRenameScene(scene.Name); e.Handled = true; }
+        };
         return card;
     }
 

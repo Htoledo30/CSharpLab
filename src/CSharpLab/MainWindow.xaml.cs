@@ -252,6 +252,26 @@ public partial class MainWindow : Window
             OpenFind(replace: true);
             e.Handled = true;
         }
+        else if (key == Key.F5 && mods == ModifierKeys.Control)
+        {
+            PlayThisScene();
+            e.Handled = true;
+        }
+    }
+
+    private void OnPlayScene(object sender, RoutedEventArgs e) => PlayThisScene();
+
+    /// <summary>Jogar esta cena (Ctrl+F5): a do Estúdio, a tela aberta ou o game.Scene onde está o cursor.</summary>
+    private void PlayThisScene()
+    {
+        if (!_vm.HasGame) return;
+        var scene = _vm.IsStudioOpen ? Studio.CurrentScene : CurrentScene();
+        if (scene == null)
+        {
+            _vm.NotifyInfo("Para jogar uma cena só, abra a tela dela ou clique dentro do game.Scene dela no código e aperte Ctrl+F5.");
+            return;
+        }
+        _vm.PlayFromScene(scene);
     }
 
     /// <summary>O editor de texto onde o menu age: o do Estúdio, quando ele está aberto, ou o da aba ativa.</summary>
@@ -320,13 +340,13 @@ public partial class MainWindow : Window
     private void OnUndo(object sender, RoutedEventArgs e)
     {
         if (CurrentScreen is { } screen) screen.Model.Undo();
-        else Exec(ApplicationCommands.Undo);
+        else if (_vm.ActiveDocument is { } doc) doc.Undo();
     }
 
     private void OnRedo(object sender, RoutedEventArgs e)
     {
         if (CurrentScreen is { } screen) screen.Model.Redo();
-        else Exec(ApplicationCommands.Redo);
+        else if (_vm.ActiveDocument is { } doc) doc.Redo();
     }
     private void OnCut(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Cut);
     private void OnCopy(object sender, RoutedEventArgs e) => Exec(ApplicationCommands.Copy);

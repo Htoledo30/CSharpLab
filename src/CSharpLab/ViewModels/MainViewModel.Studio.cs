@@ -36,14 +36,15 @@ public sealed partial class MainViewModel
     private string? _playFrom;
 
     /// <summary>
-    /// Jogar daqui: salva, compila e abre o jogo já nesta cena. As variáveis começam com o valor do começo do
-    /// código (o que as outras cenas fariam antes não aconteceu).
+    /// Jogar daqui (Ctrl+F5): salva, compila e abre o jogo já nesta cena. As variáveis começam com o valor do começo do
+    /// código (o que as outras cenas fariam antes não aconteceu), ou com o do game.Test desta cena.
     /// </summary>
     public void PlayFromScene(string scene)
     {
         if (IsBusy)
         {
-            NotifyInfo("O jogo já está rodando. Feche a janela dele (ou aperte Parar) e tente de novo.");
+            NotifyInfo(IsExporting ? "Espere a exportação terminar, ou cancele a preparação para testar o jogo."
+                : "O jogo já está rodando. Feche a janela dele (ou aperte Parar) e tente de novo.");
             return;
         }
         _playFrom = scene;

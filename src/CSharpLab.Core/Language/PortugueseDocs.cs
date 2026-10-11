@@ -317,14 +317,21 @@ public static partial class PortugueseDocs
             "string choice = game.Choose(\"Abrir o baú?\", \"Sim\", \"Não\");\nif (choice == \"Sim\") gold += 10;");
         m[game + ".OnKey"] = D("OnKey = ao apertar uma tecla. Dentro da cena: recebe cada tecla que o jogador aperta (compare com ConsoleKey, como no terminal). Segurar a tecla repete.",
             "game.OnKey(key =>\n{\n    if (key == ConsoleKey.D) x++;\n    else if (key == ConsoleKey.A) x--;\n});");
+        m[game + ".Test"] = D("Test = testar. Valores para testar uma cena sem jogar tudo até ela: com a cena aberta, aperte Ctrl+F5 (Jogar esta cena). O jogo começa nela e este código roda antes (depois do OnEnter dela). No F5 de sempre e no jogo exportado, ele não roda. Fica fora das cenas, antes do game.Start.",
+            "game.Test(\"Fight\", () =>\n{\n    health = 3;\n    potions = 0;\n});");
         m[game + ".Close"] = D("Close = fechar. Termina o jogo e fecha a janela (bom para um botão Sair).", "game.Find(\"Quit\").OnClick(() => game.Close());");
         m[game + ".WindowTitle"] = D("WindowTitle = título da janela. O nome do jogo, mostrado no alto da janela.");
-        m[game + ".Save"] = D("Save = salvar. Guarda um valor com um nome (número, texto, true/false, lista ou um objeto inteiro). Continua salvo depois de fechar o jogo.",
+        m[game + ".SaveId"] = D("SaveId = identificador do progresso. O editor fornece um identificador fixo para cada projeto. Mudar o título não muda os saves. Projetos independentes precisam de identificadores diferentes.");
+        m[game + ".Save"] = D("Save = salvar. Guarda um valor com um nome (número, texto, true/false, lista ou objeto). Continua salvo depois de fechar o jogo. A gravação mantém uma cópia anterior; um save danificado não é sobrescrito silenciosamente.",
             "game.Save(\"gold\", gold);\ngame.Save(\"hero\", hero);");
-        m[game + ".Load"] = D("Load = carregar. Pega um valor salvo com game.Save; sem nada salvo, volta o valor que você der (o do jogo novo).",
+        m[game + ".Load"] = D("Load = carregar. Pega um valor salvo com game.Save. Sem save ou sem esse nome, usa o valor inicial. Um arquivo danificado gera uma explicação e permanece intacto; a cópia anterior só é restaurada quando você escolher.",
             "int gold = game.Load(\"gold\", 50);\nHero hero = game.Load(\"hero\", new Hero());");
-        m[game + ".HasSave"] = D("HasSave = tem jogo salvo. true se o game.Save já guardou alguma coisa.", "game.Find(\"Continue\").Visible = game.HasSave;");
-        m[game + ".DeleteSave"] = D("DeleteSave = apagar o jogo salvo. Começa tudo do zero.", "game.DeleteSave();");
+        m[game + ".HasSave"] = D("HasSave = tem progresso salvo. true se há valores guardados. Um save danificado gera uma explicação em vez de parecer um jogo novo.", "game.Find(\"Continue\").Visible = game.HasSave;");
+        m[game + ".DeleteSave"] = D("DeleteSave = começar de novo. Guarda os arquivos atuais no histórico e limpa o progresso. Repetir não descarta a cópia anterior disponível para restaurar.", "game.DeleteSave();");
+        m[game + ".RestoreSave"] = D("RestoreSave = restaurar a cópia anterior, por escolha sua. Guarda o arquivo atual no histórico. Retorna false se não há cópia. Depois, use Load novamente para atualizar as variáveis.",
+            "if (game.RestoreSave())\n{\n    gold = game.Load(\"gold\", 50);\n}");
+        m[game + ".ImportLegacySave"] = D("ImportLegacySave = copiar um save antigo, que usava o título como nome. Confira se pertence a este jogo. Use antes de Load. O original permanece intacto e um save atual não é substituído. Se o título mudou, informe o antigo.",
+            "game.ImportLegacySave(\"Título antigo\");\nint gold = game.Load(\"gold\", 50);");
 
         const string item = "CSharpLab.GameEngine.Item";
         m[item] = D("Item = peça. Uma peça desenhada no Estúdio (texto, botão, barra, imagem…). Mude as propriedades dela com =.",

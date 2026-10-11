@@ -37,6 +37,9 @@ public sealed class StudioView : Grid
     private readonly Border _missingScene = new() { Visibility = Visibility.Collapsed, Padding = new Thickness(12, 8, 10, 8) };
     private readonly TextBlock _missingText = new() { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center };
     private readonly Button _play = new();
+    private bool _canPlayScene;
+    private readonly Button _export = new();
+    private readonly TextBlock _exportLabel = new() { Text = "Exportar", VerticalAlignment = VerticalAlignment.Center };
     private readonly SceneMapView _map = new() { Visibility = Visibility.Collapsed };
     private bool _mapMode;
     private readonly TextBlock _gameName = new() { VerticalAlignment = VerticalAlignment.Center, FontSize = 12, Margin = new Thickness(10, 1, 0, 0) };
@@ -55,6 +58,13 @@ public sealed class StudioView : Grid
 
     public StudioView()
     {
+        PreviewKeyDown += (_, e) =>
+        {
+            if (!(_sceneList.IsKeyboardFocusWithin || _map.IsKeyboardFocusWithin) || _vm?.ActiveDocument is not { } doc) return;
+            if (e.Key == Key.Z && Keyboard.Modifiers == ModifierKeys.Control) { doc.Undo(); e.Handled = true; }
+            else if (e.Key == Key.Y && Keyboard.Modifiers == ModifierKeys.Control || e.Key == Key.Z && Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift))
+            { doc.Redo(); e.Handled = true; }
+        };
         SetResourceReference(BackgroundProperty, "BgEditor");
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(38) });
         RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -159,7 +169,8 @@ public sealed class StudioView : Grid
         header.Children.Add(back);
 
         _play.Content = WithIcon("\uE768", "Jogar daqui");
-        _play.ToolTip = "Abre o jogo já nesta cena, para testar rápido. As variáveis começam com o valor do começo do código.";
+        _play.ToolTip = "Abre o jogo já nesta cena, para testar rápido (Ctrl+F5). As variáveis começam com o valor do começo do código, " +
+                        "ou com o do game.Test(\"Cena\", () => { ... }) desta cena, se você escreveu um.";
         _play.VerticalAlignment = VerticalAlignment.Center;
         _play.Margin = new Thickness(0, 0, 10, 0);
         _play.Cursor = Cursors.Hand;
@@ -172,16 +183,17 @@ public sealed class StudioView : Grid
         DockPanel.SetDock(_play, Dock.Right);
         header.Children.Add(_play);
 
-        var export = new Button
-        {
-            Content = WithIcon("\uE7B8", "Exportar"),
-            ToolTip = "Gera o .exe do jogo e um .zip para mandar aos amigos (roda em qualquer Windows, sem instalar nada)",
-            VerticalAlignment = VerticalAlignment.Center,
-            Margin = new Thickness(0, 0, 6, 0),
-            Cursor = Cursors.Hand,
-        };
+        var exportContent = WithIcon("\uE7B8", "Exportar");
+        exportContent.Children.RemoveAt(1);
+        exportContent.Children.Add(_exportLabel);
+        var export = _export;
+        export.Content = exportContent;
+        export.ToolTip = "Gera o .exe e o ZIP para compartilhar. A versão anterior é guardada. Durante a preparação, clique para cancelar.";
+        export.VerticalAlignment = VerticalAlignment.Center;
+        export.Margin = new Thickness(0, 0, 6, 0);
+        export.Cursor = Cursors.Hand;
         export.SetResourceReference(StyleProperty, "TextButton");
-        export.Click += (_, _) => _vm?.ExportGameCommand.Execute(null);
+        export.Click += (_, _) => _vm?.ExportOrCancelCommand.Execute(null);
         DockPanel.SetDock(export, Dock.Right);
         header.Children.Add(export);
 
@@ -329,8 +341,16 @@ public sealed class StudioView : Grid
     public void Bind(MainViewModel vm)
     {
         _vm = vm;
+        _exportLabel.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(MainViewModel.ExportButtonText)) { Source = vm });
+        _export.SetBinding(IsEnabledProperty, new System.Windows.Data.Binding(nameof(MainViewModel.CanUseExportButton)) { Source = vm });
         vm.PropertyChanged += OnVmPropertyChanged;
         vm.GoToRequested += OnGoToRequested;
+        vm.SceneRenamed += (oldName, newName) =>
+        {
+            if (!IsOpen) return;
+            if (string.Equals(_scene, oldName, StringComparison.OrdinalIgnoreCase)) _scene = newName;
+            if (_mapMode) ShowMap(); else ShowScene(_scene);
+        };
         vm.ScreenDesignRequested += doc =>
         {
             if (IsOpen && doc.FilePath != null) ShowScene(Path.GetFileNameWithoutExtension(doc.FilePath));
@@ -344,6 +364,8 @@ public sealed class StudioView : Grid
 
     private void OnVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName == nameof(MainViewModel.IsBusy))
+            _play.IsEnabled = _canPlayScene && _vm?.IsBusy == false;
         if (_vm == null || !IsOpen || _syncing) return;
         switch (e.PropertyName)
         {
@@ -579,9 +601,17 @@ public sealed class StudioView : Grid
             CornerRadius = new CornerRadius(5),
             Cursor = Cursors.Hand,
             Background = Brushes.Transparent,
-            ToolTip = scene.HasScreen ? $"Cena \"{scene.Name}\": a tela no meio, o código à direita" : $"Cena \"{scene.Name}\": feita só com código",
+            ToolTip = (scene.HasScreen ? $"Cena \"{scene.Name}\": a tela no meio, o código à direita" : $"Cena \"{scene.Name}\": feita só com código") + "\nBotão direito: renomear a cena.",
         };
         System.Windows.Automation.AutomationProperties.SetName(row, "Cena " + scene.Name);
+        var rename = new MenuItem { Header = "Renomear cena…", InputGestureText = "F2" };
+        rename.Click += (_, _) => _vm?.AskRenameScene(scene.Name);
+        row.ContextMenu = new ContextMenu { Items = { rename } };
+        row.Focusable = true;
+        row.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.F2) { _vm?.AskRenameScene(scene.Name); e.Handled = true; }
+        };
         if (current) row.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
         else
         {
@@ -607,7 +637,8 @@ public sealed class StudioView : Grid
         _scene = scene;
         if (scene != null) _vm.StudioScene = scene;
         var list = scenes ?? _vm.GameScenes();
-        _play.IsEnabled = list.Any(s => s.InCode && string.Equals(s.Name, scene, StringComparison.OrdinalIgnoreCase));
+        _canPlayScene = list.Any(s => s.InCode && string.Equals(s.Name, scene, StringComparison.OrdinalIgnoreCase));
+        _play.IsEnabled = _canPlayScene && !_vm.IsBusy;
         BuildSceneList(list);
         ShowScreen(dir, scene);
         ShowSceneCode(dir, scene);
@@ -764,7 +795,8 @@ public sealed class StudioView : Grid
         {
             _scene = scene;
             _vm.StudioScene = scene;
-            _play.IsEnabled = true;
+            _canPlayScene = true;
+            _play.IsEnabled = !_vm.IsBusy;
             BuildSceneList(_vm.GameScenes());
             ShowScreen(dir, scene);
             _missingScene.Visibility = Visibility.Collapsed;

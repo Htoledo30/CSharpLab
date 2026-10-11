@@ -87,6 +87,7 @@ public sealed partial class MainViewModel
 
     private void AddDocument(DocumentViewModel doc, bool activate)
     {
+        doc.HistoryError = NotifyError;
         // Um rascunho inicial intocado é substituído pelo primeiro arquivo aberto.
         var pristine = Documents.Count == 1 && Documents[0] is { IsUntitled: true, IsDirty: false } only &&
                        only.Document.Text == ProjectCreator.DefaultProgram && !doc.IsUntitled
@@ -152,6 +153,11 @@ public sealed partial class MainViewModel
     {
         doc ??= ActiveDocument;
         if (doc == null) return;
+        if (doc.LinkedEdits.Any(e => e.HasPendingPath || e.HasPartialSave))
+        {
+            NotifyError("Esta aba participa de uma renomeação que ainda não foi salva por inteiro. Salve tudo (Ctrl+Shift+S) antes de fechar a aba; se preferir voltar os nomes, desfaça e salve tudo.");
+            return;
+        }
         if (doc.IsDirty)
         {
             switch (Dialogs.AskSaveChanges([doc.Title]))
@@ -187,7 +193,8 @@ public sealed partial class MainViewModel
     /// <summary>Pergunta sobre alterações não salvas. Retorna false se o usuário cancelar ou se salvar falhar.</summary>
     public bool ConfirmCloseAll(IEnumerable<DocumentViewModel> docs)
     {
-        var dirty = docs.Where(d => d.IsDirty).ToList();
+        var closing = docs.ToList();
+        var dirty = closing.Where(d => d.IsDirty).ToList();
         if (dirty.Count == 0) return true;
         switch (Dialogs.AskSaveChanges(dirty.Select(d => d.Title).ToList()))
         {
@@ -200,6 +207,32 @@ public sealed partial class MainViewModel
                 }
                 return true;
             default:
+                if (closing.SelectMany(d => d.LinkedEdits).Distinct().Any(e => e.HasPartialSave))
+                {
+                    NotifyError("Parte de uma renomeação já foi salva. Descartar só os outros arquivos deixaria nomes diferentes no projeto. Salve tudo (Ctrl+Shift+S), ou desfaça a renomeação e salve tudo antes de fechar.");
+                    return false;
+                }
+                // Primeiro volta as novas renomeações; depois repõe, na ordem, as renomeações salvas que foram desfeitas.
+                var pending = closing.SelectMany(d => d.LinkedEdits).Distinct().Where(e => e.HasPendingPath)
+                    .OrderBy(e => e.DiscardNeedsRedo)
+                    .ThenBy(e => e.DiscardNeedsRedo ? e.Sequence : -e.Sequence).ToList();
+                if (pending.Any(e => !e.InvolvesOnly(closing)))
+                {
+                    NotifyError("Esta renomeação também envolve arquivos que vão continuar abertos. Salve tudo ou desfaça a renomeação antes de descartar estes arquivos.");
+                    return false;
+                }
+                var restored = new List<LinkedDocumentEdit>();
+                foreach (var edit in pending)
+                {
+                    if (edit.DiscardPath() is { } error)
+                    {
+                        foreach (var done in restored.AsEnumerable().Reverse())
+                            if (done.RestoreLivePath() is { } rollbackError) error += "\n" + rollbackError;
+                        NotifyError("Não foi possível devolver o nome da tela ao estado salvo: " + error);
+                        return false;
+                    }
+                    restored.Add(edit);
+                }
                 foreach (var d in dirty) _recovery.Delete(d.RecoveryId);
                 return true;
         }

@@ -116,6 +116,7 @@ public sealed class ScreenDesignerModel : IDisposable
 
     /// <summary>Uma peça mudou de nome (antigo, novo): o código que usa o nome antigo pode ser atualizado.</summary>
     public event Action<string, string>? Renamed;
+    internal Func<string, string, string, string?>? RenameEdit { get; set; }
 
     /// <summary>
     /// Quando o texto muda enquanto o Estúdio está escondida (Arquivo aberto), a leitura espera ela aparecer.
@@ -446,6 +447,14 @@ public sealed class ScreenDesignerModel : IDisposable
         // As peças do cartão continuam na Lista, agora com o nome novo.
         foreach (var member in layout.Pieces.Where(p => string.Equals(p.List, piece.Name, StringComparison.OrdinalIgnoreCase)))
             member.List = newName;
+        if (RenameEdit is { } rename)
+        {
+            if (rename(piece.Name, newName, ScreenFile.Serialize(layout)) is { } error) return error;
+            _selected = [newName];
+            SelectionChanged?.Invoke();
+            Renamed?.Invoke(piece.Name, newName);
+            return null;
+        }
         // A seleção acompanha o nome novo antes de avisar a tela, para nada piscar.
         _selected = [newName];
         Commit(layout);
@@ -630,13 +639,13 @@ public sealed class ScreenDesignerModel : IDisposable
     public void Undo()
     {
         EndMerge();
-        if (CanUndo) Doc.Document.UndoStack.Undo();
+        if (CanUndo) Doc.Undo();
     }
 
     public void Redo()
     {
         EndMerge();
-        if (CanRedo) Doc.Document.UndoStack.Redo();
+        if (CanRedo) Doc.Redo();
     }
 
     /// <summary>

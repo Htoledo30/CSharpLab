@@ -64,6 +64,25 @@ oferecer versões novas, mas uma cópia anterior ao recurso precisa ser instalad
 
 ## Decisões técnicas
 
+- **Renomeações conjuntas**: `GameRename` monta uma análise semântica com os textos atuais e a referência
+  do motor; altera os argumentos literais de `Game.Scene/GoTo/Start` e `Game.Find` na cena da peça.
+  Strings comuns e métodos de outras classes ficam intactos. Destinos indiretos e chamadas do motor
+  sem resolução impedem a aplicação; a leitura para renomear não trunca a lista de arquivos em 300.
+  `MainViewModel.SceneRename` prepara todos os documentos antes de mudar qualquer nome e integra lista,
+  mapa, explorador e F2. Colisões, mudanças externas e falhas de leitura não são ignoradas.
+- **Histórico entre arquivos**: `LinkedDocumentEdit` mantém as pilhas nativas de AvalonEdit e envolve
+  cada participante em um grupo com marcadores de começo/fim. Desfazer/refazer em qualquer participante
+  percorre o mesmo grupo nos demais. Revisões opcionais de `DocumentViewModel` mantêm o estado salvo de
+  cada arquivo; nenhuma pilha é substituída e as edições anteriores permanecem disponíveis.
+  Os comandos da interface verificam revisões, arquivos abertos e caminhos antes de consumir o passo.
+  O fechamento com descarte é bloqueado se só parte dos participantes teve a renomeação salva; isso
+  também protege renomeações de símbolos e peças sem mudança de caminho.
+  Uma nova edição após desfazer invalida o refazer conjunto, preservando o novo histórico local.
+  A mudança do caminho é feita antes da reprodução do texto, para uma falha de disco preservar o histórico.
+  Ao descartar todos os participantes, primeiro desfaz os caminhos novos em ordem inversa e depois
+  repõe em ordem os caminhos salvos que tinham sido desfeitos, voltando ao estado do código salvo;
+  uma falha tenta reverter os caminhos já restaurados e mantém os documentos abertos.
+
 - **.NET 10 + WPF**, aplicativo `net10.0-windows` publicado *self-contained* para win-x64 com ReadyToRun
   (abre sem runtime instalado; o SDK só é exigido para compilar os programas do usuário).
 - **Versões fixadas**: AvalonEdit 6.3.1.120, Roslyn (Microsoft.CodeAnalysis.*) 5.6.0,
@@ -98,6 +117,19 @@ oferecer versões novas, mas uma cópia anterior ao recurso precisa ser instalad
   Shift+F5, Ctrl+S e Ctrl+C/Ctrl+V (copiar seleção/colar) funcionem.
 - **Salvamento**: grava num temporário na mesma pasta e substitui o original (`File.Replace`); codificação
   (UTF-8 com/sem BOM, UTF-16, Windows-1252) e finais de linha são preservados.
+- **Progresso dos jogos**: `GameSaveIdentity` no Core grava um GUID permanente em `AssemblyMetadata`
+  (`CSharpLab.SaveId`). Projetos novos já recebem o GUID; Executar/Exportar acrescentam apenas a identidade
+  ausente do projeto existente, antes de calcular a compilação. O runtime lê a identidade do assembly de
+  entrada, inclusive no executável publicado. Cópias do projeto mantêm o GUID. Fora do editor, o construtor
+  aceita um ID explícito; o fallback usa o nome do assembly e deve ser evitado para jogos independentes com
+  o mesmo nome de assembly. `GameSaveStore` usa uma trava exclusiva durante leitura/alterações, temporários
+  exclusivos com flush para disco e `File.Replace` para trocar o atual e guardar a cópia anterior na mesma
+  operação. Um `Load` sem save não cria pastas; salvar um valor igual não regrava nem rotaciona o backup.
+  UTF-8 inválido, JSON quebrado, raiz diferente de objeto e chaves duplicadas bloqueiam a sobrescrita.
+  `RestoreSave` valida o backup e arquiva o arquivo atual antes de restaurar; `DeleteSave` arquiva os arquivos
+  e grava um objeto vazio atomicamente. Repetir o reset mantém o backup anterior. A importação do legado é
+  explícita e preserva o original, pois títulos iguais podiam compartilhar o arquivo antigo. O histórico de
+  restaurações/resets é preservado sem limpeza automática; os testes usam pastas isoladas.
 - **Recuperação**: cópias de documentos alterados em `%LocalAppData%\CSharpLab\Recovery` (1,5 s após a
   última edição, gravação atômica), apagadas ao salvar ou descartar. Gravações e exclusões passam por uma
   fila única e ordenada, então uma gravação atrasada nunca recria um rascunho já descartado.
@@ -109,6 +141,17 @@ oferecer versões novas, mas uma cópia anterior ao recurso precisa ser instalad
   `.editorconfig` define tabs/espaços e tamanho da indentação usada por Tab e Enter.
 - **Instalação**: os arquivos são copiados para uma pasta temporária irmã antes da troca. A versão
   anterior fica disponível para rollback até a nova pasta ocupar o destino com sucesso.
+- **Exportação de jogos**: `GameExportService` publica em `.exportacao/<jogo>/pendente`, fora da pasta
+  de código, com o SDK conferido e o GameKit atualizado. O nome do executável vem da avaliação do
+  projeto em Release/win-x64. `ExportArchive` cria o ZIP em blocos canceláveis e verifica tamanho e
+  SHA-256 de cada arquivo descompactado, sem carregar o jogo inteiro na memória. `ExportTransaction`
+  guarda a pasta e o ZIP anteriores em `Versões anteriores/<jogo>/<data e identificador>` antes da troca.
+  Uma trava de arquivo impede exportações simultâneas para o mesmo destino, inclusive entre instâncias.
+  Um registro atômico permite desfazer trocas incompletas na próxima exportação; se a restauração
+  falhar, os arquivos e o registro ficam preservados e o erro informa onde procurar. A preparação
+  cancela o processo do SDK e a compactação. Após iniciar a troca, a operação termina ou restaura os
+  originais. Execução e exportação são mutuamente exclusivas, inclusive pelos atalhos. Os testes
+  incluem falhas, arquivos abertos, cancelamento, recuperação e publicação real com abertura do ZIP.
 - **Salvar** confere o arquivo no disco antes de gravar (data, tamanho e conteúdo) e pergunta antes de
   substituir uma versão alterada por outro programa. Codificações antigas (Windows-1252) nunca trocam
   caracteres em silêncio: se faltar algum, o editor oferece salvar em UTF-8.

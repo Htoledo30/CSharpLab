@@ -254,7 +254,7 @@ public sealed class InputTests : IDisposable
         thread.SetApartmentState(ApartmentState.STA);
         thread.Start();
         thread.Join();
-        Assert.Null(failure?.ToString());
+        Assert.True(failure == null, failure?.ToString());
     }
 
     /// <summary>Foto do palco do jogo como está agora (em %TEMP%, para conferir o visual dos pedidos).</summary>
