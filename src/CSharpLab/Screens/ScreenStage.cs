@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
@@ -814,6 +815,14 @@ public sealed class ScreenStage : Grid
         menu.Items.Add(new Separator());
         menu.Items.Add(Item("Trazer para frente", "Ctrl+]", _model.BringToFront));
         menu.Items.Add(Item("Enviar para trás", "Ctrl+[", _model.SendToBack));
+        menu.Items.Add(new Separator());
+        var copyStyle = Item("Copiar estilo", "Ctrl+Shift+C", () => _model.CopyStyle());
+        copyStyle.IsEnabled = _model.Selected != null;
+        menu.Items.Add(copyStyle);
+        var pasteStyle = Item("Colar estilo", "Ctrl+Shift+V", () => _model.PasteStyle());
+        pasteStyle.IsEnabled = _model.HasStyle;
+        menu.Items.Add(pasteStyle);
+        menu.Items.Add(AlignMenu());
         if (_model.Selected is { })
         {
             menu.Items.Add(new Separator());
@@ -835,6 +844,28 @@ public sealed class ScreenStage : Grid
         menu.Items.Add(new Separator());
         foreach (var type in Enum.GetValues<PieceType>())
             menu.Items.Add(Item("Nova peça: " + Piece.Describe(type), null, () => _model.Add(type, at)));
+        return menu;
+    }
+
+    /// <summary>Alinhar: com várias peças, umas com as outras; com uma só, com a tela.</summary>
+    private MenuItem AlignMenu()
+    {
+        bool many = _model.SelectedNames.Count > 1;
+        var menu = new MenuItem { Header = many ? "Alinhar" : "Alinhar na tela" };
+        foreach (var (text, edge) in ScreenArrange.Edges(many))
+            menu.Items.Add(Item(text, null, () => _model.Align(edge)));
+        if (_model.SelectedNames.Count > 2)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(Item("Espaço igual na horizontal", null, () => _model.Distribute(horizontal: true)));
+            menu.Items.Add(Item("Espaço igual na vertical", null, () => _model.Distribute(horizontal: false)));
+        }
+        if (many)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(Item("Mesma largura da primeira", null, () => _model.SameSize(width: true, height: false)));
+            menu.Items.Add(Item("Mesma altura da primeira", null, () => _model.SameSize(width: false, height: true)));
+        }
         return menu;
     }
 
@@ -861,6 +892,11 @@ public sealed class ScreenStage : Grid
     protected override void OnDragOver(DragEventArgs e)
     {
         base.OnDragOver(e);
+        if (DroppedImages(e) is { } files)
+        {
+            ShowImageDrop(e, files);
+            return;
+        }
         if (e.Data.GetData(PieceDragFormat) is not PieceType type || _model.Layout == null)
         {
             e.Effects = DragDropEffects.None;
@@ -891,10 +927,70 @@ public sealed class ScreenStage : Grid
         base.OnDrop(e);
         _dropGhost.Visibility = Visibility.Collapsed;
         ShowSlotHint(null);
+        if (DroppedImages(e) is { } files)
+        {
+            DropImages(files, StagePoint(e));
+            Focus();
+            e.Handled = true;
+            return;
+        }
         if (e.Data.GetData(PieceDragFormat) is not PieceType type) return;
         _model.Add(type, StagePoint(e));
         Focus();
         e.Handled = true;
+    }
+
+    // ------------------------------------------------------------------ soltar imagens do Windows
+
+    /// <summary>As imagens arrastadas do Windows (Explorador, área de trabalho), ou null se não é isso.</summary>
+    private string[]? DroppedImages(DragEventArgs e)
+    {
+        if (_model.Layout == null || _model.AssetsDirectory == null || !e.Data.GetDataPresent(DataFormats.FileDrop)) return null;
+        var files = (e.Data.GetData(DataFormats.FileDrop) as string[] ?? []).Where(ScreenDesignerModel.IsImageFile).ToArray();
+        return files.Length > 0 ? files : null;
+    }
+
+    /// <summary>Em cima de uma Imagem, troca a imagem dela; no resto do palco, mostra onde a imagem nova vai ficar.</summary>
+    private void ShowImageDrop(DragEventArgs e, string[] files)
+    {
+        e.Effects = DragDropEffects.Copy;
+        e.Handled = true;
+        var p = StagePoint(e);
+        var target = files.Length == 1 ? _model.HitTest(p) : null;
+        var ghost = target?.Type == PieceType.Image
+            ? _model.BoundsOf(target)
+            : new Rect(p.X - 80, p.Y - 80, 160, 160);
+        Place(_dropGhost, ghost);
+        _dropGhost.StrokeThickness = 1.5 / _zoom;
+        _dropGhost.Visibility = Visibility.Visible;
+        ShowSlotHint(target?.Type == PieceType.Image ? ghost : null, target?.Type == PieceType.Image ? $"troca a imagem de {target.Name}" : null);
+    }
+
+    /// <summary>
+    /// Copia as imagens para a pasta Assets do jogo e põe na tela: soltando em cima de uma Imagem, troca a
+    /// imagem dela; no resto do palco, cria peças Imagem com o formato de cada uma.
+    /// </summary>
+    private void DropImages(string[] files, Point at)
+    {
+        var imported = new List<(string Image, Size? Natural)>();
+        try
+        {
+            foreach (var file in files)
+                imported.Add((_model.ImportImage(file), ScreenDesignerModel.ImageSize(file)));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            if (Window.GetWindow(this) is { } owner)
+                MessageBox.Show(owner, "Não foi possível copiar a imagem para a pasta Assets: " + ex.Message, "Imagem", MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (imported.Count == 0) return;
+        }
+        if (imported.Count == 1 && _model.HitTest(at) is { Type: PieceType.Image } image)
+        {
+            _model.Select(image.Name);
+            _model.Edit(image.Name, p => p.Image = imported[0].Image);
+            return;
+        }
+        _model.AddImages(imported, at);
     }
 
     // ------------------------------------------------------------------ teclado
@@ -927,6 +1023,8 @@ public sealed class ScreenStage : Grid
                 break;
             case Key.A when ctrl: _model.SelectAll(); break;
             case Key.D when ctrl: _model.Duplicate(); break;
+            case Key.C when ctrl && shift: _model.CopyStyle(); break;
+            case Key.V when ctrl && shift: _model.PasteStyle(); break;
             case Key.C when ctrl: CopySelection(); break;
             case Key.V when ctrl: _model.Paste(); break;
             case Key.Z when ctrl && shift: _model.Redo(); break;

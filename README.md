@@ -172,6 +172,14 @@ cima do tema. A escolha fica no arquivo `GameStyle.json`, na pasta do projeto.
 - **Várias peças**: Shift+clique ou arraste um retângulo no fundo do palco (`Ctrl+A` pega todas). Elas andam, duplicam e apagam juntas.
 - **Copiar e colar entre telas**: `Ctrl+C` numa tela e `Ctrl+V` em outra cola no mesmo lugar e com os mesmos nomes
   (copie o painel de status da Vila e cole na Floresta: o mesmo código serve às duas).
+- **Alinhar**: com várias peças selecionadas, o painel alinha todas pela esquerda, pelo meio, pela direita, pelo topo
+  ou pela base; **Espaço igual** deixa o mesmo espaço entre 3 ou mais; **Mesma largura/altura** copia o tamanho da
+  primeira que você selecionou. Com uma peça só, alinha com a tela (ou com o cartão da Lista): o **Centro ↔** centraliza.
+- **Copiar estilo**: `Ctrl+Shift+C` numa peça guarda a aparência dela (cores, letra, sombra, cantos…), sem o texto e sem o
+  lugar; `Ctrl+Shift+V` cola nas selecionadas, até em outra tela. Entre tipos diferentes vai o que combina: de um botão
+  para um texto, a letra; para uma caixa, a cor e os cantos.
+- **Imagens do Windows**: arraste um `.png` ou `.jpg` do Explorador para o palco. Ele é copiado para a pasta `Assets` e
+  vira uma peça Imagem no formato dela (as grandes chegam reduzidas). Soltando em cima de uma Imagem, troca a imagem dela.
 - **Propriedades** à direita: nome, texto, letra, cor, imagem, posição e tamanho, e os estilos de cada peça:
 
 | Peça | Estilos |

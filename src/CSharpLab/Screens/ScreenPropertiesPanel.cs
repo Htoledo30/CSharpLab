@@ -285,9 +285,25 @@ public sealed class ScreenPropertiesPanel : Border
         names.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
         _content.Children.Add(names);
 
+        _content.Children.Add(Section("ALINHAR"));
+        _content.Children.Add(AlignGrid(many: true));
+
+        _content.Children.Add(Section("ESPAÇO E TAMANHO"));
+        var spacing = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -6, 0) };
+        bool three = pieces.Count > 2;
+        spacing.Children.Add(SmallAction("↔  Espaço igual", three ? "Deixa o mesmo espaço entre elas, da esquerda para a direita (a primeira e a última não saem do lugar)."
+            : "Selecione 3 peças ou mais para deixar o mesmo espaço entre elas.", () => _model.Distribute(horizontal: true), three));
+        spacing.Children.Add(SmallAction("↕  Espaço igual", three ? "Deixa o mesmo espaço entre elas, de cima para baixo (a primeira e a última não saem do lugar)."
+            : "Selecione 3 peças ou mais para deixar o mesmo espaço entre elas.", () => _model.Distribute(horizontal: false), three));
+        var first = pieces[0].Name;
+        spacing.Children.Add(SmallAction("Mesma largura", $"Todas ficam com a largura de {first} (a primeira que você selecionou).", () => _model.SameSize(width: true, height: false)));
+        spacing.Children.Add(SmallAction("Mesma altura", $"Todas ficam com a altura de {first} (a primeira que você selecionou).", () => _model.SameSize(width: false, height: true)));
+        _content.Children.Add(spacing);
+
         _content.Children.Add(Section("FAZER COM TODAS"));
         foreach (var (text, action) in new (string, Action)[]
                  {
+                     ("Colar estilo  (Ctrl+Shift+V)", () => PasteStyle()),
                      ("Duplicar  (Ctrl+D)", () => _model.Duplicate()),
                      ("Copiar  (Ctrl+C)", _model.Copy),
                      ("Apagar  (Del)", _model.Delete),
@@ -304,6 +320,7 @@ public sealed class ScreenPropertiesPanel : Border
                      "Arraste qualquer uma: todas andam juntas. As setas também.",
                      "Copie aqui e cole em outra tela (Ctrl+V): as peças vão para o mesmo lugar, com os mesmos nomes.",
                      "Shift+clique numa peça tira ela da seleção.",
+                     "Mesma largura e mesma altura copiam o tamanho da primeira peça que você selecionou.",
                  })
         {
             _content.Children.Add(Bullet(tip));
@@ -555,6 +572,9 @@ public sealed class ScreenPropertiesPanel : Border
                 () => Current()?.Corner ?? Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
         }
 
+        _content.Children.Add(Section("APARÊNCIA"));
+        _content.Children.Add(StyleRow());
+
         _content.Children.Add(Section(piece.List != null ? "POSIÇÃO NO CARTÃO E TAMANHO" : "POSIÇÃO E TAMANHO"));
         var bounds = new UniformGrid { Columns = 2 };
         bounds.Children.Add(Labeled("X", NumberField(() => Current()?.X ?? 0, v => Edit(p => p.X = v, "x"), -2000, 3000)));
@@ -562,6 +582,10 @@ public sealed class ScreenPropertiesPanel : Border
         bounds.Children.Add(Labeled("Largura", NumberField(() => Current()?.Width ?? 0, v => Edit(p => p.Width = v, "w"), ScreenDesignerModel.MinSize, 3000), top: 8));
         bounds.Children.Add(Labeled("Altura", NumberField(() => Current()?.Height ?? 0, v => Edit(p => p.Height = v, "h"), ScreenDesignerModel.MinSize, 3000), left: 8, top: 8));
         _content.Children.Add(bounds);
+        var center = Muted(piece.List != null ? "Alinhar no cartão:" : "Alinhar na tela:");
+        center.Margin = new Thickness(0, 10, 0, 4);
+        _content.Children.Add(center);
+        _content.Children.Add(AlignGrid(many: false));
 
         var visible = SwitchRow("Aparece no começo", "Desligado: a peça começa escondida e o código mostra com .Visible = true.",
             () => Current()?.Visible != false, v => Edit(p => p.Visible = v, "visible"));
@@ -1553,6 +1577,73 @@ public sealed class ScreenPropertiesPanel : Border
         {
             Core.Settings.AppPaths.Log(ex, "Abrindo Assets");
         }
+    }
+
+    // ------------------------------------------------------------------ arrumar
+
+    /// <summary>Os seis jeitos de alinhar: com várias peças, umas com as outras; com uma só, com a tela (ou o cartão).</summary>
+    private FrameworkElement AlignGrid(bool many)
+    {
+        var grid = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -6, 0) };
+        string[] labels = ["⇤  Esquerda", "Centro  ↔", "Direita  ⇥", "⤒  Topo", "Meio  ↕", "⤓  Base"];
+        var edges = ScreenArrange.Edges(many);
+        for (int i = 0; i < edges.Count; i++)
+        {
+            var (text, edge) = edges[i];
+            grid.Children.Add(SmallAction(labels[i], (many ? "Alinhar " : "Pôr ") + char.ToLowerInvariant(text[0]) + text[1..], () => _model.Align(edge)));
+        }
+        return grid;
+    }
+
+    /// <summary>Copiar o estilo desta peça e colar o estilo copiado (de qualquer tela) nela.</summary>
+    private FrameworkElement StyleRow()
+    {
+        var stack = new StackPanel();
+        var row = new UniformGrid { Columns = 2, Margin = new Thickness(0, 0, -6, 0) };
+        var info = Muted("");
+        info.Margin = new Thickness(0, 4, 0, 0);
+        void ShowInfo(string? text)
+        {
+            info.Text = text ?? (_model.CopiedStyleName is { } from ? $"Estilo copiado: {from}. Selecione outras peças e cole (Ctrl+Shift+V)." : "");
+            info.Visibility = info.Text.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        row.Children.Add(SmallAction("Copiar estilo", "Guarda a aparência desta peça (cores, letra, sombra, cantos…), sem o texto e sem o lugar. Ctrl+Shift+C.", () =>
+        {
+            _model.CopyStyle();
+            ShowInfo(null);
+        }));
+        row.Children.Add(SmallAction("Colar estilo", "Esta peça fica com a aparência copiada. Ctrl+Shift+V.", () => ShowInfo(PasteStyle())));
+        stack.Children.Add(row);
+        stack.Children.Add(info);
+        ShowInfo(null);
+        return stack;
+    }
+
+    /// <summary>Cola o estilo copiado nas selecionadas. Retorna o aviso para mostrar (null se colou).</summary>
+    private string? PasteStyle()
+    {
+        if (!_model.HasStyle) return "Primeiro clique em \"Copiar estilo\" na peça que tem a aparência que você quer.";
+        return _model.PasteStyle() > 0 ? null : "Já estava com esse estilo.";
+    }
+
+    private Button SmallAction(string text, string tip, Action action, bool enabled = true)
+    {
+        var button = new Button
+        {
+            Content = text,
+            ToolTip = tip,
+            Style = (Style)FindResource("DialogButton"),
+            Margin = new Thickness(0, 0, 6, 6),
+            Padding = new Thickness(4, 0, 4, 0),
+            MinWidth = 0,
+            Height = 28,
+            FontSize = 12,
+            Focusable = false,
+            IsEnabled = enabled,
+        };
+        ToolTipService.SetShowOnDisabled(button, true);
+        button.Click += (_, _) => action();
+        return button;
     }
 
     // ------------------------------------------------------------------ textos e caixas

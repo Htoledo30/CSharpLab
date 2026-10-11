@@ -269,7 +269,9 @@ public sealed class ScreenDesignerTests
         var source = Path.Combine(Ui.NewFolder("fotos"), "goblin.png");
         File.WriteAllBytes(source, [1, 2, 3]);
         Assert.Equal("goblin.png", model.ImportImage(source));
-        Assert.Equal("goblin-2.png", model.ImportImage(source));
+        Assert.Equal("goblin.png", model.ImportImage(source));   // a mesma imagem de novo: usa a que já está lá
+        File.WriteAllBytes(source, [4, 5, 6]);
+        Assert.Equal("goblin-2.png", model.ImportImage(source));   // outra imagem com o mesmo nome: não sobrescreve
         Assert.Equal(["goblin-2.png", "goblin.png"], model.ImageFiles());
         Assert.True(File.Exists(Path.Combine(dir, "Assets", "goblin.png")));
         return Task.CompletedTask;

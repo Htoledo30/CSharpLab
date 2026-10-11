@@ -11,7 +11,7 @@ namespace CSharpLab.Screens;
 /// de verdade: cada mudança grava o JSON no mesmo documento da aba, então desfazer, salvar, a recuperação
 /// e o aviso de "arquivo mudou no disco" funcionam como em qualquer arquivo.
 /// </summary>
-public sealed class ScreenDesignerModel : IDisposable
+public sealed partial class ScreenDesignerModel : IDisposable
 {
     /// <summary>Quanto de uma peça precisa continuar dentro do palco ao arrastar para fora.</summary>
     public const double KeepInside = 16;
@@ -720,17 +720,24 @@ public sealed class ScreenDesignerModel : IDisposable
         var dir = AssetsDirectory ?? throw new InvalidOperationException("A tela não está dentro de um projeto de jogo.");
         Directory.CreateDirectory(dir);
         var full = Path.GetFullPath(sourcePath);
-        if (string.Equals(Path.GetDirectoryName(full), Path.GetFullPath(dir), StringComparison.OrdinalIgnoreCase))
-            return Path.GetFileName(full);
+        // Já está na pasta Assets (ou numa pasta dentro dela): usa o nome que a tela entende ("enemies/orc.png").
+        var inside = Path.GetRelativePath(Path.GetFullPath(dir), full);
+        if (!inside.StartsWith("..", StringComparison.Ordinal) && !Path.IsPathRooted(inside))
+            return inside.Replace('\\', '/');
         var name = Path.GetFileName(full);
         var target = Path.Combine(dir, name);
         for (int i = 2; File.Exists(target); i++)
         {
+            // A mesma imagem já está lá (soltou de novo): usa ela, sem criar uma cópia "-2".
+            if (SameFile(full, target)) return name;
             name = $"{Path.GetFileNameWithoutExtension(full)}-{i}{Path.GetExtension(full)}";
             target = Path.Combine(dir, name);
         }
         File.Copy(full, target);
         return name;
+
+        static bool SameFile(string a, string b) =>
+            new FileInfo(a).Length == new FileInfo(b).Length && File.ReadAllBytes(a).AsSpan().SequenceEqual(File.ReadAllBytes(b));
     }
 
     // ------------------------------------------------------------------ código
