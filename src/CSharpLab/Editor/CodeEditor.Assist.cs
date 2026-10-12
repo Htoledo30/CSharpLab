@@ -68,6 +68,35 @@ public sealed partial class CodeEditor
                 MoveLines(-1);
                 e.Handled = true;
                 break;
+            case Key.Enter when mods == ModifierKeys.Control:
+                InsertLineBelow();
+                e.Handled = true;
+                break;
+            case Key.Enter when mods == (ModifierKeys.Control | ModifierKeys.Shift):
+                InsertLineAbove();
+                e.Handled = true;
+                break;
+            case Key.Down when mods == (ModifierKeys.Control | ModifierKeys.Shift):
+                GoToOccurrence(1);
+                e.Handled = true;
+                break;
+            case Key.Up when mods == (ModifierKeys.Control | ModifierKeys.Shift):
+                GoToOccurrence(-1);
+                e.Handled = true;
+                break;
+            // "[" e "]" pelo caractere que a tecla escreve (no ABNT2 elas ficam em outras teclas que no americano).
+            case var _ when (mods & ModifierKeys.Control) != 0 && (mods & ModifierKeys.Alt) == 0 && KeyChar(key) is '[' or ']':
+                bool open = KeyChar(key) == '[';
+                if (mods == ModifierKeys.Control)
+                {
+                    if (open) OutdentLines(); else IndentLines();
+                }
+                else if (mods == (ModifierKeys.Control | ModifierKeys.Shift))
+                {
+                    if (open) FoldAtCaret(); else UnfoldAtCaret();
+                }
+                e.Handled = mods is ModifierKeys.Control or (ModifierKeys.Control | ModifierKeys.Shift);
+                break;
             case Key.Down when mods == ModifierKeys.Alt:
                 MoveLines(1);
                 e.Handled = true;
@@ -135,6 +164,9 @@ public sealed partial class CodeEditor
         Item("Comentar / descomentar", "Ctrl+/", ToggleComment);
         Item("Duplicar linha", "Ctrl+D", DuplicateLines);
         Item("Formatar documento", "Ctrl+Shift+F", () => _ = FormatAsync());
+        _menu.Items.Add(new Separator());
+        Item("Recolher todos os blocos", "", FoldAll);
+        Item("Expandir todos os blocos", "", UnfoldAll);
 
         _menu.Opened += (_, _) =>
         {

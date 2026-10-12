@@ -154,6 +154,8 @@ public sealed class CompletionController
 
     public void Update() => _popup.Update();
 
+    public void Reposition() => _popup.Reposition();
+
     public static bool IsIdentifierChar(char c) => char.IsLetterOrDigit(c) || c == '_';
 
     public static bool IsIdentifierStart(char c) => char.IsLetter(c) || c == '_' || c == '@';

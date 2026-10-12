@@ -189,6 +189,18 @@
                         <MenuItem Header="Mover linha para cima" InputGestureText="Alt+↑" Click="OnMoveLineUp" />
                         <MenuItem Header="Mover linha para baixo" InputGestureText="Alt+↓" Click="OnMoveLineDown" />
                         <MenuItem Header="Apagar linha" InputGestureText="Ctrl+Shift+K" Click="OnDeleteLine" />
+                        <MenuItem Header="Nova linha abaixo" InputGestureText="Ctrl+Enter" Click="OnLineBelow" />
+                        <MenuItem Header="Nova linha acima" InputGestureText="Ctrl+Shift+Enter" Click="OnLineAbove" />
+                        <MenuItem Header="Recuar linhas" InputGestureText="Ctrl+]" Click="OnIndentLines" />
+                        <MenuItem Header="Desrecuar linhas" InputGestureText="Ctrl+[" Click="OnOutdentLines" />
+                        <Separator />
+                        <MenuItem Header="Próxima ocorrência do nome" InputGestureText="Ctrl+Shift+↓" Click="OnNextOccurrence" />
+                        <MenuItem Header="Ocorrência anterior do nome" InputGestureText="Ctrl+Shift+↑" Click="OnPreviousOccurrence" />
+                        <Separator />
+                        <MenuItem Header="Recolher bloco" InputGestureText="Ctrl+Shift+[" Click="OnFold" />
+                        <MenuItem Header="Expandir bloco" InputGestureText="Ctrl+Shift+]" Click="OnUnfold" />
+                        <MenuItem Header="Recolher todos os blocos" Click="OnFoldAll" />
+                        <MenuItem Header="Expandir todos os blocos" Click="OnUnfoldAll" />
                     </MenuItem>
                     <MenuItem Header="_Projeto">
                         <MenuItem Header="Executar" InputGestureText="F5" Command="{Binding RunCommand}"

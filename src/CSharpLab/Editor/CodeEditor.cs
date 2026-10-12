@@ -118,7 +118,10 @@ public sealed partial class CodeEditor : TextEditor
         area.TextView.ScrollOffsetChanged += (_, _) =>
         {
             CloseHover();
-            _completion.Close();
+            // Antes a lista fechava a cada rolagem, e digitar no fim de uma linha comprida (a tela anda para
+            // o lado a cada letra) fazia as sugestões sumirem. Agora elas acompanham o texto.
+            _completion.Reposition();
+            _signature.Reposition();
             if (Doc.Document.TextLength > SemanticWholeDocumentLimit) ScheduleSemantic();
         };
         PreviewMouseWheel += OnPreviewMouseWheel;
@@ -137,6 +140,8 @@ public sealed partial class CodeEditor : TextEditor
 
         _diagnostics.SetDiagnostics(doc.Diagnostics);
         InitializeAssist();
+        InitializeFormat();
+        InitializeStructure();
     }
 
     private const int SemanticWholeDocumentLimit = 200_000;
@@ -176,6 +181,7 @@ public sealed partial class CodeEditor : TextEditor
         _contextCts?.Cancel();
         CloseEditGroup();
         EndSnippet();
+        DetachStructure();
         _colorizer?.Dispose();
         _completion.Close();
         _signature.Close();
@@ -201,6 +207,8 @@ public sealed partial class CodeEditor : TextEditor
         _completion.Close();
         _signature.Close();
         _colorizer?.SetSemantic([], Document.TextLength);
+        _formatter = null;
+        UpdateFoldings();   // virou (ou deixou de ser) .cs, ou mudou o arquivo
         if (!Doc.IsCSharp)
         {
             _semanticCts?.Cancel();
@@ -235,6 +243,7 @@ public sealed partial class CodeEditor : TextEditor
             _indentation.IndentSize = settings.IndentationSize;
             _indentation.TabSize = settings.TabSize;
             _indentation.UseTabs = settings.UseTabs;
+            LoadFormatter(ls, key, cts.Token);
             ScheduleSemantic();
             TextArea.TextView.Redraw();
         }
@@ -363,6 +372,20 @@ public sealed partial class CodeEditor : TextEditor
             return;
         }
 
+        if (c == '{' && TextArea.Selection.IsEmpty && !TextArea.OverstrikeMode && OpensInterpolation(caret))
+        {
+            // $"Ganhou {|}": sem o "}", a aspa do fim viraria o começo de outro texto e as sugestões
+            // não apareceriam dentro das chaves.
+            e.Handled = true;
+            document.Insert(caret, "{}");
+            CaretOffset = caret + 1;
+            var hole = document.CreateAnchor(caret + 1);
+            hole.MovementType = AnchorMovementType.AfterInsertion;
+            _autoClosers.Add(hole);
+            AfterCharTyped(c);
+            return;
+        }
+
         if (c is '(' or '[' or '{' or '"' or '\'' && TextArea.Selection.IsEmpty && !TextArea.OverstrikeMode)
         {
             if (InCommentOrString(caret)) return;
@@ -395,6 +418,21 @@ public sealed partial class CodeEditor : TextEditor
         }
     }
 
+    /// <summary>"{" digitado no texto de um $"…" abre um pedaço de código (e não é o "{{" de uma chave escrita).</summary>
+    private bool OpensInterpolation(int caret)
+    {
+        if (caret > 0 && Document.GetCharAt(caret - 1) == '{') return false;
+        if (caret < Document.TextLength && Document.GetCharAt(caret) is '{' or '}') return false;
+        try
+        {
+            return SyntaxContext.IsInInterpolatedText(Syntax.Root, caret);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private bool TakeAutoCloser(int offset)
     {
         _autoClosers.RemoveAll(a => a.IsDeleted);
@@ -417,7 +455,9 @@ public sealed partial class CodeEditor : TextEditor
     private void AfterCharTyped(char c)
     {
         int caret = CaretOffset;
-        if (c == '}') ReindentClosingBrace(caret - 1);
+        // ";" e "}" formatam a instrução ou o bloco; sem o Roslyn pronto, o "}" ao menos volta ao recuo do "{".
+        if (c == '}' && !FormatAfterTyping(caret - 1)) ReindentClosingBrace(caret - 1);
+        else if (c == ';') FormatAfterTyping(caret - 1);
         else if (c == '{') _indentation.AlignOpeningBrace(Document, caret - 1);
 
         if (SignatureHelp.IsTriggerCharacter(c))
@@ -574,6 +614,7 @@ public sealed partial class CodeEditor : TextEditor
     {
         ReportCaret();
         CheckSnippetBounds();
+        UpdateStructureForCaret();
         if (Doc.IsCSharp)
         {
             (int, int)? pair = null;

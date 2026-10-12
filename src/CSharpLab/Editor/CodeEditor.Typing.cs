@@ -121,6 +121,12 @@ public sealed partial class CodeEditor
         var selection = TextArea.Selection;
         if (selection.IsEmpty || !selection.IsMultiline || selection is RectangleSelection) return false;
         var (first, last) = SelectedLines();
+        IndentLineRange(first, last);
+        return true;
+    }
+
+    private void IndentLineRange(DocumentLine first, DocumentLine last)
+    {
         using (Document.RunUpdate())
         {
             for (var line = first; line != null; line = line.NextLine)
@@ -130,7 +136,6 @@ public sealed partial class CodeEditor
                 if (line == last) break;
             }
         }
-        return true;
     }
 
     // ================================================================ envolver a seleção

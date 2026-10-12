@@ -19,6 +19,14 @@ public static class SyntaxTheme
     public static readonly Color ErrorColor = (Color)ColorConverter.ConvertFromString("#F0727C");
     public static readonly Color WarningColor = (Color)ColorConverter.ConvertFromString("#D8B05E");
     public static readonly Brush SnippetField = Freeze("#2C3157");
+    public static readonly Brush IndentGuide = Freeze("#2E3036");
+    public static readonly Brush IndentGuideActive = Freeze("#4C4F5C");
+    public static readonly Brush Occurrence = Freeze("#2D3647");
+    public static readonly Pen OccurrencePen = FreezePen("#46536E", 1);
+    public static readonly Brush FoldingMarker = Freeze("#6B6E78");
+    public static readonly Brush FoldingMarkerHover = Freeze("#C8C8D0");
+    public static readonly Brush FoldedText = Freeze("#8A8D99");
+    public static readonly Brush FoldedBackground = Freeze("#2A2C33");
 
     private static readonly Brush[] ByKind = new Brush[Enum.GetValues<TokenKind>().Length];
 

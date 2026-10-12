@@ -55,6 +55,7 @@ public sealed class StudioView : Grid
     private ScreenDesignerModel? _watched;
     private bool _selectingFromCode;
     private string? _codeNote;
+    private (IReadOnlyList<GameSceneInfo> Scenes, string? Scene, bool Map)? _sceneListShown;
 
     public StudioView()
     {
@@ -506,6 +507,9 @@ public sealed class StudioView : Grid
 
     private void BuildSceneList(IReadOnlyList<GameSceneInfo> scenes)
     {
+        // Refeita a cada pausa na digitação: se nada mudou, a lista fica como está (sem piscar nem perder o foco).
+        if (_sceneListShown is { } shown && shown.Scene == _scene && shown.Map == _mapMode && shown.Scenes.SequenceEqual(scenes)) return;
+        _sceneListShown = (scenes, _scene, _mapMode);
         _sceneList.Children.Clear();
         _sceneList.Children.Add(MapRow());
         if (scenes.Count == 0)

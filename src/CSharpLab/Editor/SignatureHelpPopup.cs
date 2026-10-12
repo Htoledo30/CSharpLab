@@ -146,6 +146,12 @@ public sealed class SignatureHelpPopup
         if (pos < sig.Text.Length) _text.Inlines.Add(new Run(sig.Text[pos..]));
     }
 
+    /// <summary>O texto rolou: a caixa acompanha o "(" da chamada.</summary>
+    public void Reposition()
+    {
+        if (IsOpen && _result != null) Place(_result.ArgumentListStart);
+    }
+
     private void Place(int offset)
     {
         var textView = _editor.TextArea.TextView;

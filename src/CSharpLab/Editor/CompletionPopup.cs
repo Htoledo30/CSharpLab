@@ -221,6 +221,20 @@ public sealed class CompletionPopup : TextAreaStackedInputHandler
         };
     }
 
+    /// <summary>
+    /// O texto rolou (por exemplo, digitando no fim de uma linha comprida, a tela anda para o lado):
+    /// a lista acompanha a palavra. Só fecha se a palavra saiu da tela.
+    /// </summary>
+    public void Reposition()
+    {
+        if (!IsOpen) return;
+        var textView = TextArea.TextView;
+        var location = _editor.Document.GetLocation(Math.Min(_start, _editor.Document.TextLength));
+        var pos = textView.GetVisualPosition(new ICSharpCode.AvalonEdit.TextViewPosition(location), VisualYPosition.LineTop) - textView.ScrollOffset;
+        if (pos.Y < 0 || pos.Y > textView.ActualHeight || pos.X < -1 || pos.X > textView.ActualWidth) Close();
+        else Place();
+    }
+
     private void Place()
     {
         var textView = TextArea.TextView;

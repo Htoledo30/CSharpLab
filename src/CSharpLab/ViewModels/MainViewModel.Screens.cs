@@ -92,9 +92,8 @@ public sealed partial class MainViewModel
         string? start = null;
         foreach (var file in CodeFiles(dir))
         {
-            var text = FindDocument(file)?.Document.Text ?? TryRead(file);
-            if (text == null || !text.Contains("Scene", StringComparison.Ordinal)) continue;
-            var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text).GetRoot();
+            if (CodeTree(file) is not { } code || !code.Text.Contains("Scene", StringComparison.Ordinal)) continue;
+            var (text, root) = (code.Text, code.Tree.GetRoot());
             foreach (var call in Core.Language.GameAssist.FindScenes(root))
             {
                 if (scenes.Any(s => string.Equals(s.Name, call.Name, StringComparison.OrdinalIgnoreCase))) continue;
@@ -117,9 +116,8 @@ public sealed partial class MainViewModel
         var links = new List<(string, string)>();
         foreach (var file in CodeFiles(project.Directory))
         {
-            var text = FindDocument(file)?.Document.Text ?? TryRead(file);
-            if (text == null || !text.Contains("GoTo", StringComparison.Ordinal)) continue;
-            var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text).GetRoot();
+            if (CodeTree(file) is not { } code || !code.Text.Contains("GoTo", StringComparison.Ordinal)) continue;
+            var root = code.Tree.GetRoot();
             foreach (var link in Core.Language.GameAssist.SceneLinks(root))
                 if (!links.Contains(link)) links.Add(link);
         }
@@ -225,9 +223,8 @@ public sealed partial class MainViewModel
         PieceCode? firstUse = null;
         foreach (var file in CodeFiles(projectDirectory))
         {
-            var text = FindDocument(file)?.Document.Text ?? TryRead(file);
-            if (text == null || !text.Contains(piece, StringComparison.OrdinalIgnoreCase)) continue;
-            var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text);
+            if (CodeTree(file) is not { } code || !code.Text.Contains(piece, StringComparison.OrdinalIgnoreCase)) continue;
+            var tree = code.Tree;
             foreach (var use in Core.Language.GameAssist.FindPieceUses(tree.GetRoot(), scene, piece, handler))
             {
                 var line = tree.GetText().Lines.GetLineFromPosition(use.Start).LineNumber + 1;
@@ -329,9 +326,8 @@ public sealed partial class MainViewModel
         (string, int)? caseInsensitive = null;
         foreach (var file in CodeFiles(projectDirectory))
         {
-            var text = FindDocument(file)?.Document.Text ?? TryRead(file);
-            if (text == null || !text.Contains(scene, StringComparison.OrdinalIgnoreCase)) continue;
-            var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text).GetRoot();
+            if (CodeTree(file) is not { } code || !code.Text.Contains(scene, StringComparison.OrdinalIgnoreCase)) continue;
+            var root = code.Tree.GetRoot();
             foreach (var call in Core.Language.GameAssist.FindScenes(root))
             {
                 if (call.Name == scene) return (file, call.Span.Start);
@@ -400,21 +396,48 @@ public sealed partial class MainViewModel
         NotifyInfo($"A cena \"{name}\" foi escrita no Program.cs (ainda não salvo).");
     }
 
-    /// <summary>Os .cs do projeto, Program.cs primeiro (sem bin/obj).</summary>
+    /// <summary>Os .cs do projeto, Program.cs primeiro (sem entrar em bin/obj).</summary>
     private static List<string> CodeFiles(string projectDirectory)
     {
-        try
+        var files = new List<string>();
+        var pending = new Queue<string>([projectDirectory]);   // mesma ordem de antes (pasta por pasta)
+        while (pending.Count > 0 && files.Count < 300)
         {
-            return Directory.EnumerateFiles(projectDirectory, "*.cs", SearchOption.AllDirectories)
-                .Where(f => !ProjectLocator.IsInsideSkippedDirectory(f, projectDirectory))
-                .Take(300)
-                .OrderBy(f => string.Equals(Path.GetFileName(f), "Program.cs", StringComparison.OrdinalIgnoreCase) ? 0 : 1)
-                .ToList();
+            var dir = pending.Dequeue();
+            try
+            {
+                files.AddRange(Directory.EnumerateFiles(dir, "*.cs").Take(300 - files.Count));
+                foreach (var sub in Directory.EnumerateDirectories(dir))
+                {
+                    if (!ProjectLocator.IsSkippedDirectory(Path.GetFileName(sub))) pending.Enqueue(sub);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                if (dir == projectDirectory) return [];
+            }
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-        {
-            return [];
-        }
+        return files.OrderBy(f => string.Equals(Path.GetFileName(f), "Program.cs", StringComparison.OrdinalIgnoreCase) ? 0 : 1).ToList();
+    }
+
+    // Árvores dos .cs do jogo, reaproveitadas enquanto o arquivo não muda (o Estúdio consulta a cada pausa
+    // na digitação e a cada peça escolhida; reler e reanalisar tudo toda vez era trabalho jogado fora).
+    private readonly Dictionary<string, (object Stamp, string Text, Microsoft.CodeAnalysis.SyntaxTree Tree)> _codeTrees =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Texto e árvore de um .cs: o da aba, se estiver aberto (mesmo sem salvar), senão o do disco.</summary>
+    private (string Text, Microsoft.CodeAnalysis.SyntaxTree Tree)? CodeTree(string file)
+    {
+        var doc = FindDocument(file);
+        object? stamp = doc != null ? (doc, doc.Version) : (object?)FileStamp.Of(file);
+        if (stamp == null) return null;
+        if (_codeTrees.TryGetValue(file, out var cached) && Equals(cached.Stamp, stamp)) return (cached.Text, cached.Tree);
+        var text = doc?.Document.Text ?? TryRead(file);
+        if (text == null) return null;
+        var tree = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(text);
+        if (_codeTrees.Count > 300) _codeTrees.Clear();
+        _codeTrees[file] = (stamp, text, tree);
+        return (text, tree);
     }
 
     private static string? TryRead(string file)

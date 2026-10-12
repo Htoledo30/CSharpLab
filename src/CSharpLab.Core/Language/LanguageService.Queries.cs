@@ -211,6 +211,64 @@ public sealed partial class LanguageService
 #pragma warning restore CS0618
     }
 
+    /// <summary>
+    /// Onde, neste arquivo, aparece o mesmo símbolo (variável, método, classe…) que está sob o cursor.
+    /// Vazio se o cursor não está num nome do código, ou se o nome aparece uma vez só.
+    /// </summary>
+    public async Task<IReadOnlyList<TextSpan>> FindOccurrencesAsync(string key, int position, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        if (document == null) return [];
+        var root = await document.GetSyntaxRootAsync(ct).ConfigureAwait(false);
+        if (root == null || position > root.FullSpan.End) return [];
+        var token = root.FindToken(Math.Min(position, Math.Max(0, root.FullSpan.End - 1)));
+        // Cursor logo depois do nome ("vida|") também vale.
+        if (!token.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken) || !token.Span.IntersectsWith(position) && token.Span.End != position)
+        {
+            if (position == 0) return [];
+            token = root.FindToken(position - 1);
+            if (!token.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken) || token.Span.End != position) return [];
+        }
+        var model = await document.GetSemanticModelAsync(ct).ConfigureAwait(false);
+        if (model == null) return [];
+        var symbol = SymbolOf(model, token, ct);
+        if (symbol == null) return [];
+
+        var spans = new List<TextSpan>();
+        foreach (var other in root.DescendantTokens())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!other.IsKind(Microsoft.CodeAnalysis.CSharp.SyntaxKind.IdentifierToken) || other.ValueText != token.ValueText) continue;
+            if (SymbolEqualityComparer.Default.Equals(SymbolOf(model, other, ct)?.OriginalDefinition, symbol.OriginalDefinition))
+                spans.Add(other.Span);
+        }
+        return spans.Count > 1 ? spans : [];
+
+        static ISymbol? SymbolOf(SemanticModel model, SyntaxToken token, CancellationToken ct)
+        {
+            if (token.Parent == null) return null;
+            var symbol = model.GetDeclaredSymbol(token.Parent, ct) ?? model.GetSymbolInfo(token.Parent, ct).Symbol;
+            if (symbol == null && model.GetSymbolInfo(token.Parent, ct).CandidateSymbols is { Length: > 0 } candidates) symbol = candidates[0];
+            // "new Heroi()" aponta para o construtor; o nome é o da classe.
+            return symbol is IMethodSymbol { MethodKind: MethodKind.Constructor } ctor ? ctor.ContainingType : symbol;
+        }
+    }
+
+    /// <summary>Formatador de trechos com as opções deste arquivo (null se o arquivo não está no Roslyn).</summary>
+    public async Task<SpanFormatter?> GetSpanFormatterAsync(string key, CancellationToken ct)
+    {
+        var document = GetDocument(key);
+        if (document == null) return null;
+#pragma warning disable CS0618
+        var options = await document.GetOptionsAsync(ct).ConfigureAwait(false);
+#pragma warning restore CS0618
+        var formatter = new SpanFormatter(_workspace, options);
+        // A primeira formatação carrega o formatador inteiro; aqui, longe da tecla que vai usá-lo.
+        var warm = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText("class A{void M(){int x=1;}}").GetRoot(ct);
+        formatter.Format(warm, warm.FullSpan, "\n");
+        return formatter;
+    }
+
     /// <summary>Alterações do formatador do Roslyn (respeita .editorconfig e o final de linha do arquivo).</summary>
     public async Task<IReadOnlyList<TextChange>> FormatAsync(string key, CancellationToken ct)
     {

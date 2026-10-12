@@ -54,10 +54,11 @@ public sealed class SceneMapView : Grid
 
     internal IReadOnlyList<(string From, string To)> Arrows { get; private set; } = [];
 
+    private (string Directory, string? Current, IReadOnlyList<GameSceneInfo> Scenes, List<(string From, string To)> Links)? _shown;
+
     /// <summary>Desenha o mapa de novo com o que o código e as telas dizem agora.</summary>
     public void Show(MainViewModel vm, string projectDirectory, string? current)
     {
-        _canvas.Children.Clear();
         var scenes = vm.GameScenes();
         var names = scenes.Select(s => s.Name).ToList();
         var links = vm.GameSceneLinks()
@@ -65,6 +66,12 @@ public sealed class SceneMapView : Grid
             .Select(l => (From: Canonical(names, l.From), To: Canonical(names, l.To)))
             .Distinct()
             .ToList();
+        // O Estúdio pede o mapa de novo a cada pausa na digitação: igual ao desenhado, fica como está.
+        if (_shown is { } shown && shown.Directory == projectDirectory && shown.Current == current &&
+            shown.Scenes.SequenceEqual(scenes) && shown.Links.SequenceEqual(links))
+            return;
+        _shown = (projectDirectory, current, scenes, links);
+        _canvas.Children.Clear();
         Arrows = links;
         _hint.Text = scenes.Count == 0
             ? "O jogo ainda não tem cenas."

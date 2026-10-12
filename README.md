@@ -371,6 +371,10 @@ cópia do motor em `lib\` (funciona mesmo se a pasta mudar de lugar).
 | Comentar / descomentar linhas | `Ctrl+/` |
 | Duplicar / apagar linha | `Ctrl+D` / `Ctrl+Shift+K` |
 | Mover linha | `Alt+↑` / `Alt+↓` |
+| Nova linha abaixo / acima (sem quebrar a atual) | `Ctrl+Enter` / `Ctrl+Shift+Enter` |
+| Recuar / desrecuar linhas | `Ctrl+]` / `Ctrl+[` |
+| Próxima / anterior ocorrência do nome sob o cursor | `Ctrl+Shift+↓` / `Ctrl+Shift+↑` |
+| Recolher / expandir o bloco | `Ctrl+Shift+[` / `Ctrl+Shift+]` (ou o `−` ao lado dos números) |
 | Tamanho da fonte | `Ctrl` + roda do mouse |
 | Terminei: pedir revisão (avisa quem acompanha a sessão) | `Ctrl+Shift+R` |
 
@@ -383,6 +387,15 @@ Tudo isso também está no menu **Editar** e no botão direito do mouse, para n�
 linha volta um nível inteiro, como o Tab ao contrário. **Tab** com várias linhas selecionadas recua todas
 (`Shift+Tab` volta). Com um trecho selecionado, `(`, `[`, `{` ou aspas envolvem o trecho. Enter numa linha
 vazia mantém o recuo dela. Mover e duplicar linhas mantêm a seleção.
+
+**Estrutura à vista**: linhas-guia finas mostram cada nível de recuo (a do bloco onde está o cursor fica
+mais clara); o `−` ao lado dos números recolhe um bloco (`game.Scene`, método, `if`…), e "Recolher todos os
+blocos" (menu Editar ou botão direito) deixa só as cenas e os métodos à vista. Com o cursor num nome, as
+outras vezes em que ele aparece no arquivo ficam marcadas (só o mesmo símbolo: um `x` de outro método não).
+
+**Formatação automática** (como no Visual Studio): ao digitar `;` a instrução fica formatada (`int  x=1;` vira
+`int x = 1;`, no recuo certo); ao digitar `}`, o bloco inteiro. Colar várias linhas ajusta o recuo do trecho ao
+lugar onde ele entrou. Um `Ctrl+Z` logo depois desfaz só a formatação.
 
 **Dicas** (sublinhado azul) apontam armadilhas que o compilador aceita calado: imprimir uma lista
 direto (`Console.WriteLine(list)` mostra o nome do tipo), divisão entre inteiros que perde as casas

@@ -62,6 +62,26 @@ public static class SyntaxContext
         return false;
     }
 
+    /// <summary>
+    /// Verdadeiro se a posição está no texto de uma string interpolada comum ($"…" ou $@"…"), onde um "{"
+    /// abre um pedaço de código. Strings com $$ (que pedem "{{") ficam de fora.
+    /// </summary>
+    public static bool IsInInterpolatedText(SyntaxNode root, int position)
+    {
+        if (position <= 0 || position > root.FullSpan.End) return false;
+        var token = root.FindToken(Math.Min(position, root.FullSpan.End - 1));
+        var left = root.FindToken(position - 1);
+        bool inText =
+            token.IsKind(SyntaxKind.InterpolatedStringTextToken) && position >= token.SpanStart && position <= token.Span.End ||
+            token.IsKind(SyntaxKind.InterpolatedStringEndToken) && position == token.SpanStart ||
+            left.IsKind(SyntaxKind.InterpolatedStringTextToken) && position == left.Span.End ||
+            left.IsKind(SyntaxKind.InterpolatedStringStartToken) && position == left.Span.End;
+        if (!inText) return false;
+        var str = (token.Parent as InterpolatedStringExpressionSyntax ?? left.Parent as InterpolatedStringExpressionSyntax)
+                  ?? token.Parent?.FirstAncestorOrSelf<InterpolatedStringExpressionSyntax>();
+        return str != null && str.StringStartToken.Text.Count(c => c == '$') == 1;
+    }
+
     private static bool IsCommentTrivia(SyntaxTrivia t) =>
         t.IsKind(SyntaxKind.SingleLineCommentTrivia) || t.IsKind(SyntaxKind.MultiLineCommentTrivia) ||
         t.IsKind(SyntaxKind.SingleLineDocumentationCommentTrivia) || t.IsKind(SyntaxKind.MultiLineDocumentationCommentTrivia) ||
@@ -246,6 +266,43 @@ public static class SyntaxContext
             return kind == open ? (token.SpanStart, other.SpanStart) : (other.SpanStart, token.SpanStart);
         }
         return null;
+    }
+
+    /// <summary>
+    /// Pares de chaves de blocos ({ … } de classe, método, if, lambda, inicializador…), sem as das interpolações
+    /// $"{…}" nem as que faltam. Na ordem do texto.
+    /// </summary>
+    public static IEnumerable<(int Open, int Close)> BraceBlocks(SyntaxNode root)
+    {
+        foreach (var node in root.DescendantNodes(n => n is not InterpolatedStringExpressionSyntax))
+        {
+            if (Braces(node) is { } pair) yield return pair;
+        }
+    }
+
+    /// <summary>O bloco { … } mais interno que contém a posição (entre as chaves).</summary>
+    public static (int Open, int Close)? EnclosingBlock(SyntaxNode root, int offset)
+    {
+        if (offset < 0 || offset > root.FullSpan.End) return null;
+        var token = root.FindToken(Math.Min(offset, Math.Max(0, root.FullSpan.End - 1)));
+        for (var node = token.Parent; node != null; node = node.Parent)
+        {
+            if (Braces(node) is { } pair && pair.Open < offset && offset <= pair.Close) return pair;
+        }
+        return null;
+    }
+
+    private static (int Open, int Close)? Braces(SyntaxNode node)
+    {
+        if (node is InterpolationSyntax) return null;
+        SyntaxToken open = default, close = default;
+        foreach (var t in node.ChildTokens())
+        {
+            if (t.IsKind(SyntaxKind.OpenBraceToken) && open.IsKind(SyntaxKind.None)) open = t;
+            else if (t.IsKind(SyntaxKind.CloseBraceToken)) close = t;
+        }
+        if (open.IsKind(SyntaxKind.None) || close.IsKind(SyntaxKind.None) || open.IsMissing || close.IsMissing) return null;
+        return (open.SpanStart, close.SpanStart);
     }
 
     /// <summary>Indentação (em colunas) da linha onde está o "{" que corresponde ao "}" em <paramref name="closeBrace"/>.</summary>

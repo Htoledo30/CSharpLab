@@ -318,6 +318,16 @@ public partial class MainWindow : Window
     private void OnMoveLineUp(object sender, RoutedEventArgs e) => WithEditor(ed => ed.MoveLines(-1));
     private void OnMoveLineDown(object sender, RoutedEventArgs e) => WithEditor(ed => ed.MoveLines(1));
     private void OnDeleteLine(object sender, RoutedEventArgs e) => WithEditor(ed => ed.DeleteLines());
+    private void OnLineBelow(object sender, RoutedEventArgs e) => WithEditor(ed => ed.InsertLineBelow());
+    private void OnLineAbove(object sender, RoutedEventArgs e) => WithEditor(ed => ed.InsertLineAbove());
+    private void OnIndentLines(object sender, RoutedEventArgs e) => WithEditor(ed => ed.IndentLines());
+    private void OnOutdentLines(object sender, RoutedEventArgs e) => WithEditor(ed => ed.OutdentLines());
+    private void OnNextOccurrence(object sender, RoutedEventArgs e) => WithEditor(ed => ed.GoToOccurrence(1));
+    private void OnPreviousOccurrence(object sender, RoutedEventArgs e) => WithEditor(ed => ed.GoToOccurrence(-1));
+    private void OnFold(object sender, RoutedEventArgs e) => WithEditor(ed => ed.FoldAtCaret());
+    private void OnUnfold(object sender, RoutedEventArgs e) => WithEditor(ed => ed.UnfoldAtCaret());
+    private void OnFoldAll(object sender, RoutedEventArgs e) => WithEditor(ed => ed.FoldAll());
+    private void OnUnfoldAll(object sender, RoutedEventArgs e) => WithEditor(ed => ed.UnfoldAll());
 
     private void OnShowCompletion(object sender, RoutedEventArgs e)
     {
