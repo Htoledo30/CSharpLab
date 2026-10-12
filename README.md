@@ -379,6 +379,11 @@ Espaço e pontuação nunca aceitam uma sugestão sozinhos.
 
 Tudo isso também está no menu **Editar** e no botão direito do mouse, para não precisar decorar.
 
+**Ao digitar**: `Ctrl+Z` desfaz uma palavra por vez (não uma letra). **Backspace** no recuo do começo da
+linha volta um nível inteiro, como o Tab ao contrário. **Tab** com várias linhas selecionadas recua todas
+(`Shift+Tab` volta). Com um trecho selecionado, `(`, `[`, `{` ou aspas envolvem o trecho. Enter numa linha
+vazia mantém o recuo dela. Mover e duplicar linhas mantêm a seleção.
+
 **Dicas** (sublinhado azul) apontam armadilhas que o compilador aceita calado: imprimir uma lista
 direto (`Console.WriteLine(list)` mostra o nome do tipo), divisão entre inteiros que perde as casas
 decimais (`double average = sum / count;`), `int.Parse(Console.ReadLine())` sem conferir, comparação
@@ -389,7 +394,8 @@ mostra uma explicação em português com exemplo. Sugestões de método já ent
 
 ## Snippets
 
-Digite o atalho e aperte **Tab**. Depois, **Tab** passa para o próximo campo e **Enter** termina.
+Digite o atalho e aperte **Tab**. Depois, **Tab** passa para o próximo campo; no último (ou com **Enter**)
+o cursor vai para dentro do bloco. Clicar fora do snippet também termina: Tab e Enter voltam ao normal.
 
 `cw` `read` `if` `ifelse` `for` `foreach` `while` `switch` `method` `methodr` `class` `array` `list`
 

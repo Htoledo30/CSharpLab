@@ -5,6 +5,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using CSharpLab.Core.Language;
 using ICSharpCode.AvalonEdit.Document;
+using ICSharpCode.AvalonEdit.Editing;
 using Microsoft.CodeAnalysis.CSharp;
 
 namespace CSharpLab.Editor;
@@ -514,12 +515,34 @@ public sealed partial class CodeEditor
         var (first, last) = SelectedLines();
         var newline = TextUtilities.GetNewLineFromDocument(Document, first.LineNumber);
         var block = Document.GetText(first.Offset, last.EndOffset - first.Offset);
-        int column = CaretOffset - Document.GetLineByOffset(CaretOffset).Offset;
+        var marks = SelectionMarks(first.Offset);
+        int copyStart = last.EndOffset + newline.Length;
         Document.Insert(last.EndOffset, newline + block);
-        // O cursor vai para a cópia, na mesma coluna.
-        var target = Document.GetLineByNumber(Math.Min(Document.LineCount, Document.GetLineByOffset(CaretOffset).LineNumber + (last.LineNumber - first.LineNumber + 1)));
-        TextArea.ClearSelection();
-        CaretOffset = target.Offset + Math.Min(column, target.Length);
+        // Cursor e seleção vão para a cópia, nas mesmas colunas.
+        RestoreSelectionMarks(marks, copyStart);
+    }
+
+    /// <summary>Cursor e seleção como distâncias até <paramref name="origin"/> (o começo do bloco de linhas).</summary>
+    private (int Caret, int? Anchor) SelectionMarks(int origin)
+    {
+        var selection = TextArea.Selection;
+        int caret = CaretOffset - origin;
+        if (selection.IsEmpty || selection is RectangleSelection) return (caret, null);
+        var start = Document.GetOffset(selection.StartPosition.Location);
+        var end = Document.GetOffset(selection.EndPosition.Location);
+        // A ponta da seleção que não é o cursor fica parada (vale para selecionar de baixo para cima também).
+        int anchor = end == CaretOffset ? start : end;
+        return (caret, anchor - origin);
+    }
+
+    private void RestoreSelectionMarks((int Caret, int? Anchor) marks, int origin)
+    {
+        int caret = Math.Clamp(origin + marks.Caret, 0, Document.TextLength);
+        CaretOffset = caret;
+        if (marks.Anchor is { } a)
+            TextArea.Selection = Selection.Create(TextArea, Math.Clamp(origin + a, 0, Document.TextLength), caret);
+        else
+            TextArea.ClearSelection();
     }
 
     public void DeleteLines()
@@ -538,35 +561,28 @@ public sealed partial class CodeEditor
         var (first, last) = SelectedLines();
         if (direction < 0 && first.PreviousLine == null || direction > 0 && last.NextLine == null) return;
         var newline = TextUtilities.GetNewLineFromDocument(Document, first.LineNumber);
-        int caretLine = Document.GetLineByOffset(CaretOffset).LineNumber - first.LineNumber;
-        int caretColumn = CaretOffset - Document.GetLineByOffset(CaretOffset).Offset;
         var block = Document.GetText(first.Offset, last.EndOffset - first.Offset);
-        bool hadSelection = !TextArea.Selection.IsEmpty;
-        // As linhas são recriadas pela edição: guarda os números antes.
-        int firstNumber = first.LineNumber, lineCount = last.LineNumber - first.LineNumber;
+        var marks = SelectionMarks(first.Offset);
 
-        int newFirstLine;
+        int newStart;
         using (Document.RunUpdate())
         {
             if (direction < 0)
             {
                 var above = first.PreviousLine!;
                 var aboveText = Document.GetText(above);
+                newStart = above.Offset;
                 Document.Replace(above.Offset, last.EndOffset - above.Offset, block + newline + aboveText);
-                newFirstLine = above.LineNumber;
             }
             else
             {
                 var below = last.NextLine!;
                 var belowText = Document.GetText(below);
+                newStart = first.Offset + belowText.Length + newline.Length;
                 Document.Replace(first.Offset, below.EndOffset - first.Offset, belowText + newline + block);
-                newFirstLine = firstNumber + 1;
             }
         }
-        var newFirst = Document.GetLineByNumber(newFirstLine);
-        var newLast = Document.GetLineByNumber(Math.Min(Document.LineCount, newFirstLine + lineCount));
-        var caretTarget = Document.GetLineByNumber(Math.Min(Document.LineCount, newFirstLine + caretLine));
-        CaretOffset = caretTarget.Offset + Math.Min(caretColumn, caretTarget.Length);
-        if (hadSelection) Select(newFirst.Offset, newLast.EndOffset - newFirst.Offset);
+        // O bloco muda de lugar inteiro: cursor e seleção vão junto, nas mesmas colunas.
+        RestoreSelectionMarks(marks, newStart);
     }
 }

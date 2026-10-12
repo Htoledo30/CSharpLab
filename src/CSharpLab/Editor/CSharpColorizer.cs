@@ -34,7 +34,22 @@ public sealed class CSharpColorizer : DocumentColorizingTransformer, IDisposable
         var start = Math.Max(0, e.Offset - 1);
         foreach (var s in Semantic.FindOverlappingSegments(start, e.InsertionLength + 2).ToList())
             Semantic.Remove(s);
+        // Comentário de bloco, aspas, @, $, # ou \ podem mudar a cor de outras linhas além da editada.
+        if (!NeedsFullRedraw && (ChangesOtherLines(e.InsertedText) || ChangesOtherLines(e.RemovedText)))
+            NeedsFullRedraw = true;
     }
+
+    private static bool ChangesOtherLines(ITextSource text)
+    {
+        for (int i = 0; i < text.TextLength; i++)
+        {
+            if (text.GetCharAt(i) is '/' or '*' or '"' or '\'' or '@' or '$' or '#' or '\\') return true;
+        }
+        return false;
+    }
+
+    /// <summary>Alguma edição desde a última classificação pode ter mudado a cor de outras linhas.</summary>
+    public bool NeedsFullRedraw { get; set; }
 
     public void Dispose() => _document.Changed -= OnChanged;
 
@@ -42,14 +57,24 @@ public sealed class CSharpColorizer : DocumentColorizingTransformer, IDisposable
 
     public bool Enabled { get; set; } = true;
 
-    public void SetSemantic(IReadOnlyList<ClassifiedRange> ranges, int documentLength)
+    /// <summary>
+    /// Troca a classificação semântica. Devolve o trecho cujas cores mudaram (null se nada mudou),
+    /// para redesenhar só ele: depois de uma tecla, em geral é só a linha editada.
+    /// </summary>
+    public (int Start, int End)? SetSemantic(IReadOnlyList<ClassifiedRange> ranges, int documentLength)
     {
+        var changed = new HashSet<(int, int, TokenKind)>(Semantic.Select(s => (s.StartOffset, s.Length, s.Kind)));
+        var fresh = new HashSet<(int, int, TokenKind)>();
         Semantic.Clear();
         foreach (var r in ranges)
         {
             if (r.Start + r.Length > documentLength) continue;
             Semantic.Add(new SemanticSegment { StartOffset = r.Start, Length = r.Length, Kind = r.Kind });
+            fresh.Add((r.Start, r.Length, r.Kind));
         }
+        changed.SymmetricExceptWith(fresh);
+        if (changed.Count == 0) return null;
+        return (changed.Min(c => c.Item1), changed.Max(c => c.Item1 + c.Item2));
     }
 
     protected override void ColorizeLine(DocumentLine line)

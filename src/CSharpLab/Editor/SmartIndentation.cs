@@ -8,6 +8,7 @@ namespace CSharpLab.Editor;
 /// Indentação ao pressionar Enter: mantém o recuo da linha anterior e acrescenta um nível
 /// depois de "{" ou de um cabeçalho de controle sem chaves (if, for, while…).
 /// "{" digitado no início de uma linha volta ao recuo do cabeçalho (chaves em nova linha).
+/// Enter numa linha vazia mantém o recuo dela e não deixa espaços sobrando para trás.
 /// </summary>
 public sealed partial class SmartIndentation(int indentSize) : IIndentationStrategy
 {
@@ -35,6 +36,21 @@ public sealed partial class SmartIndentation(int indentSize) : IIndentationStrat
 
     public void IndentLine(TextDocument document, DocumentLine line)
     {
+        // Enter numa linha só com recuo: a linha nova fica no mesmo recuo (o que a pessoa escolheu,
+        // mesmo que tenha voltado um nível) e a de cima não guarda espaços sobrando.
+        var above = line.PreviousLine;
+        if (above != null && above.Length > 0 && document.GetText(above).Trim().Length == 0)
+        {
+            var kept = document.GetText(above);
+            document.Remove(above.Offset, above.Length);
+            var currentText = document.GetText(line);
+            if (currentText.Trim().Length == 0)
+            {
+                document.Replace(line.Offset, LeadingWhitespace(currentText).Length, kept);
+                return;
+            }
+        }
+
         var previous = PreviousNonBlank(document, line);
         if (previous == null) return;
         var prevText = document.GetText(previous);

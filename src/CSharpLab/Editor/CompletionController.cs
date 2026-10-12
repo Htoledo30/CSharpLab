@@ -259,7 +259,7 @@ public sealed class CompletionController
         var document = textArea.Document;
         if (entry.Snippet != null)
         {
-            SnippetExpander.Expand(textArea, entry.Snippet, start, length);
+            _editor.ExpandSnippet(entry.Snippet, start, length);
             return;
         }
         if (entry.PieceName != null)

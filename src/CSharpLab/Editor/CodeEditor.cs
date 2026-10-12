@@ -67,6 +67,8 @@ public sealed partial class CodeEditor : TextEditor
         Options.CutCopyWholeLine = true;
         Options.AllowScrollBelowDocument = true;
         Options.ShowBoxForControlCharacters = true;
+        // Arrastar dentro de uma seleção seleciona outro trecho (não move o código sem querer).
+        Options.EnableTextDragDrop = false;
 
         var area = TextArea;
         area.SelectionBrush = SyntaxTheme.Selection;
@@ -104,6 +106,8 @@ public sealed partial class CodeEditor : TextEditor
         area.TextEntering += OnTextEntering;
         area.TextEntered += OnTextEntered;
         area.PreviewKeyDown += OnPreviewKeyDown;
+        // No editor (antes da área de texto): decide Tab e Enter dos snippets antes do AvalonEdit.
+        PreviewKeyDown += OnSnippetKeyDown;
         area.Caret.PositionChanged += OnCaretMoved;
         area.TextView.MouseHover += OnMouseHover;
         area.TextView.MouseHoverStopped += (_, _) =>
@@ -170,6 +174,8 @@ public sealed partial class CodeEditor : TextEditor
         _semanticTimer.Stop();
         _semanticCts?.Cancel();
         _contextCts?.Cancel();
+        CloseEditGroup();
+        EndSnippet();
         _colorizer?.Dispose();
         _completion.Close();
         _signature.Close();
@@ -285,8 +291,17 @@ public sealed partial class CodeEditor : TextEditor
             var key = Doc.LanguageKey;
             var ranges = await Task.Run(() => ls.ClassifySemanticAsync(key, span, cts.Token), cts.Token);
             if (IsDetached || cts.IsCancellationRequested || version != Doc.Version || key != Doc.LanguageKey || colorizer != _colorizer) return;
-            colorizer.SetSemantic(ranges, Doc.Document.TextLength);
-            TextArea.TextView.Redraw();
+            var changed = colorizer.SetSemantic(ranges, Doc.Document.TextLength);
+            if (colorizer.NeedsFullRedraw)
+            {
+                colorizer.NeedsFullRedraw = false;
+                TextArea.TextView.Redraw();
+            }
+            else if (changed is { } c && c.End <= Document.TextLength)
+            {
+                // Só o que mudou de cor (em geral, a linha editada): redesenhar tudo a cada pausa pesa.
+                TextArea.TextView.Redraw(c.Start, c.End - c.Start);
+            }
         }
         catch (OperationCanceledException)
         {
@@ -313,6 +328,15 @@ public sealed partial class CodeEditor : TextEditor
 
     private void OnTextEntering(object? sender, TextCompositionEventArgs e)
     {
+        if (e.Text.Length == 0) return;
+        BeginTyping(e.Text);
+        HandleTextEntering(e);
+        // Tratado aqui (fechamento automático, envolver…): o AvalonEdit não chama TextEntered.
+        if (e.Handled) CloseEditGroup();
+    }
+
+    private void HandleTextEntering(TextCompositionEventArgs e)
+    {
         if (e.Text.Length != 1) return;
         char c = e.Text[0];
 
@@ -324,12 +348,18 @@ public sealed partial class CodeEditor : TextEditor
         int caret = CaretOffset;
 
         // Digitar o fechamento que foi inserido automaticamente só avança o cursor.
-        if (c is ')' or ']' or '}' or '"' or '\'' && caret < document.TextLength && document.GetCharAt(caret) == c &&
+        if (c is ')' or ']' or '}' or '"' or '\'' && TextArea.Selection.IsEmpty && caret < document.TextLength && document.GetCharAt(caret) == c &&
             TakeAutoCloser(caret))
         {
             e.Handled = true;
             CaretOffset = caret + 1;
             AfterCharTyped(c);
+            return;
+        }
+
+        if (c is '(' or '[' or '{' or '"' or '\'' && TrySurroundSelection(c))
+        {
+            e.Handled = true;
             return;
         }
 
@@ -376,6 +406,7 @@ public sealed partial class CodeEditor : TextEditor
 
     private void OnTextEntered(object? sender, TextCompositionEventArgs e)
     {
+        CloseEditGroup();
         if (e.Text.Length != 1 || !Doc.IsCSharp) return;
         AfterCharTyped(e.Text[0]);
     }
@@ -458,14 +489,14 @@ public sealed partial class CodeEditor : TextEditor
                 _signature.Cycle(1);
                 e.Handled = true;
                 break;
-            case Key.Tab when mods == ModifierKeys.None && Doc.IsCSharp:
-                e.Handled = TryExpandSnippetAtCaret();
+            case Key.Tab when mods == ModifierKeys.None:
+                e.Handled = IndentSelectedLines() || Doc.IsCSharp && TryExpandSnippetAtCaret();
                 break;
             case Key.Enter when mods == ModifierKeys.None && Doc.IsCSharp:
                 e.Handled = TryEnterBetweenBraces();
                 break;
-            case Key.Back when mods == ModifierKeys.None && Doc.IsCSharp:
-                e.Handled = TryDeletePair();
+            case Key.Back when mods == ModifierKeys.None:
+                e.Handled = Backspace();
                 break;
         }
     }
@@ -479,6 +510,8 @@ public sealed partial class CodeEditor : TextEditor
         while (start > 0 && CompletionController.IsIdentifierChar(Document.GetCharAt(start - 1))) start--;
         if (start == caret) return false;
         if (start > 0 && Document.GetCharAt(start - 1) is '.' or '@') return false;
+        // No meio de uma palavra ("for|each") o Tab só recua.
+        if (caret < Document.TextLength && CompletionController.IsIdentifierChar(Document.GetCharAt(caret))) return false;
         var word = Document.GetText(start, caret - start);
         var snippet = Snippets.Find(word);
         if (snippet == null) return false;
@@ -492,7 +525,7 @@ public sealed partial class CodeEditor : TextEditor
             return false;
         }
         if (!Snippets.Fits(snippet, context, LanguageServices?.MainModel?.UsesGameEngine == true)) return false;
-        SnippetExpander.Expand(TextArea, snippet, start, caret - start);
+        ExpandSnippet(snippet, start, caret - start);
         return true;
     }
 
@@ -540,6 +573,7 @@ public sealed partial class CodeEditor : TextEditor
     private void OnCaretMoved(object? sender, EventArgs e)
     {
         ReportCaret();
+        CheckSnippetBounds();
         if (Doc.IsCSharp)
         {
             (int, int)? pair = null;

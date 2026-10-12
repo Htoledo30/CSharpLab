@@ -34,8 +34,11 @@ public static class SnippetExpander
         return snippet;
     }
 
-    /// <summary>Substitui o atalho digitado (wordStart..wordStart+wordLength) pela estrutura.</summary>
-    public static void Expand(TextArea textArea, SnippetDefinition definition, int wordStart, int wordLength)
+    /// <summary>
+    /// Substitui o atalho digitado (wordStart..wordStart+wordLength) pela estrutura. Devolve a edição dos
+    /// campos, para o editor decidir quando ela acaba (ver CodeEditor.Typing).
+    /// </summary>
+    public static InsertionContext Expand(TextArea textArea, SnippetDefinition definition, int wordStart, int wordLength)
     {
         var document = textArea.Document;
         var snippet = Build(definition);
@@ -44,7 +47,10 @@ public static class SnippetExpander
             if (wordLength > 0) document.Remove(wordStart, wordLength);
             textArea.ClearSelection();
             textArea.Caret.Offset = wordStart;
-            snippet.Insert(textArea);
+            var context = new InsertionContext(textArea, wordStart);
+            snippet.Insert(context);
+            context.RaiseInsertionCompleted(EventArgs.Empty);
+            return context;
         }
     }
 }
