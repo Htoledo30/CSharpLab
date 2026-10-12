@@ -27,6 +27,9 @@ public sealed class EditorTypingTests
             await vm.InitializeAsync();
             var typist = new Typist(text, vm, width);
             await Ui.WaitUntil(() => typist.Editor.CanFormat, 60_000, "formatação automática pronta");
+            // A primeira lista de sugestões carrega o Roslyn inteiro: numa máquina lenta (o CI do GitHub) passa
+            // de 20 s. Aqui ela é carregada antes, para os testes medirem o editor e não a partida a frio.
+            await vm.Language!.GetCompletionsAsync(typist.Editor.Doc.LanguageKey, typist.Editor.CaretOffset, null, CancellationToken.None);
             return typist;
         }
 
@@ -349,10 +352,10 @@ public sealed class EditorTypingTests
         // A chave de fechar entra junto: sem ela, a aspa do fim vira o começo de outro texto e nada mais é código.
         Assert.Contains("$\"Ganhou {|}\"", t.Text);
         t.Type("gob");
-        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 20_000, "sugestões ao digitar o nome");
+        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 60_000, "sugestões ao digitar o nome");
         t.Editor.CompletionController.Close();
         t.Type("lin.");
-        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 20_000, "sugestões depois do ponto");
+        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 60_000, "sugestões depois do ponto");
         t.Editor.CompletionController.Close();
         t.Type("Recompensa}");
         Assert.Contains("$\"Ganhou {goblin.Recompensa}|\"", t.Text);
@@ -372,7 +375,7 @@ public sealed class EditorTypingTests
         t.Editor.UpdateLayout();
         double before = view.ScrollOffset.X;
         t.Type("N");
-        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 20_000, "sugestões com a tela rolando");
+        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 60_000, "sugestões com a tela rolando");
         Assert.True(view.ScrollOffset.X > before, "o teste precisa que a tela role para o lado");
     });
 
@@ -382,14 +385,14 @@ public sealed class EditorTypingTests
         const string code = "class Goblin { public string Nome = \"\"; public int Recompensa; }\nclass A\n{\n    void M()\n    {\n        var goblin = new Goblin();\n        var s = $\"Por matar o {goblin.|}\";\n    }\n}";
         using var t = await Typist.WithRoslyn(code);
         t.Type("N");
-        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 20_000, "sugestões dentro de chaves fechadas");
+        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 60_000, "sugestões dentro de chaves fechadas");
         t.Editor.CompletionController.Close();
 
         // O ponto também abre a lista, mesmo com o texto da string continuando depois das chaves.
         t.Editor.Document.Replace(t.Editor.Document.Text.IndexOf("{goblin.N}"), "{goblin.N}".Length, "{goblin}");
         t.Editor.CaretOffset = t.Editor.Document.Text.IndexOf("{goblin}") + 7;
         t.Type(".");
-        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 20_000, "sugestões depois do ponto em chaves fechadas");
+        await Ui.WaitUntil(() => t.Editor.CompletionController.IsOpen, 60_000, "sugestões depois do ponto em chaves fechadas");
     });
 
     // ================================================================ estrutura: blocos, ocorrências, linhas
