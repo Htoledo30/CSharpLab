@@ -39,6 +39,7 @@ public partial class App : Application
             var window = new MainWindow(vm);
             MainWindow = window;
             window.Show();
+            SessionLog.Write("app-start", new { version = Core.Updates.UpdateService.CurrentVersion.ToString(3) });
         }
         catch (Exception ex)
         {
@@ -50,6 +51,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        if (_instanceLease != null) SessionLog.Write("app-exit");
         _instanceLease?.Dispose();
         base.OnExit(e);
     }

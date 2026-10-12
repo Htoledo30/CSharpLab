@@ -8,6 +8,9 @@ public sealed record RuntimeFrame(string File, int Line, int Column, string Meth
 public sealed record RuntimeCrash(string Type, string Message, IReadOnlyList<RuntimeFrame> Frames)
 {
     public string ShortType => Type[(Type.LastIndexOf('.') + 1)..];
+
+    /// <summary>Os primeiros métodos da pilha, com ou sem arquivo ("Tipo.Metodo"), do mais recente ao mais antigo.</summary>
+    public IReadOnlyList<string> Methods { get; init; } = [];
 }
 
 /// <summary>O que aconteceu, em português, e o que fazer a respeito.</summary>
@@ -38,9 +41,11 @@ public static partial class RuntimeErrors
             if (!File.Exists(reportPath)) return null;
             string? type = null, message = null;
             var frames = new List<RuntimeFrame>();
+            var methods = new List<string>();
             foreach (var line in File.ReadAllLines(reportPath))
             {
-                if (line.StartsWith("type=", StringComparison.Ordinal)) type = line[5..];
+                if (line.StartsWith("at=", StringComparison.Ordinal)) methods.Add(line[3..]);
+                else if (line.StartsWith("type=", StringComparison.Ordinal)) type = line[5..];
                 else if (line.StartsWith("message=", StringComparison.Ordinal)) message = line[8..];
                 else if (line.StartsWith("frame=", StringComparison.Ordinal))
                 {
@@ -49,7 +54,7 @@ public static partial class RuntimeErrors
                         frames.Add(new RuntimeFrame(parts[0], l, c, parts[3]));
                 }
             }
-            return type == null ? null : new RuntimeCrash(type, message ?? "", frames);
+            return type == null ? null : new RuntimeCrash(type, message ?? "", frames) { Methods = methods };
         }
         catch (IOException)
         {

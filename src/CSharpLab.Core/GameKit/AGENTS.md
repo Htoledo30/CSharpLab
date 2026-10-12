@@ -308,3 +308,7 @@ game.Scene("Village", () =>
 ## Erros
 
 Os erros do motor (`GameException`) já explicam em português o que fazer, por exemplo uma cena com nome errado ou uma peça que não existe na tela. O CSharp Lab mostra a linha do erro no painel Problemas.
+
+## Acompanhar ao vivo (para IAs)
+
+O CSharp Lab grava o que acontece em `%LocalAppData%\CSharpLab\sessao.jsonl`, uma linha JSON por acontecimento: salvou um arquivo, compilou (com os erros), o jogo rodou, parou com um erro (tipo, explicação em português e a linha), e **"Terminei: pedir revisão"** (Ctrl+Shift+R), quando a pessoa avisa que acabou de mexer. Se ela pedir para você acompanhar enquanto programa, siga esse arquivo (por exemplo `tail -n 0 -F`). Ao ver um erro, explique o que aconteceu e onde; não reescreva o código dela sem ela pedir. O formato completo está em `docs/ACOMPANHAMENTO.md`, no repositório do CSharp Lab.

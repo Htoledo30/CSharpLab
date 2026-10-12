@@ -35,6 +35,17 @@ public sealed class RuntimeErrorTests
         Assert.Equal(3, problem.Diagnostic.Line);
         Assert.True(problem.HasHelp);
 
+        // O registro da sessão conta a história: compilou, executou, parou com erro na linha 3.
+        var folder = vm.RunProject!.Directory;
+        bool Mine(System.Text.Json.JsonElement e) => e.GetProperty("project").GetProperty("folder").GetString() == folder;
+        Assert.Contains(SessionLogTests.Events("build"), e => Mine(e) && e.GetProperty("outcome").GetString() == "Succeeded");
+        Assert.Contains(SessionLogTests.Events("run-start"), Mine);
+        var crash = SessionLogTests.Events("crash").Last(Mine);
+        Assert.Equal("Program.cs", crash.GetProperty("file").GetString());
+        Assert.Equal(3, crash.GetProperty("line").GetInt32());
+        Assert.False(crash.GetProperty("inEngine").GetBoolean());
+        Assert.True(SessionLogTests.Events("run-end").Last(Mine).GetProperty("crashed").GetBoolean());
+
         await vm.OpenProblemHelpCommand.ExecuteAsync(problem);
         Assert.Equal("https://learn.microsoft.com/pt-br/dotnet/api/system.formatexception", Assert.Single(dialogs.OpenedUrls));
 
@@ -73,6 +84,12 @@ public sealed class RuntimeErrorTests
                                                n.Contains("A cena \"Florest\" não existe. Você quis dizer \"Forest\"?"));
         var problem = Assert.Single(vm.Problems.Errors, p => p.Diagnostic.Id == RuntimeErrors.DiagnosticId);
         Assert.Equal(4, problem.Diagnostic.Line);
+
+        // Erro lançado de dentro do motor: o registro marca inEngine, com a linha do jogo.
+        var crash = SessionLogTests.Events("crash").Last(e => e.GetProperty("project").GetProperty("folder").GetString() == created.Directory);
+        Assert.True(crash.GetProperty("inEngine").GetBoolean());
+        Assert.Equal(4, crash.GetProperty("line").GetInt32());
+        Assert.Equal("game", crash.GetProperty("project").GetProperty("kind").GetString());
     }, 300);
 
     [Fact]

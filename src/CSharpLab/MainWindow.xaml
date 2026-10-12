@@ -26,6 +26,7 @@
         <KeyBinding Key="F4" Modifiers="Ctrl" Command="{Binding CloseTabCommand}" />
         <KeyBinding Key="F5" Command="{Binding RunCommand}" />
         <KeyBinding Key="F5" Modifiers="Shift" Command="{Binding StopCommand}" />
+        <KeyBinding Key="R" Modifiers="Ctrl+Shift" Command="{Binding RequestReviewCommand}" />
         <KeyBinding Key="B" Modifiers="Ctrl" Command="{Binding ToggleExplorerCommand}" />
         <KeyBinding Key="J" Modifiers="Ctrl" Command="{Binding TogglePanelCommand}" />
         <KeyBinding Key="J" Modifiers="Ctrl+Shift" Command="{Binding TogglePanelMaximizedCommand}" />
@@ -196,6 +197,8 @@
                                   Visibility="{Binding HasGame, Converter={StaticResource BoolToVis}}"
                                   ToolTip="Abre o jogo já na cena aberta (a tela, ou o game.Scene onde está o cursor). Se ela tiver um game.Test, os valores dele valem." />
                         <MenuItem Header="Parar" InputGestureText="Shift+F5" Command="{Binding StopCommand}" />
+                        <MenuItem Header="Terminei: pedir revisão" InputGestureText="Ctrl+Shift+R" Command="{Binding RequestReviewCommand}"
+                                  ToolTip="Salva os arquivos e avisa quem acompanha a sessão (por exemplo, o Claude) que você terminou de mexer" />
                         <Separator />
                         <MenuItem Header="Escolher projeto para executar…" Command="{Binding ChooseRunProjectCommand}"
                                   Visibility="{Binding HasMultipleProjects, Converter={StaticResource BoolToVis}}" />

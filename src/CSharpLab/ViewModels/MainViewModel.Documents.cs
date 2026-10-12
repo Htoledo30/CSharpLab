@@ -307,6 +307,7 @@ public sealed partial class MainViewModel
             doc.MarkSaved(stamp);
             _recovery.Delete(doc.RecoveryId);
             _recoveryVersions.Remove(doc.RecoveryId);
+            LogSaved(doc, path);
             return true;
         }
         catch (UnrepresentableTextException ex) when (doc.Encoding is not (UTF8Encoding or UnicodeEncoding))

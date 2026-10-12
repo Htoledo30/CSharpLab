@@ -75,5 +75,12 @@ public static class AppPaths
         catch
         {
         }
+        SessionLog.Write("app-error", new
+        {
+            context,
+            type = ex.GetType().FullName,
+            message = ex.Message,
+            at = ex.StackTrace?.Split('\n').FirstOrDefault()?.Trim(),
+        });
     }
 }

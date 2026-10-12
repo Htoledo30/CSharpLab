@@ -372,6 +372,7 @@ cópia do motor em `lib\` (funciona mesmo se a pasta mudar de lugar).
 | Duplicar / apagar linha | `Ctrl+D` / `Ctrl+Shift+K` |
 | Mover linha | `Alt+↑` / `Alt+↓` |
 | Tamanho da fonte | `Ctrl` + roda do mouse |
+| Terminei: pedir revisão (avisa quem acompanha a sessão) | `Ctrl+Shift+R` |
 
 Sugestões: setas para escolher, **Tab** ou **Enter** para aceitar, **Esc** para fechar.
 Espaço e pontuação nunca aceitam uma sugestão sozinhos.
@@ -400,5 +401,6 @@ Em jogos com botões: `scene` `button`
 - Preferências, recentes e recuperação de rascunhos: `%LocalAppData%\CSharpLab`.
 - Se o computador desligar com alterações não salvas, o texto é recuperado na próxima abertura.
 - Uma instância por pasta de preferências mantém a recuperação protegida; a cópia só é apagada ao salvar ou descartar.
+- Registro da sessão (salvou, compilou, executou, erros): `%LocalAppData%\CSharpLab\sessao.jsonl`, para uma IA acompanhar ao vivo enquanto você programa. Fica só no seu PC. Formato: [docs/ACOMPANHAMENTO.md](docs/ACOMPANHAMENTO.md).
 
 Detalhes técnicos e como compilar o próprio editor: [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md).

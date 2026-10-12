@@ -191,6 +191,7 @@ public sealed partial class MainViewModel
         }
 
         Problems.SetBuild(result);
+        LogBuild(project, result);
         RefreshDocumentDiagnostics();
         if (!result.Success)
         {
@@ -226,6 +227,7 @@ public sealed partial class MainViewModel
         RunInfo = $"{project.Name} — executando";
         RunState = RunState.Running;
         StatusText = "Executando";
+        LogRunStart(project);
         if (project.IsWindowApp)
             terminal.WriteNotice("O jogo abre numa janela própria. Para encerrar, feche a janela ou clique em Parar.");
         else
@@ -252,6 +254,7 @@ public sealed partial class MainViewModel
             terminal.WriteNotice($"O programa encerrou com erro (código {exitCode}).", isError: true);
             RunInfo = $"{project.Name} — encerrou com erro";
         }
+        LogRunEnd(project, exitCode, crashed: !_stopRequested && exitCode != 0);
         if (crashReport != null) TryDelete(crashReport);
         StatusText = "";
     }
@@ -292,6 +295,7 @@ public sealed partial class MainViewModel
             catch (IOException) { }
         }
         var explanation = RuntimeErrors.Explain(crash, sourceLine);
+        LogCrash(project, crash, frame, explanation);
         var where = frame != null ? $"Erro na linha {frame.Line} ({Path.GetFileName(frame.File)}): " : "Erro: ";
         terminal.WriteNotice(where + explanation.Message, isError: true);
         if (explanation.Tip != null) terminal.WriteNotice("Dica: " + explanation.Tip);

@@ -125,6 +125,7 @@ public sealed partial class MainViewModel
         CloseFolderCore();
 
         CurrentFolder = folder;
+        LogFolderOpened(folder);
         Explorer.Load(folder);
         StartWatcher(folder);
         Problems.SetLive([]);

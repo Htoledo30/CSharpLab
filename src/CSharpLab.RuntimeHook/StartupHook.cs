@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 
@@ -53,13 +54,20 @@ internal static class StartupHook
         var sb = new StringBuilder();
         sb.Append("type=").Append(ex.GetType().FullName).Append('\n');
         sb.Append("message=").Append(OneLine(ex.Message)).Append('\n');
-        foreach (var frame in new StackTrace(ex, fNeedFileInfo: true).GetFrames())
+        var frames = new StackTrace(ex, fNeedFileInfo: true).GetFrames();
+        foreach (var frame in frames)
         {
             var file = frame.GetFileName();
             if (string.IsNullOrEmpty(file)) continue;
             var method = frame.GetMethod();
             sb.Append("frame=").Append(file).Append('|').Append(frame.GetFileLineNumber()).Append('|')
               .Append(frame.GetFileColumnNumber()).Append('|').Append(method?.Name ?? "").Append('\n');
+        }
+        // Também os métodos sem arquivo (do .NET ou do motor dos jogos), para saber onde o erro nasceu.
+        foreach (var frame in frames.Take(10))
+        {
+            var method = frame.GetMethod();
+            sb.Append("at=").Append(method?.DeclaringType?.FullName).Append('.').Append(method?.Name).Append('\n');
         }
         return sb.ToString();
     }

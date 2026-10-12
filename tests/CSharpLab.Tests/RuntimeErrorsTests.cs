@@ -54,10 +54,12 @@ public sealed class RuntimeErrorsTests
             var report = Path.Combine(dir, "r.txt");
             File.WriteAllText(report,
                 "type=System.FormatException\nmessage=The input string 'x' was not in a correct format.\n" +
-                @"frame=C:\outro\Lib.cs|10|5|Parse" + "\n" + $"frame={dir}\\Program.cs|3|9|<Main>$\n");
+                @"frame=C:\outro\Lib.cs|10|5|Parse" + "\n" + $"frame={dir}\\Program.cs|3|9|<Main>$\n" +
+                "at=System.Number.ThrowFormatException\nat=Program.<Main>$\n");
             var crash = RuntimeErrors.Read(report)!;
             Assert.Equal("FormatException", crash.ShortType);
             Assert.Equal(2, crash.Frames.Count);
+            Assert.Equal(["System.Number.ThrowFormatException", "Program.<Main>$"], crash.Methods);
             var frame = RuntimeErrors.UserFrame(crash, dir)!;
             Assert.Equal(3, frame.Line);
             Assert.Null(RuntimeErrors.Read(Path.Combine(dir, "nao-existe.txt")));
