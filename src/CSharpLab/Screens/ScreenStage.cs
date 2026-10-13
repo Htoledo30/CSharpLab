@@ -104,6 +104,8 @@ public sealed class ScreenStage : Grid
     private Drag _drag;
     private string? _dragName;                 // a peça que o mouse pegou
     private List<string> _dragNames = [];      // as que andam juntas (a seleção)
+    private List<string> _carried = [];        // o que as Caixas arrastadas levam junto (o que está em cima delas)
+    private bool _carryOff;                    // Ctrl durante o arraste: a Caixa vai sozinha
     private readonly Dictionary<string, Rect> _dragOrigins = new(StringComparer.OrdinalIgnoreCase);
     private Point _dragStart;      // ponto do palco onde o mouse desceu
     private Rect _dragOrigin;      // posição da peça (ou do grupo) quando o arraste começou
@@ -174,6 +176,7 @@ public sealed class ScreenStage : Grid
         // Outra aba pode ter trocado o tema do jogo: ao voltar para esta, desenha de novo.
         IsVisibleChanged += OnVisibleChanged;
         model.SelectionChanged += UpdateOverlay;
+        model.PreviewRequested += Preview;
         Rebuild();
     }
 
@@ -193,6 +196,62 @@ public sealed class ScreenStage : Grid
         _model.ThemeChanged -= Rebuild;
         IsVisibleChanged -= OnVisibleChanged;
         _model.SelectionChanged -= UpdateOverlay;
+        _model.PreviewRequested -= Preview;
+    }
+
+    // ------------------------------------------------------------------ ver o movimento (▶ Ver)
+
+    /// <summary>
+    /// Mostra no palco o que o jogo vai fazer: a peça treme, pisca, faz um Pop de exemplo ("-7"), ou a barra
+    /// perde (ou ganha) um pedaço animando. Nada muda na tela: a barra volta a ser a de antes logo depois.
+    /// </summary>
+    private void Preview(string name, PiecePreview kind)
+    {
+        if (_model.Layout?.Find(name) is not { } piece || !_elements.TryGetValue(piece.Name, out var element)) return;
+        var bounds = _model.BoundsOf(piece);
+        switch (kind)
+        {
+            case PiecePreview.Shake:
+                EffectPlayer.Play(element, GameEngine.Effect.Shake);
+                break;
+            case PiecePreview.Flash:
+                EffectPlayer.Play(element, GameEngine.Effect.Flash);
+                break;
+            case PiecePreview.Pop:
+                EffectPlayer.Pop(_overlay, element, bounds, piece.Type == PieceType.Bar ? "-7" : "+10", piece.Type == PieceType.Bar ? GameEngine.Color.Red : GameEngine.Color.Gold);
+                break;
+            case PiecePreview.Spin when piece.Type == PieceType.Wheel:
+                // A roleta pode estar dentro de um quadro (peça escondida no começo): o giro fica no Tag dela.
+                var wheel = element.Tag is RotateTransform ? element : (element as Grid)?.Children.OfType<FrameworkElement>().FirstOrDefault(c => c.Tag is RotateTransform);
+                if (wheel?.Tag is RotateTransform turn) EffectPlayer.Spin(wheel, turn.Angle);
+                break;
+            case PiecePreview.Bar when piece.Type == PieceType.Bar:
+            {
+                // Perde 40% da barra (ou ganha, se ela está quase vazia) e anima como no jogo.
+                double before = ScreenRenderer.BarFraction(piece);
+                var demo = piece.Clone();
+                demo.Animate = true;
+                int change = Math.Max(1, (int)Math.Round(piece.BarMax * 0.4));
+                demo.Value = before >= 0.4 ? Math.Max(0, piece.BarValue - change) : Math.Min(piece.BarMax, piece.BarValue + change);
+                var animated = ScreenRenderer.Create(demo, new RenderContext { Live = false, BarBefore = _ => before });
+                Canvas.SetLeft(animated, bounds.X);
+                Canvas.SetTop(animated, bounds.Y);
+                int index = _pieces.Children.IndexOf(element);
+                if (index < 0) return;
+                _pieces.Children.RemoveAt(index);
+                _pieces.Children.Insert(index, animated);
+                _elements[piece.Name] = animated;
+                // Depois de ver, a barra volta a ser a do arquivo.
+                var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1700) };
+                timer.Tick += (_, _) =>
+                {
+                    timer.Stop();
+                    if (_drag == Drag.None && _elements.TryGetValue(piece.Name, out var shown) && shown == animated) Rebuild();
+                };
+                timer.Start();
+                break;
+            }
+        }
     }
 
     private static Brush Freeze(WpfColor color)
@@ -269,6 +328,8 @@ public sealed class ScreenStage : Grid
         var context = new RenderContext { Live = false, Members = list => layout.MembersOf(list.Name) };
         foreach (var piece in _model.DrawOrder())
         {
+            // Escondida só aqui (o olho das Camadas): não aparece no palco, mas continua no jogo.
+            if (_model.IsHiddenHere(piece)) continue;
             FrameworkElement element;
             try
             {
@@ -279,7 +340,7 @@ public sealed class ScreenStage : Grid
                 Core.Settings.AppPaths.Log(ex, "Desenhando peça");
                 element = new Border { Background = Theme.Panel };
             }
-            bool showsText = piece.Type is PieceType.Text or PieceType.Button;
+            bool showsText = piece.Type is PieceType.Text or PieceType.Button or PieceType.Bar;
             if (!piece.Visible || showsText)
             {
                 var holder = new Grid { Width = element.Width, Height = element.Height, IsHitTestVisible = false, Tag = HiddenHolder };
@@ -292,7 +353,7 @@ public sealed class ScreenStage : Grid
                 }
                 if (showsText)
                 {
-                    // Texto que não cabe (seria cortado no jogo): contorno laranja e um "!" no canto.
+                    // Texto que não cabe (seria cortado no jogo) ou barra baixa demais: contorno laranja e um "!" no canto.
                     var mark = OverflowMark();
                     mark.Visibility = ScreenRenderer.Overflow(piece) != null ? Visibility.Visible : Visibility.Collapsed;
                     holder.Children.Add(mark);
@@ -346,7 +407,7 @@ public sealed class ScreenStage : Grid
             return;
         }
 
-        if (single is { } r)
+        if (single is { } r && !_model.IsLocked(_model.Selected!))
         {
             bool small = r.Width * _zoom < 36 || r.Height * _zoom < 36;
             var points = HandlePoints(r);
@@ -365,7 +426,7 @@ public sealed class ScreenStage : Grid
 
         // Nome da peça em cima (é o nome do game.Find) e medidas embaixo durante o arraste.
         var group = single ?? Union(selected.Select(CurrentBounds));
-        _nameText.Text = single != null ? _model.Selected!.Name : $"{selected.Count} peças";
+        _nameText.Text = single != null ? _model.Selected!.Name + (_model.IsLocked(_model.Selected!) ? "  (travada)" : "") : $"{selected.Count} peças";
         _nameTag.LayoutTransform = new ScaleTransform(px, px);
         _nameTag.Visibility = Visibility.Visible;
         _nameTag.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -375,7 +436,7 @@ public sealed class ScreenStage : Grid
         if (_drag is Drag.Moving or Drag.Resizing)
         {
             var shown = _drag == Drag.Moving ? _dragCurrent : group;
-            _sizeText.Text = _drag == Drag.Moving ? $"x {shown.X:0}   y {shown.Y:0}" : $"{shown.Width:0} × {shown.Height:0}";
+            _sizeText.Text = _drag == Drag.Moving ? $"x {shown.X:0}   y {shown.Y:0}" + CarryHint() : $"{shown.Width:0} × {shown.Height:0}";
             _sizeTag.LayoutTransform = new ScaleTransform(px, px);
             _sizeTag.Visibility = Visibility.Visible;
             _sizeTag.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
@@ -387,6 +448,11 @@ public sealed class ScreenStage : Grid
             _sizeTag.Visibility = Visibility.Collapsed;
         }
     }
+
+    /// <summary>Arrastando uma Caixa com peças em cima: avisa quantas vão junto e como levar só a caixa.</summary>
+    private string CarryHint() => _carried.Count == 0 ? ""
+        : _carryOff ? "   ·   só a caixa (solte o Ctrl para levar o que está em cima)"
+        : $"   ·   leva junto {_carried.Count} {(_carried.Count == 1 ? "peça" : "peças")} (Ctrl: só a caixa)";
 
     private static Rect Union(IEnumerable<Rect> rects)
     {
@@ -426,7 +492,7 @@ public sealed class ScreenStage : Grid
 
     private Edges HandleAt(Point p)
     {
-        if (SelectedBounds() is not { } r) return Edges.None;
+        if (SelectedBounds() is not { } r || _model.IsLocked(_model.Selected!)) return Edges.None;
         double reach = (HandleSize / 2 + 3) / _zoom;
         bool small = r.Width * _zoom < 36 || r.Height * _zoom < 36;
         var points = HandlePoints(r);
@@ -552,8 +618,10 @@ public sealed class ScreenStage : Grid
         _dragStart = at;
         _dragOrigins.Clear();
         var layout = _model.Layout!;
-        // Quem anda junto: as selecionadas e, de cada Lista, as peças do cartão dela.
-        var moving = new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
+        // Quem anda junto: as selecionadas, o que está em cima de cada Caixa e, de cada Lista, as peças do cartão dela.
+        _carried = kind == Drag.Resizing ? [] : [.. _model.Carried(names)];
+        _carryOff = false;
+        var moving = new HashSet<string>(names.Concat(_carried), StringComparer.OrdinalIgnoreCase);
         foreach (var p in layout.Pieces)
         {
             if (moving.Contains(p.Name) || p.List != null && moving.Contains(p.List))
@@ -617,11 +685,13 @@ public sealed class ScreenStage : Grid
             (_dragCurrent, guides) = _snapper!.Move(moved, snap);
             _dragCurrent = KeepVisible(_dragCurrent);
             double dx = _dragCurrent.X - _dragOrigin.X, dy = _dragCurrent.Y - _dragOrigin.Y;
+            _carryOff = (Keyboard.Modifiers & ModifierKeys.Control) != 0;
             foreach (var (name, origin) in _dragOrigins)
             {
                 if (!_elements.TryGetValue(name, out var element)) continue;
-                Canvas.SetLeft(element, origin.X + dx);
-                Canvas.SetTop(element, origin.Y + dy);
+                bool stays = _carryOff && IsCarried(name);
+                Canvas.SetLeft(element, origin.X + (stays ? 0 : dx));
+                Canvas.SetTop(element, origin.Y + (stays ? 0 : dy));
             }
             UpdateSlotHint();
         }
@@ -656,6 +726,11 @@ public sealed class ScreenStage : Grid
         ShowGuides(guides);
         UpdateOverlay();
     }
+
+    /// <summary>A peça vai junto por estar em cima de uma Caixa arrastada (ou no cartão de uma Lista que ela leva).</summary>
+    private bool IsCarried(string name) =>
+        _carried.Contains(name, StringComparer.OrdinalIgnoreCase) ||
+        _model.Layout?.Find(name)?.List is { } list && _carried.Contains(list, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Uma peça só (que não é Lista) entrando ou saindo do cartão modelo de uma Lista.</summary>
     private void UpdateSlotHint()
@@ -742,6 +817,9 @@ public sealed class ScreenStage : Grid
         var name = _dragName;
         var names = _dragNames;
         var rect = _dragCurrent;
+        var carried = _carryOff ? [] : _carried;
+        _carried = [];
+        _carryOff = false;
         _drag = Drag.None;
         _dragName = null;
         _snapper = null;
@@ -770,7 +848,7 @@ public sealed class ScreenStage : Grid
         if (commit && name != null && rect != _dragOrigin)
         {
             if (kind == Drag.Resizing) _model.SetBounds(name, rect);                     // grava e redesenha
-            else _model.MoveBy(names, rect.X - _dragOrigin.X, rect.Y - _dragOrigin.Y);
+            else _model.MoveBy(names.Concat(carried), rect.X - _dragOrigin.X, rect.Y - _dragOrigin.Y);
         }
         else
         {
@@ -823,6 +901,11 @@ public sealed class ScreenStage : Grid
         pasteStyle.IsEnabled = _model.HasStyle;
         menu.Items.Add(pasteStyle);
         menu.Items.Add(AlignMenu());
+        if (_model.Selected is { } chosen)
+        {
+            menu.Items.Add(new Separator());
+            menu.Items.Add(Item("Travar no palco (o mouse não pega mais)", null, () => _model.SetLocked(chosen.Name, true)));
+        }
         if (_model.Selected is { })
         {
             menu.Items.Add(new Separator());

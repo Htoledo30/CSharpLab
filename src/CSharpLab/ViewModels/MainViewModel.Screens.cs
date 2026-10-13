@@ -293,7 +293,14 @@ public sealed partial class MainViewModel
 
     public void WritePieceHandler(string projectDirectory, string scene, string piece, string handler)
     {
-        var parameter = handler == "OnAnswer" ? "answer" : "()";
+        var parameter = handler switch
+        {
+            "OnAnswer" => "answer",
+            "OnChoose" => "choice",
+            "OnChange" => "value",
+            "OnCellClick" => "(x, y)",
+            _ => "()",
+        };
         var found = FindSceneInCode(projectDirectory, scene);
         if (found == null)
         {
@@ -315,9 +322,14 @@ public sealed partial class MainViewModel
         }
         doc.Document.Replace(insertion.Offset, insertion.Length, insertion.Text);
         NavigateTo(doc, 1, 1, insertion.Offset + insertion.Caret);
-        NotifyInfo(handler == "OnAnswer"
-            ? $"Pronto: escreva entre as chaves o que acontece quando o jogador responde no \"{piece}\" (ainda não salvo)."
-            : $"Pronto: escreva entre as chaves o que o botão \"{piece}\" faz (ainda não salvo).");
+        NotifyInfo(handler switch
+        {
+            "OnAnswer" => $"Pronto: escreva entre as chaves o que acontece quando o jogador responde no \"{piece}\" (ainda não salvo).",
+            "OnChoose" => $"Pronto: escreva entre as chaves o que acontece quando o jogador escolhe no \"{piece}\"; choice é a opção (ainda não salvo).",
+            "OnChange" => $"Pronto: escreva entre as chaves o que acontece quando o número do \"{piece}\" muda; value é o número (ainda não salvo).",
+            "OnCellClick" => $"Pronto: escreva entre as chaves o que acontece no clique numa casa do \"{piece}\"; x é a coluna e y a linha (ainda não salvo).",
+            _ => $"Pronto: escreva entre as chaves o que o botão \"{piece}\" faz (ainda não salvo).",
+        });
     }
 
     /// <summary>Onde está o game.Scene("Nome", …): arquivo e posição (Program.cs primeiro; abas abertas valem pelo texto da aba).</summary>

@@ -47,6 +47,12 @@ internal sealed partial class GameWindow : Window, IGameView
     /// <summary>Rolagem de cada Lista da cena atual (volta para o topo só ao entrar de novo na cena).</summary>
     private readonly Dictionary<string, double> _scrollOffsets = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Quanto cada barra mostrava no último desenho (de 0 a 1), para a barra animada deslizar do valor antigo.
+    /// As peças são novas a cada visita da cena, então ao chegar numa cena as barras aparecem direto no valor.
+    /// </summary>
+    private Dictionary<Piece, double> _barShown = new(ReferenceEqualityComparer.Instance);
+
     public GameWindow(Game game)
     {
         _game = game;
@@ -240,6 +246,8 @@ internal sealed partial class GameWindow : Window, IGameView
         var scene = screen.Designed!;
         var messages = screen.Messages;
         var elements = new Dictionary<Piece, FrameworkElement>(ReferenceEqualityComparer.Instance);
+        var barsBefore = _barShown;
+        var barsNow = new Dictionary<Piece, double>(ReferenceEqualityComparer.Instance);
         var context = new RenderContext
         {
             Live = true,
@@ -249,8 +257,16 @@ internal sealed partial class GameWindow : Window, IGameView
             MessagesByPiece = screen.MessagesByPiece,
             IsClickable = _game.IsClickable,
             Cards = _game.CardsOf,
-            Created = (piece, element) => elements[piece] = element,
+            Created = (piece, element) =>
+            {
+                elements[piece] = element;
+                if (piece.Type == PieceType.Bar) barsNow[piece] = ScreenRenderer.BarFraction(piece);
+            },
             ScrollOffsets = _scrollOffsets,
+            BarBefore = piece => barsBefore.TryGetValue(piece, out var before) ? before : null,
+            Choose = _game.ChoosePiece,
+            Step = _game.StepPiece,
+            CellClick = _game.ClickCell,
         };
 
         _designed.Children.Clear();
@@ -282,37 +298,30 @@ internal sealed partial class GameWindow : Window, IGameView
             _designed.Children.Add(Toast(toast, avoid));
         }
 
-        foreach (var (piece, effect) in screen.Effects)
-        {
-            if (elements.TryGetValue(piece, out var element)) Play(element, effect);
-        }
-    }
+        _barShown = barsNow;
 
-    /// <summary>Tremer (vai e volta para os lados) ou piscar (some e volta duas vezes).</summary>
-    private static void Play(FrameworkElement element, Effect effect)
-    {
-        if (effect == GameEngine.Effect.Shake)
+        var pops = new Dictionary<Piece, int>(ReferenceEqualityComparer.Instance);
+        foreach (var effect in screen.Effects)
         {
-            var move = new TranslateTransform();
-            element.RenderTransform = move;
-            var shake = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(420) };
-            double[] steps = [0, -9, 9, -7, 7, -4, 4, -2, 0];
-            for (int i = 0; i < steps.Length; i++)
-                shake.KeyFrames.Add(new LinearDoubleKeyFrame(steps[i], KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(420.0 * i / (steps.Length - 1)))));
-            element.Loaded += (_, _) => move.BeginAnimation(TranslateTransform.XProperty, shake);
-            return;
+            elements.TryGetValue(effect.Piece, out var element);
+            if (effect.Effect == GameEngine.Effect.Pop)
+            {
+                // Vários Pop na mesma peça saem um depois do outro, um pouco para os lados.
+                int index = pops[effect.Piece] = pops.GetValueOrDefault(effect.Piece, -1) + 1;
+                // Peça escondida (ou de um cartão que não apareceu): usa o lugar dela no arquivo da tela.
+                if (element == null && effect.Piece.List != null) continue;
+                var piece = effect.Piece;
+                EffectPlayer.Pop(_designed, element, new Rect(piece.X, piece.Y, piece.Width, piece.Height), effect.Text ?? "", effect.Color, index);
+            }
+            else if (effect.Effect == GameEngine.Effect.Spin)
+            {
+                if (element != null) EffectPlayer.Spin(element, ScreenRenderer.WheelAngle(effect.Piece, effect.Text));
+            }
+            else if (element != null)
+            {
+                EffectPlayer.Play(element, effect.Effect);
+            }
         }
-        var flash = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(460) };
-        double[] values = [1, 0.15, 1, 0.15, 1];
-        for (int i = 0; i < values.Length; i++)
-            flash.KeyFrames.Add(new LinearDoubleKeyFrame(values[i], KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(460.0 * i / (values.Length - 1)))));
-        var opacity = element.Opacity;
-        flash.Completed += (_, _) =>
-        {
-            element.BeginAnimation(OpacityProperty, null);
-            element.Opacity = opacity;
-        };
-        element.Loaded += (_, _) => element.BeginAnimation(OpacityProperty, flash);
     }
 
     private static FrameworkElement Toast(IReadOnlyList<MessageLine> messages, IReadOnlyList<Rect> avoid)

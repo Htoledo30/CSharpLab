@@ -151,6 +151,8 @@ public sealed partial class ScreenDesignerModel
                 (from.Size, from.Bold, from.Align, from.Font, from.Italic, from.Shadow, from.TextShadow, from.TextColor);
             (to.Color, to.Shade, to.Opacity, to.Border, to.Corner, to.Style, to.BarStyle, to.BarText) =
                 (from.Color, from.Shade, from.Opacity, from.Border, from.Corner, from.Style, from.BarStyle, from.BarText);
+            (to.BorderColor, to.BorderWidth, to.Gradient, to.GradientDirection, to.Animate) =
+                (from.BorderColor, from.BorderWidth, from.Gradient, from.GradientDirection, from.Animate);
             return;
         }
         if (Piece.HasLetters(from.Type) && Piece.HasLetters(to.Type))

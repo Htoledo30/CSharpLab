@@ -102,6 +102,10 @@ public static class GameScreens
         "input" => "Campo de escrita",
         "messages" => "Mensagens",
         "list" => "Lista",
+        "choice" => "Escolha",
+        "counter" => "Contador",
+        "wheel" => "Roleta",
+        "grid" => "Grade",
         _ => type,
     };
 }

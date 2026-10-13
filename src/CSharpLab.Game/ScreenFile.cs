@@ -21,7 +21,12 @@ internal static class ScreenFile
 
     private static readonly string[] PieceKeys =
         ["type", "name", "list", "x", "y", "width", "height", "text", "size", "bold", "italic", "shadow", "textshadow", "scroll", "font", "align", "color", "shade",
-         "opacity", "border", "corner", "style", "textcolor", "barstyle", "bartext", "shortcut", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "gamewrite", "visible"];
+         "opacity", "border", "corner", "style", "textcolor", "barstyle", "bartext", "shortcut", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "gamewrite", "visible",
+         "bordercolor", "borderwidth", "gradient", "gradientdirection", "animate", "locked",
+         "options", "selected", "min", "step", "columns", "rows"];
+
+    /// <summary>Quantas opções uma Escolha ou uma Roleta pode ter.</summary>
+    public const int MaxOptions = 24;
 
     public static string ValidColors => Color.NamedList + " (ou o código de qualquer cor, como \"#8A2BE2\")";
 
@@ -71,6 +76,18 @@ internal static class ScreenFile
                             return Fail("\"background\" precisa ser o nome de uma imagem da pasta Assets, entre aspas.", LineOf(json, "\"background\""));
                         layout.Background = property.Value.GetString() is { Length: > 0 } bg ? bg : null;
                         break;
+                    case "backgroundcolor":
+                    case "backgroundgradient":
+                    {
+                        bool gradient = property.Name.Equals("backgroundGradient", StringComparison.OrdinalIgnoreCase);
+                        var colorError = ReadColor(property.Value, "O fundo", property.Name, color =>
+                        {
+                            if (gradient) layout.BackgroundGradient = color;
+                            else layout.BackgroundColor = color;
+                        });
+                        if (colorError != null) return Fail(colorError, LineOf(json, $"\"{property.Name}\""));
+                        break;
+                    }
                     case "pieces":
                         if (property.Value.ValueKind != JsonValueKind.Array)
                             return Fail("\"pieces\" precisa ser uma lista: \"pieces\": [ ... ]", LineOf(json, "\"pieces\""));
@@ -162,6 +179,18 @@ internal static class ScreenFile
                 "list" => Text(value, label, key, v => piece.List = string.IsNullOrWhiteSpace(v) ? null : v.Trim()),
                 "color" => ReadColor(value, label, key, v => piece.Color = v),
                 "textcolor" => ReadColor(value, label, key, v => piece.TextColor = v),
+                "bordercolor" => ReadColor(value, label, key, v => piece.BorderColor = v),
+                "gradient" => ReadColor(value, label, key, v => piece.Gradient = v),
+                "borderwidth" => Integer(value, label, key, v => piece.BorderWidth = v, range: (1, 20)),
+                "gradientdirection" => ReadEnum<GradientDirection>(value, label, key, v => piece.GradientDirection = v),
+                "animate" => Boolean(value, label, key, v => piece.Animate = v),
+                "locked" => Boolean(value, label, key, v => piece.Locked = v),
+                "options" => ReadOptions(value, label, v => piece.Options = v),
+                "selected" => Text(value, label, key, v => piece.Selected = string.IsNullOrWhiteSpace(v) ? null : v.Trim()),
+                "min" => Integer(value, label, key, v => piece.Min = v),
+                "step" => Integer(value, label, key, v => piece.Step = v, positive: true),
+                "columns" => Integer(value, label, key, v => piece.Columns = v, range: (1, Piece.MaxCells)),
+                "rows" => Integer(value, label, key, v => piece.Rows = v, range: (1, Piece.MaxCells)),
                 "barstyle" => ReadEnum<BarStyle>(value, label, key, v => piece.BarStyle = v),
                 "bartext" => ReadEnum<BarText>(value, label, key, v => piece.BarText = v),
                 "font" => ReadEnum<Font>(value, label, key, v => piece.Font = v),
@@ -176,7 +205,32 @@ internal static class ScreenFile
             };
             if (error != null) return (null, error);
         }
+        if (piece.Selected != null && piece.SelectedOption == null && Piece.Supports(piece.Type, nameof(Piece.Selected)))
+        {
+            warnings.Add($"{label}: \"selected\": \"{piece.Selected}\" não está nas opções e foi ignorado.");
+            piece.Selected = null;
+        }
+        if (piece.Type == PieceType.Counter && piece.Max is { } max && max < piece.CounterMin)
+            return (null, $"{label}: o \"max\" ({max}) precisa ser maior ou igual ao \"min\" ({piece.CounterMin}).");
         return (piece, null);
+    }
+
+    /// <summary>As opções: uma lista de textos entre aspas, como ["Fácil", "Normal", "Difícil"].</summary>
+    private static string? ReadOptions(JsonElement value, string label, Action<List<string>> apply)
+    {
+        const string Example = "[\"Fácil\", \"Normal\", \"Difícil\"]";
+        if (value.ValueKind != JsonValueKind.Array)
+            return $"{label}: \"options\" precisa ser uma lista de textos entre colchetes, como {Example}.";
+        var options = new List<string>();
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String)
+                return $"{label}: cada opção do \"options\" precisa ser um texto entre aspas, como {Example}.";
+            if (item.GetString()?.Trim() is { Length: > 0 } option) options.Add(option);
+        }
+        if (options.Count > MaxOptions) return $"{label}: \"options\" pode ter até {MaxOptions} opções (veio {options.Count}).";
+        apply(options);
+        return null;
     }
 
     private static string? ReadShortcut(JsonElement value, string label, Piece piece)
@@ -312,6 +366,10 @@ internal static class ScreenFile
         sb.Append("  \"format\": ").Append(ScreenLayout.CurrentFormat).Append(',').Append(nl);
         if (layout.Background != null)
             sb.Append("  \"background\": ").Append(Quote(layout.Background)).Append(',').Append(nl);
+        if (layout.BackgroundColor is { } backgroundColor)
+            sb.Append("  \"backgroundColor\": \"").Append(backgroundColor).Append("\",").Append(nl);
+        if (layout.BackgroundGradient is { } backgroundGradient)
+            sb.Append("  \"backgroundGradient\": \"").Append(backgroundGradient).Append("\",").Append(nl);
         if (layout.Pieces.Count == 0)
         {
             sb.Append("  \"pieces\": []").Append(nl);
@@ -359,14 +417,33 @@ internal static class ScreenFile
         if (p.Shade is { } shade and not Shade.Normal && Piece.Supports(p.Type, nameof(Piece.Shade))) parts.Add($"\"shade\": \"{shade}\"");
         if (p.Opacity is { } opacity && Piece.Supports(p.Type, nameof(Piece.Opacity))) parts.Add($"\"opacity\": {opacity.ToString(CultureInfo.InvariantCulture)}");
         if (p.Border is { } border && Piece.Supports(p.Type, nameof(Piece.Border))) parts.Add($"\"border\": {(border ? "true" : "false")}");
+        if (p.BorderColor is { } borderColor && Piece.Supports(p.Type, nameof(Piece.BorderColor))) parts.Add($"\"borderColor\": \"{borderColor}\"");
+        if (p.BorderWidth is { } borderWidth and not 1 && Piece.Supports(p.Type, nameof(Piece.BorderWidth))) parts.Add($"\"borderWidth\": {borderWidth.ToString(CultureInfo.InvariantCulture)}");
+        if (p.Gradient is { } gradient && Piece.Supports(p.Type, nameof(Piece.Gradient)))
+        {
+            parts.Add($"\"gradient\": \"{gradient}\"");
+            if (p.GradientDirection is { } direction and not GradientDirection.Down) parts.Add($"\"gradientDirection\": \"{direction}\"");
+        }
         if (p.Corner is { } corner and not Corner.Round && Piece.Supports(p.Type, nameof(Piece.Corner))) parts.Add($"\"corner\": \"{corner}\"");
         if (p.Style is { } style and not ButtonStyle.Filled && Piece.Supports(p.Type, nameof(Piece.Style))) parts.Add($"\"style\": \"{style}\"");
         if (p.TextColor is { } textColor && Piece.Supports(p.Type, nameof(Piece.TextColor))) parts.Add($"\"textColor\": \"{textColor}\"");
         if (p.BarStyle is { } barStyle and not BarStyle.Smooth && Piece.Supports(p.Type, nameof(Piece.BarStyle))) parts.Add($"\"barStyle\": \"{barStyle}\"");
         if (p.BarText is { } barText and not BarText.Above && Piece.Supports(p.Type, nameof(Piece.BarText))) parts.Add($"\"barText\": \"{barText}\"");
         if (p.Shortcut != null && Piece.Supports(p.Type, nameof(Piece.Shortcut))) parts.Add($"\"shortcut\": {Quote(p.Shortcut)}");
-        if (p.Value != null && p.Type == PieceType.Bar) parts.Add($"\"value\": {p.Value.Value.ToString(CultureInfo.InvariantCulture)}");
-        if (p.Max != null && p.Type == PieceType.Bar) parts.Add($"\"max\": {p.Max.Value.ToString(CultureInfo.InvariantCulture)}");
+        if (p.Value != null && Piece.Supports(p.Type, nameof(Piece.Value))) parts.Add($"\"value\": {p.Value.Value.ToString(CultureInfo.InvariantCulture)}");
+        if (p.Min != null && Piece.Supports(p.Type, nameof(Piece.Min))) parts.Add($"\"min\": {p.Min.Value.ToString(CultureInfo.InvariantCulture)}");
+        if (p.Max != null && Piece.Supports(p.Type, nameof(Piece.Max))) parts.Add($"\"max\": {p.Max.Value.ToString(CultureInfo.InvariantCulture)}");
+        if (p.Step is { } step and not 1 && Piece.Supports(p.Type, nameof(Piece.Step))) parts.Add($"\"step\": {step.ToString(CultureInfo.InvariantCulture)}");
+        if (p.Options != null && Piece.Supports(p.Type, nameof(Piece.Options)))
+            parts.Add("\"options\": [" + string.Join(", ", p.Options.Select(Quote)) + "]");
+        if (p.SelectedOption is { } selected && Piece.Supports(p.Type, nameof(Piece.Selected))) parts.Add($"\"selected\": {Quote(selected)}");
+        if (p.Type == PieceType.Grid)
+        {
+            parts.Add($"\"columns\": {p.GridColumns.ToString(CultureInfo.InvariantCulture)}");
+            parts.Add($"\"rows\": {p.GridRows.ToString(CultureInfo.InvariantCulture)}");
+        }
+        else if (p.Columns is { } columns && Piece.Supports(p.Type, nameof(Piece.Columns))) parts.Add($"\"columns\": {columns.ToString(CultureInfo.InvariantCulture)}");
+        if (p.Animate == true && Piece.Supports(p.Type, nameof(Piece.Animate))) parts.Add("\"animate\": true");
         if (p.Image != null && p.Type == PieceType.Image) parts.Add($"\"image\": {Quote(p.Image)}");
         if (p.Type == PieceType.List)
         {
@@ -377,6 +454,7 @@ internal static class ScreenFile
         if (!p.Enabled && Piece.Supports(p.Type, nameof(Piece.Enabled))) parts.Add("\"enabled\": false");
         if (!p.GameWrite && Piece.Supports(p.Type, nameof(Piece.GameWrite))) parts.Add("\"gameWrite\": false");
         if (!p.Visible) parts.Add("\"visible\": false");
+        if (p.Locked) parts.Add("\"locked\": true");
         return "{ " + string.Join(", ", parts) + " }";
     }
 

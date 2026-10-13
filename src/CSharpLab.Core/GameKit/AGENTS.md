@@ -95,6 +95,7 @@ game.Start("Name");
 | `game.Test("Name", () => { health = 3; });` | **Fora das cenas, antes do `game.Start`.** Valores para testar a cena com Ctrl+F5 (Jogar esta cena): roda antes dela (depois do `OnEnter`). No F5 normal e no jogo exportado não roda. Um por cena. |
 | `game.CurrentScene` | Nome da cena atual. |
 | `game.Background = "tower.png";` | Troca a imagem de fundo da tela (pasta `Assets/`). Começa com o `background` do arquivo da tela. |
+| `game.BackgroundColor = Color.Hex("#3A0D0D");` | Troca a cor do fundo da tela (a imagem, se tiver, fica por cima). `null` volta para a do tema. |
 | `game.Wait(0.6);` | **Só dentro de um clique.** Mostra a tela como está e espera (0 a 5 s) antes do resto do clique: o herói ataca, o inimigo responde depois. O jogador não clica durante a pausa. |
 | `game.Pause();` | **Só dentro de um clique.** Mostra a tela e espera o jogador apertar Continuar (ou Enter, Espaço, clique na tela); depois o código segue na linha de baixo. É o "aperte Enter para continuar" do terminal. `game.Pause("Abrir o baú")` muda o texto do botão. |
 | `string answer = game.Read("Pergunta?");` | **Só dentro de um clique.** Pergunta e espera o jogador escrever (resposta sem espaços nas pontas, nunca vazia). É o `Console.ReadLine()`. |
@@ -114,7 +115,9 @@ game.Start("Name");
 | `Text` | Text, Button, Bar (rótulo), Input (pergunta) |
 | `Value`, `Max` | Bar |
 | `Color`, `Shade` | Text, Button, Bar, Box |
-| `Opacity` (0 a 100), `Border` | Box |
+| `Opacity` (0 a 100), `Border`, `BorderColor`, `BorderWidth` (1 a 20) | Box |
+| `Gradient` (segunda cor, `null` = uma cor só), `GradientDirection` (`Down`, `Right`, `Diagonal`) | Box |
+| `Animate` (`true`: desliza até o valor novo e mostra o pedaço perdido) | Bar |
 | `Corner` | Box, Button, Bar (`Circle` no Botão e na Barra = pontas redondas, pílula) |
 | `Font`, `Bold`, `Italic` | todas as peças com letras: Text, Button, Bar (nome e número), Input (pergunta), Messages, List (texto de vazia). O nome da Bar já começa em negrito |
 | `TextColor` (cor da letra; sem escolher, automática) | Button, Bar, Input, Messages (as linhas sem cor no Write), List. No Text, a cor da letra é o `Color` |
@@ -131,7 +134,11 @@ game.Start("Name");
 | `OnClick(() => { })` | Button, Image |
 | `OnAnswer(answer => { })` | Input (o texto já vem sem espaços nas pontas e nunca vazio) |
 | `Show(items, (card, item) => { })` | List |
-| `Shake()` (tremer), `Flash()` (piscar) | todas |
+| `Shake()` (tremer), `Flash()` (piscar), `Pop("-5", Color.Red)` (texto que sobe e some em cima da peça) | todas |
+| `Selected` (a escolhida, `""` se nenhuma), `Options` (`["A", "B"]`), `OnChoose(choice => { })` | Choice (`Selected` e `Options` também na Wheel) |
+| `Value`, `Min`, `Max`, `Step`, `OnChange(value => { })` | Counter (o número fica sempre entre `Min` e `Max`) |
+| `string prize = Spin();` | Wheel: **só dentro de um clique**. Gira, espera parar e devolve a fatia sorteada (repita uma opção para ela sair mais) |
+| `Cell(x, y)` (`.Text`, `.Color`, `.IsEmpty`), `Clear()`, `Columns`, `Rows`, `OnCellClick((x, y) => { })` | Grid: `x` é a coluna e `y` a linha; a casa de cima à esquerda é `(0, 0)` |
 
 Cores com nome (`Color`, combinam com o tema): `White`, `Gray`, `Black`, `Red`, `Pink`, `Orange`, `Gold`, `Green`, `Cyan`,
 `Blue`, `Purple`, `Brown`. Qualquer outra cor: `Color.Hex("#8A2BE2")` ou `Color.Rgb(138, 43, 226)` (no arquivo da tela,
@@ -199,6 +206,7 @@ game.Find("Attack").OnClick(() =>
     enemyHealth -= 7;
     game.Write("Você causou 7 de dano!", Color.Green);
     game.Find("EnemyIcon").Shake();
+    game.Find("EnemyHealth").Pop("-7", Color.Red);   // o número do dano sobe e some
     game.Wait(0.6);                       // a tela mostra o golpe; depois o inimigo responde
     health -= 4;
     game.Write("O goblin revida: -4.", Color.Red);
@@ -228,7 +236,7 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 
 | Chave | Valor |
 |---|---|
-| `type` | `Text`, `Button`, `Bar`, `Image`, `Box`, `Input`, `Messages`, `List` |
+| `type` | `Text`, `Button`, `Bar`, `Image`, `Box`, `Input`, `Messages`, `List`, `Choice`, `Counter`, `Wheel`, `Grid` |
 | `name` | Nome único na tela, em inglês, só letras sem acento, números e `_` (é o nome do `game.Find`/`card.Find`) |
 | `list` | Peça do cartão modelo de uma Lista: o nome da Lista. Aí `x`/`y` contam do canto do cartão |
 | `x`, `y`, `width`, `height` | Posição e tamanho (números) |
@@ -242,6 +250,13 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 | `color` | Uma das cores acima |
 | `shade` | `Normal`, `Dark`, `Light` (tom da cor) |
 | `opacity`, `border`, `corner` | Só Box: preenchimento 0 a 100 (com cor: 25; sem cor: 100), `true`/`false`, `Round`/`Square`/`Circle` |
+| `borderColor`, `borderWidth` | Só Box: cor da borda (liga a borda) e grossura de 1 a 20 |
+| `gradient`, `gradientDirection` | Só Box: segunda cor do degradê e a direção (`Down`, `Right`, `Diagonal`) |
+| `animate` | Só Bar: `true` = anima quando o valor muda |
+| `options`, `selected` | Choice e Wheel: as opções (`["Fácil", "Normal", "Difícil"]`, até 24) e a que começa escolhida |
+| `value`, `min`, `max`, `step` | Counter: o número, os limites e de quanto em quanto ele anda |
+| `columns`, `rows` | Grid: casas por linha e linhas (1 a 20). Choice: `columns` = opções por linha (sem ele, automático) |
+| `locked` | `true` = travada no Estúdio (o mouse não pega no palco). O jogo ignora |
 | `style` | Só Button: `Filled`, `Outline`, `Text` |
 | `shortcut` | Só Button: tecla do mesmo `OnClick` (`Space`, `Enter`, `Escape`, `Up`, `Down`, `Left`, `Right`, `A` a `Z` ou `D0` a `D9`); vazio/null tira |
 | `enabled` | `false` para começar apagado e sem clique (Button, Input, Image) |
@@ -250,6 +265,7 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 | `image` | Só Image: arquivo da pasta `Assets/` |
 | `visible` | `false` para começar escondida (o código mostra com `.Visible = true`) |
 | `background` (no topo) | Imagem de fundo da pasta `Assets/` |
+| `backgroundColor`, `backgroundGradient` (no topo) | Cor do fundo e, se quiser, a cor de baixo do degradê (a imagem fica por cima) |
 
 Dicas para telas bonitas: deixe 40 de margem nas bordas, alinhe as peças pelas mesmas linhas (mesmo `x` ou `y`), use tamanhos parecidos para botões da mesma linha (altura 52) e uma `Box` atrás de grupos de barras.
 Títulos com `"font": "Fantasy"` e `"shadow": true`; a ação principal com botão cheio e as secundárias com `Outline` ou `Text`; retratos com uma `Box` `"corner": "Circle"` atrás de um Texto com emoji grande.

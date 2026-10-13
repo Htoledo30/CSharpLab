@@ -16,8 +16,11 @@ internal sealed record ButtonItem(string Text, Action OnClick);
 
 internal sealed record BarItem(string Label, int Value, int Max, Color Color);
 
-/// <summary>Um movimento curto de uma peça (tremer ou piscar), tocado uma vez quando a tela aparece.</summary>
-internal enum Effect { Shake, Flash }
+/// <summary>Um movimento curto de uma peça (tremer, piscar ou um texto que salta), tocado uma vez quando a tela aparece.</summary>
+internal enum Effect { Shake, Flash, Pop, Spin }
+
+/// <summary>O movimento de uma peça. No Pop: o texto que salta e a cor dele. No Spin: a opção de onde a roleta saiu.</summary>
+internal sealed record PieceEffect(Piece Piece, Effect Effect, string? Text = null, Color? Color = null);
 
 internal sealed class Screen
 {
@@ -54,7 +57,7 @@ internal sealed class Screen
     public IReadOnlyList<MessageLine>? Toast { get; set; }
 
     /// <summary>Peças que tremem ou piscam quando esta tela aparecer.</summary>
-    public List<(Piece Piece, Effect Effect)> Effects { get; } = [];
+    public List<PieceEffect> Effects { get; } = [];
 }
 
 /// <summary>
@@ -69,7 +72,7 @@ internal sealed class DesignedScene
     private readonly Dictionary<string, Item> _items = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<Piece, Item> _byPiece = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<string, Piece> _cardPieces = new(StringComparer.OrdinalIgnoreCase);
-    private readonly List<(Piece Piece, Effect Effect)> _effects = [];
+    private readonly List<PieceEffect> _effects = [];
 
     public DesignedScene(string sceneName, ScreenLayout layout)
     {
@@ -127,9 +130,9 @@ internal sealed class DesignedScene
         foreach (var item in cards.SelectMany(c => c.Items)) _byPiece[item.Piece] = item;
     }
 
-    public void AddEffect(Piece piece, Effect effect) => _effects.Add((piece, effect));
+    public void AddEffect(PieceEffect effect) => _effects.Add(effect);
 
-    public List<(Piece Piece, Effect Effect)> TakeEffects()
+    public List<PieceEffect> TakeEffects()
     {
         var effects = _effects.ToList();
         _effects.Clear();
@@ -149,6 +152,9 @@ internal sealed class DesignedScene
         {
             item.Click = null;
             item.Answer = null;
+            item.Choose = null;
+            item.Change = null;
+            item.CellClick = null;
         }
     }
 }

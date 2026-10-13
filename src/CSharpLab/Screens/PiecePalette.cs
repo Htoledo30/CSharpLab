@@ -32,6 +32,10 @@ public sealed class PiecePalette : Border
         (PieceType.Input, "Uma pergunta com campo para o jogador escrever: OnAnswer(answer => { });"),
         (PieceType.Messages, "Onde aparecem os textos do game.Write, com as mensagens antigas apagadinhas."),
         (PieceType.List, "Um cartão que se repete para cada item (loja, inventário): game.Find(\"Nome\").Show(items, (card, item) => { });"),
+        (PieceType.Choice, "Uma opção entre várias (dificuldade, classe, resposta de quiz): game.Find(\"Nome\").OnChoose(choice => { });"),
+        (PieceType.Counter, "Um número com − e + (quantidade na loja, aposta, pontos): game.Find(\"Nome\").Value"),
+        (PieceType.Wheel, "Uma roleta da sorte (prêmios, eventos): string prize = game.Find(\"Nome\").Spin();"),
+        (PieceType.Grid, "Casas em linhas e colunas (jogo da velha, memória, tabuleiro): game.Find(\"Nome\").Cell(x, y).Text = \"X\";"),
     ];
 
     public PiecePalette(ScreenDesignerModel model)
@@ -198,6 +202,30 @@ public sealed class PiecePalette : Border
                 Add(new Rectangle { Width = 12, Height = 2, Fill = light }, 4, 4);
                 Add(new Rectangle { Width = 2, Height = 4, Fill = B(0xF2, 0xC1, 0x4E) }, 4, 8);
                 Add(new Rectangle { Width = 9, Height = 2, Fill = muted }, 7, 9);
+                break;
+            case PieceType.Choice:
+                // Três opções: a do meio escolhida.
+                Add(new Rectangle { Width = 6, Height = 10, RadiusX = 2, RadiusY = 2, Stroke = B(0x3D, 0x7B, 0xE8), StrokeThickness = 1.2 }, 0, 3);
+                Add(new Rectangle { Width = 7, Height = 10, RadiusX = 2, RadiusY = 2, Fill = B(0x3D, 0x7B, 0xE8) }, 7.5, 3);
+                Add(new Rectangle { Width = 6, Height = 10, RadiusX = 2, RadiusY = 2, Stroke = B(0x3D, 0x7B, 0xE8), StrokeThickness = 1.2 }, 16, 3);
+                break;
+            case PieceType.Counter:
+                Add(new Rectangle { Width = 6, Height = 10, RadiusX = 2, RadiusY = 2, Fill = B(0x3D, 0x7B, 0xE8) }, 0, 3);
+                Add(new Rectangle { Width = 4, Height = 1.6, Fill = Brushes.White }, 1, 7.2);
+                Add(new TextBlock { Text = "3", FontSize = 11, FontWeight = FontWeights.Bold, Foreground = light }, 8.2, 1);
+                Add(new Rectangle { Width = 6, Height = 10, RadiusX = 2, RadiusY = 2, Fill = B(0x3D, 0x7B, 0xE8) }, 16, 3);
+                Add(new Rectangle { Width = 4, Height = 1.6, Fill = Brushes.White }, 17, 7.2);
+                Add(new Rectangle { Width = 1.6, Height = 4, Fill = Brushes.White }, 18.2, 6);
+                break;
+            case PieceType.Wheel:
+                Add(new Ellipse { Width = 15, Height = 15, Fill = B(0xE8, 0x6A, 0x4E) }, 3.5, 0.5);
+                Add(new Path { Data = Geometry.Parse("M 7.5,7.5 L 7.5,0 A 7.5,7.5 0 0 1 15,7.5 Z M 7.5,7.5 L 7.5,15 A 7.5,7.5 0 0 1 0,7.5 Z"), Fill = B(0xF2, 0xC1, 0x4E) }, 3.5, 0.5);
+                Add(new Polygon { Points = [new(8, 0), new(14, 0), new(11, 4)], Fill = light }, 0, -1);
+                break;
+            case PieceType.Grid:
+                for (int row = 0; row < 3; row++)
+                    for (int column = 0; column < 3; column++)
+                        Add(new Rectangle { Width = 4.4, Height = 4.4, RadiusX = 1, RadiusY = 1, Fill = row == 1 && column == 1 ? B(0x5C, 0xCB, 0x7A) : muted }, 4 + column * 5, 0.5 + row * 5);
                 break;
         }
         return canvas;

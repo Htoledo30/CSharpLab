@@ -170,6 +170,22 @@ public sealed partial class Game
     }
 
     /// <summary>
+    /// BackgroundColor = cor do fundo da tela desenhada. Começa com a escolhida no Estúdio; null volta para a do tema.
+    /// Se a tela tem imagem de fundo, a imagem fica por cima da cor.
+    /// </summary>
+    /// <example><code>game.BackgroundColor = health &lt; 5 ? Color.Hex("#3A0D0D") : null;</code></example>
+    public Color? BackgroundColor
+    {
+        get => _designed?.Layout.BackgroundColor;
+        set
+        {
+            var scene = _designed ?? throw new GameException(
+                "game.BackgroundColor é o fundo de uma tela desenhada. Esta cena não tem tela: crie em Arquivo → Nova tela do jogo….");
+            scene.Layout.BackgroundColor = value;
+        }
+    }
+
+    /// <summary>
     /// Wait = esperar. Dentro de um clique, mostra a tela como está e espera um pouco antes de continuar:
     /// você ataca, a tela mostra o golpe e o inimigo responde logo depois. O jogador não clica durante a pausa.
     /// </summary>
@@ -194,6 +210,33 @@ public sealed partial class Game
                 "game.Find(\"Attack\").OnClick(() => { ...; game.Wait(0.6); ... });");
         if (double.IsNaN(seconds) || seconds < 0 || seconds > MaxWait)
             throw new GameException($"game.Wait espera de 0 a {MaxWait} segundos (veio {seconds}). Para meio segundo: game.Wait(0.5);");
+        ShowAndPause(seconds);
+    }
+
+    /// <summary>Quanto o Spin espera: a roleta girando e um instantinho parada na fatia sorteada.</summary>
+    private const double SpinSeconds = 3.4;
+
+    /// <summary>A Roleta: sorteia uma fatia, mostra ela girando até lá e devolve o texto dela (Item.Spin).</summary>
+    internal string SpinWheel(Item wheel)
+    {
+        if (!_started || _building != null || !_inAction)
+            throw new GameException(
+                $"O Spin gira a roleta dentro de um clique, para o jogador ver: game.Find(\"SpinButton\").OnClick(() => {{ string prize = game.Find(\"{wheel.Name}\").Spin(); ... }});");
+        var piece = wheel.Piece;
+        var options = piece.OptionList;
+        if (options.Count == 0)
+            throw new GameException($"A roleta \"{wheel.Name}\" não tem opções. No Estúdio, escreva as opções dela (uma por linha), ou no código: .Options = [\"10 moedas\", \"Nada\"];");
+        var before = piece.SelectedOption;
+        var result = options[Random.Shared.Next(options.Count)];
+        piece.Selected = result;
+        _designed?.AddEffect(new PieceEffect(piece, Effect.Spin, before));
+        ShowAndPause(SpinSeconds);
+        return result;
+    }
+
+    /// <summary>Mostra a tela como está (o que o clique já fez) e espera, sem cliques do jogador.</summary>
+    private void ShowAndPause(double seconds)
+    {
         // Mostra o que o clique já fez (inclusive a troca de cena) antes da pausa.
         if (_pendingScene != null)
         {
@@ -533,8 +576,40 @@ public sealed partial class Game
         Act(() => Write($"O campo \"{piece.Name}\" ainda não faz nada com a resposta. Na cena, escreva: {find}(\"{piece.Name}\").OnAnswer(answer => {{ ... }});", Color.Gray));
     }
 
-    /// <summary>A peça tem OnClick no código (só essas ganham a mãozinha do mouse, no caso das imagens).</summary>
-    internal bool IsClickable(Piece piece) => ItemFor(piece)?.Click != null;
+    /// <summary>O jogador escolheu uma opção da Escolha: ela fica escolhida e o OnChoose roda (se tiver).</summary>
+    internal void ChoosePiece(Piece piece, string option)
+    {
+        if (!piece.Enabled || _inAction || _closed) return;
+        piece.Selected = option;
+        var choose = ItemFor(piece)?.Choose;
+        Act(() => choose?.Invoke(option));
+    }
+
+    /// <summary>O jogador apertou o − ou o + do Contador: o número anda um passo e o OnChange roda (se tiver).</summary>
+    internal void StepPiece(Piece piece, int direction)
+    {
+        if (!piece.Enabled || _inAction || _closed) return;
+        int next = Math.Clamp(piece.CounterValue + Math.Sign(direction) * piece.CounterStep, piece.CounterMin, piece.CounterMax);
+        if (next == piece.CounterValue) return;
+        piece.Value = next;
+        var change = ItemFor(piece)?.Change;
+        Act(() => change?.Invoke(next));
+    }
+
+    /// <summary>Clique numa casa da Grade: roda o OnCellClick, ou explica que ele ainda falta.</summary>
+    internal void ClickCell(Piece piece, int x, int y)
+    {
+        if (!piece.Enabled) return;
+        if (ItemFor(piece)?.CellClick is { } click)
+        {
+            Act(() => click(x, y));
+            return;
+        }
+        Act(() => Write($"A grade \"{piece.Name}\" ainda não faz nada. Na cena, escreva: game.Find(\"{piece.Name}\").OnCellClick((x, y) => {{ ... }});", Color.Gray));
+    }
+
+    /// <summary>A peça tem o clique ligado no código (OnClick; na Grade, OnCellClick): só essas ganham a mãozinha do mouse.</summary>
+    internal bool IsClickable(Piece piece) => piece.Type == PieceType.Grid ? ItemFor(piece)?.CellClick != null : ItemFor(piece)?.Click != null;
 
     /// <summary>Os cartões que o Show pôs na Lista (para desenhar).</summary>
     internal IReadOnlyList<Card> CardsOf(Piece list) => _designed?.CardsOf(list) ?? [];

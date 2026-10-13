@@ -303,6 +303,8 @@ public static partial class PortugueseDocs
 
         m[game + ".Background"] = D("Background = fundo. A imagem de fundo da tela desenhada (pasta Assets). Mude pelo código para a mesma tela servir a lugares diferentes.",
             "game.Background = \"tower.png\";");
+        m[game + ".BackgroundColor"] = D("BackgroundColor = cor do fundo da tela desenhada. Começa com a escolhida no Estúdio; null volta para a do tema. A imagem de fundo, se tiver, fica por cima.",
+            "game.BackgroundColor = Color.Hex(\"#3A0D0D\");");
         m[game + ".OnEnter"] = D("OnEnter = ao entrar. Roda uma vez cada vez que o jogador chega na cena, e não nos cliques dentro dela. Use para preparar a visita: sortear o inimigo, dar a recompensa da chegada.",
             "game.OnEnter(() =>\n{\n    enemyHealth = 30;\n    game.Write(\"Um goblin aparece!\");\n});");
         m[game + ".Wait"] = D("Wait = esperar. Dentro de um clique, mostra a tela como está e espera um pouco (em segundos) antes de continuar: você ataca e o inimigo responde logo depois.",
@@ -339,8 +341,8 @@ public static partial class PortugueseDocs
         m[item + ".Name"] = D("Name = nome. O nome da peça no Estúdio.");
         m[item + ".Text"] = D("Text = texto. O texto de um Texto ou Botão, o rótulo de uma Barra ou a pergunta de um Campo de escrita.",
             "game.Find(\"Story\").Text = $\"Ouro: {gold}\";");
-        m[item + ".Value"] = D("Value = valor. Quanto a Barra tem agora.", "game.Find(\"PlayerHealth\").Value = health;");
-        m[item + ".Max"] = D("Max = máximo. O valor da Barra cheia.", "game.Find(\"PlayerHealth\").Max = maxHealth;");
+        m[item + ".Value"] = D("Value = valor. Quanto a Barra tem agora, ou o número do Contador.", "game.Find(\"PlayerHealth\").Value = health;");
+        m[item + ".Max"] = D("Max = máximo. O valor da Barra cheia, ou o maior número do Contador.", "game.Find(\"PlayerHealth\").Max = maxHealth;");
         m[item + ".Visible"] = D("Visible = visível. false esconde a peça; true mostra de novo.", "game.Find(\"Potion\").Visible = potions > 0;");
         m[item + ".Color"] = D("Color = cor. A cor do texto, do botão, da barra ou da caixa.", "game.Find(\"Story\").Color = Color.Red;");
         m[item + ".Image"] = D("Image = imagem. O arquivo da pasta Assets que a peça Imagem mostra.", "game.Find(\"Enemy\").Image = \"dragon.png\";");
@@ -359,6 +361,14 @@ public static partial class PortugueseDocs
         m[item + ".Shade"] = D("Shade = tom. A cor mais escura (Shade.Dark) ou mais clara (Shade.Light).", "game.Find(\"BossFrame\").Shade = Shade.Dark;");
         m[item + ".Opacity"] = D("Opacity = preenchimento da Caixa, de 0 (invisível) a 100 (cheia).", "game.Find(\"Panel\").Opacity = 60;");
         m[item + ".Border"] = D("Border = borda. true mostra a borda da Caixa; false tira.", "game.Find(\"Panel\").Border = true;");
+        m[item + ".BorderColor"] = D("BorderColor = cor da borda da Caixa. Escolher uma cor já liga a borda.", "game.Find(\"Panel\").BorderColor = Color.Gold;");
+        m[item + ".BorderWidth"] = D("BorderWidth = grossura da borda da Caixa, de 1 (fininha) a 20.", "game.Find(\"Panel\").BorderWidth = 3;");
+        m[item + ".Gradient"] = D("Gradient = degradê. A segunda cor da Caixa: ela vai da cor dela (Color) até esta. null volta a ter uma cor só.",
+            "game.Find(\"Sky\").Gradient = Color.Hex(\"#1A4F9C\");");
+        m[item + ".GradientDirection"] = D("GradientDirection = direção do degradê da Caixa: GradientDirection.Down (de cima para baixo), Right (para o lado) ou Diagonal.",
+            "game.Find(\"Sky\").GradientDirection = GradientDirection.Right;");
+        m[item + ".Animate"] = D("Animate = animar. true: quando o Value muda, a Barra desliza até o valor novo e mostra por um instante o pedaço perdido (como nos jogos de luta).",
+            "game.Find(\"EnemyHealth\").Animate = true;");
         m[item + ".Corner"] = D("Corner = canto. Cantos da Caixa, do Botão e da Barra: Corner.Round (redondos), Corner.Square (retos) ou Corner.Circle (na Caixa, círculo; no Botão e na Barra, pontas redondas como uma pílula).",
             "game.Find(\"Portrait\").Corner = Corner.Circle;");
         m[item + ".Font"] = D("Font = fonte, o desenho das letras: Font.Normal, Fantasy (fantasia), Book (livro), Hand (à mão), Strong (forte), Classic (clássica), Elegant (elegante), Fun (divertida), Retro (retrô) ou Tech (técnica).",
@@ -372,7 +382,7 @@ public static partial class PortugueseDocs
             "game.Find(\"Back\").Style = ButtonStyle.Text;");
         m[item + ".Write"] = D("Write = escrever. Escreve uma mensagem só nesta caixa de Mensagens (o game.Write escreve em todas que recebem o game.Write). Bom para uma caixa com o que você faz e outra com o que o inimigo faz.",
             "game.Find(\"PlayerLog\").Write($\"Você causou {damage} de dano.\", Color.Green);\ngame.Find(\"EnemyLog\").Write($\"O goblin causou {hit} de dano.\", Color.Red);");
-        m[item + ".Clear"] = D("Clear = limpar. Apaga só as mensagens escritas nesta caixa de Mensagens (o game.Clear apaga todas).", "game.Find(\"EnemyLog\").Clear();");
+        m[item + ".Clear"] = D("Clear = limpar. Na Grade, apaga todas as casas. Nas Mensagens, apaga só as mensagens escritas nesta caixa (o game.Clear apaga todas).", "game.Find(\"Board\").Clear();");
         m[item + ".GameWrite"] = D("GameWrite = recebe o game.Write. false: a caixa de Mensagens mostra só o que for escrito nela com game.Find(\"Nome\").Write.",
             "game.Find(\"EnemyLog\").GameWrite = false;");
         m[item + ".TextShadow"] = D("TextShadow = sombra nas letras do Botão (o Shadow do botão é a sombra embaixo dele inteiro).", "game.Find(\"Attack\").TextShadow = true;");
@@ -385,8 +395,38 @@ public static partial class PortugueseDocs
         m[item + ".Show"] = D("Show = mostrar. Enche a Lista com um cartão para cada item; entre as chaves, você diz o que vai em cada cartão.",
             "game.Find(\"Weapons\").Show(weapons, (card, weapon) =>\n{\n    card.Find(\"Name\").Text = weapon.Name;\n    card.Find(\"Buy\").OnClick(() => Buy(weapon));\n});");
         m[item + ".Shake"] = D("Shake = tremer. A peça treme um pouquinho (bom para quem levou um golpe).", "game.Find(\"EnemyIcon\").Shake();");
+        m[item + ".Min"] = D("Min = mínimo. O menor número do Contador (o − para nele).", "game.Find(\"Amount\").Min = 1;");
+        m[item + ".Step"] = D("Step = passo. De quanto em quanto o Contador anda a cada clique no − ou no +.", "game.Find(\"Bet\").Step = 10;");
+        m[item + ".Options"] = D("Options = opções. As opções da Escolha ou as fatias da Roleta. Para uma fatia sair mais vezes, repita ela.",
+            "game.Find(\"Class\").Options = [\"Guerreiro\", \"Mago\", \"Arqueiro\"];");
+        m[item + ".Selected"] = D("Selected = escolhida. Na Escolha, a opção que o jogador escolheu (\"\" se nenhuma); na Roleta, onde a seta parou.",
+            "if (game.Find(\"Difficulty\").Selected == \"Difícil\") enemyHealth *= 2;");
+        m[item + ".OnChoose"] = D("OnChoose = ao escolher. O código entre as chaves roda quando o jogador escolhe uma opção da Escolha; choice é a opção.",
+            "game.Find(\"Class\").OnChoose(choice =>\n{\n    heroClass = choice;\n});");
+        m[item + ".OnChange"] = D("OnChange = ao mudar. O código entre as chaves roda quando o jogador aperta o − ou o + do Contador; value é o número novo.",
+            "game.Find(\"Amount\").OnChange(value =>\n{\n    game.Find(\"Total\").Text = $\"Total: {value * price}\";\n});");
+        m[item + ".Spin"] = D("Spin = girar. Gira a Roleta, espera parar e devolve a fatia sorteada. Só dentro de um clique (o OnClick de um botão).",
+            "string prize = game.Find(\"Wheel\").Spin();\ngame.Write($\"Você ganhou: {prize}!\");");
+        m[item + ".Columns"] = D("Columns = colunas. Na Grade, quantas casas por linha (1 a 20); na Escolha, quantas opções por linha.", "game.Find(\"Board\").Columns = 4;");
+        m[item + ".Rows"] = D("Rows = linhas. Quantas linhas de casas a Grade tem (1 a 20).", "game.Find(\"Board\").Rows = 4;");
+        m[item + ".Cell"] = D("Cell = casa. A casa (x, y) da Grade: x é a coluna e y é a linha (a de cima à esquerda é 0, 0). Depois mude o Text e a Color dela.",
+            "game.Find(\"Board\").Cell(x, y).Text = \"X\";");
+        m[item + ".OnCellClick"] = D("OnCellClick = ao clicar numa casa. O código entre as chaves roda quando o jogador clica numa casa da Grade; x é a coluna e y a linha.",
+            "game.Find(\"Board\").OnCellClick((x, y) =>\n{\n    game.Find(\"Board\").Cell(x, y).Text = \"X\";\n});");
+        m[item + ".Pop"] = D("Pop = saltar. Um texto aparece em cima da peça, sobe e some: o dano, a cura, o ouro ganho. A cor é opcional.",
+            "game.Find(\"EnemyHealth\").Pop($\"-{damage}\", Color.Red);");
         m[item + ".Flash"] = D("Flash = piscar. A peça pisca rapidinho (bom para dano, cura ou algo que mudou).", "game.Find(\"PlayerHealth\").Flash();");
         m[item + ".ToString"] = D("Mostra o nome e o tipo da peça, como \"Attack (Botão)\".");
+
+        const string cell = "CSharpLab.GameEngine.Cell";
+        m[cell] = D("Cell = casa. Uma casa da Grade, pega com game.Find(\"Board\").Cell(x, y). Mude o Text e a Color dela.",
+            "var cell = game.Find(\"Board\").Cell(1, 2);\nif (cell.IsEmpty) cell.Text = \"X\";");
+        m[cell + ".X"] = D("X = a coluna da casa (0 é a da esquerda).");
+        m[cell + ".Y"] = D("Y = a linha da casa (0 é a de cima).");
+        m[cell + ".Text"] = D("Text = texto. O que aparece na casa (\"X\", \"O\", um número…). \"\" apaga.", "game.Find(\"Board\").Cell(x, y).Text = \"X\";");
+        m[cell + ".Color"] = D("Color = cor. A cor da casa (null volta para a cor da Grade).", "game.Find(\"Board\").Cell(x, y).Color = Color.Green;");
+        m[cell + ".IsEmpty"] = D("IsEmpty = está vazia. true quando a casa não tem texto.", "if (game.Find(\"Board\").Cell(x, y).IsEmpty) { ... }");
+        m[cell + ".ToString"] = D("Mostra a casa e o texto dela, como \"Casa (1, 2): X\".");
 
         const string card = "CSharpLab.GameEngine.Card";
         m[card] = D("Card = cartão. Um cartão da Lista: uma cópia do cartão modelo para cada item. Chega pronto dentro do Show.",
@@ -452,6 +492,12 @@ public static partial class PortugueseDocs
         m[engine + "BarText.Above"] = D("Above = em cima: \"Vida\" e \"30 / 50\" em cima da barra (o normal).");
         m[engine + "BarText.Inside"] = D("Inside = dentro: o nome e o número dentro da barra, como nos jogos de luta.");
         m[engine + "BarText.None"] = D("None = nenhum: só a barra, sem texto.");
+
+        m[engine + "GradientDirection"] = D("GradientDirection = direção do degradê da Caixa: Down (de cima para baixo), Right (para o lado) ou Diagonal.",
+            "game.Find(\"Sky\").GradientDirection = GradientDirection.Right;");
+        m[engine + "GradientDirection.Down"] = D("Down = para baixo: a cor da caixa em cima, a do degradê embaixo (o normal).");
+        m[engine + "GradientDirection.Right"] = D("Right = para a direita: a cor da caixa à esquerda, a do degradê à direita.");
+        m[engine + "GradientDirection.Diagonal"] = D("Diagonal: do canto de cima à esquerda até o canto de baixo à direita.");
 
         m[engine + "GameException"] = D("Erro do motor do jogo. A mensagem explica em português o que fazer.");
     }

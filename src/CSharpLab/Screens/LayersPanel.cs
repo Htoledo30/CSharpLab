@@ -9,6 +9,7 @@ namespace CSharpLab.Screens;
 /// <summary>
 /// Camadas: todas as peças da tela, da frente (em cima) para trás (embaixo). Clicar seleciona, mesmo uma
 /// peça escondida atrás de outra; arrastar uma linha muda a ordem (quem fica na frente de quem).
+/// Em cada linha, o olho esconde a peça só aqui no Estúdio e o cadeado trava ela no palco.
 /// </summary>
 public sealed class LayersPanel : DockPanel
 {
@@ -149,10 +150,26 @@ public sealed class LayersPanel : DockPanel
         var line = new DockPanel { LastChildFill = true };
         DockPanel.SetDock(icon, Dock.Left);
         line.Children.Add(icon);
+
+        // O cadeado e o olho: aparecem com o mouse em cima da linha, ou sempre quando estão ligados.
+        bool locked = piece.Locked;
+        bool hiddenHere = _model?.IsHiddenHere(piece.Name) == true;
+        var lockButton = RowToggle(locked ? "\uE72E" : "\uE785", locked,
+            locked ? "Travada: o mouse não pega nem arrasta no palco. Clique para destravar."
+                   : "Travar: o mouse não pega mais esta peça no palco (bom para fundos e molduras). O jogo não muda.",
+            () => _model?.SetLocked(piece.Name, !locked));
+        var eyeButton = RowToggle(hiddenHere ? "\uED1A" : "\uE7B3", hiddenHere,
+            hiddenHere ? "Escondida só aqui no Estúdio (no jogo ela aparece). Clique para mostrar."
+                       : "Esconder só aqui no Estúdio, para mexer no que está atrás. No jogo ela continua aparecendo.",
+            () => _model?.SetHiddenHere(piece.Name, !hiddenHere));
+        DockPanel.SetDock(lockButton, Dock.Right);
+        DockPanel.SetDock(eyeButton, Dock.Right);
+        line.Children.Add(lockButton);
+        line.Children.Add(eyeButton);
         if (!piece.Visible)
         {
-            var hidden = new TextBlock { Text = "\uED1A", FontSize = 11, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0), ToolTip = "Começa escondida no jogo (Visible = false)" };
-            hidden.SetResourceReference(TextBlock.FontFamilyProperty, "IconFont");
+            // Começa escondida no jogo: um aviso em palavras (o olho é só do Estúdio).
+            var hidden = new TextBlock { Text = "oculta", FontSize = 10.5, FontStyle = FontStyles.Italic, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 4, 0), ToolTip = "Começa escondida no jogo (Visible = false); o código mostra com .Visible = true" };
             hidden.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             DockPanel.SetDock(hidden, Dock.Right);
             line.Children.Add(hidden);
@@ -178,8 +195,15 @@ public sealed class LayersPanel : DockPanel
             ToolTip = $"{Piece.Describe(piece.Type)} \"{piece.Name}\"" + (depth > 0 ? $" (no cartão da Lista \"{piece.List}\")" : ""),
         };
         System.Windows.Automation.AutomationProperties.SetName(row, $"Camada {piece.Name}");
-        row.MouseEnter += (_, _) => { if (!_dragging) Paint(row, piece, hover: true); };
-        row.MouseLeave += (_, _) => Paint(row, piece, hover: false);
+        if (hiddenHere) line.Opacity = 0.55;
+        void ShowToggles(bool show)
+        {
+            lockButton.Visibility = show || locked ? Visibility.Visible : Visibility.Hidden;
+            eyeButton.Visibility = show || hiddenHere ? Visibility.Visible : Visibility.Hidden;
+        }
+        ShowToggles(false);
+        row.MouseEnter += (_, _) => { if (!_dragging) Paint(row, piece, hover: true); ShowToggles(true); };
+        row.MouseLeave += (_, _) => { Paint(row, piece, hover: false); ShowToggles(false); };
         row.MouseLeftButtonDown += (_, e) =>
         {
             if (_model == null) return;
@@ -199,10 +223,28 @@ public sealed class LayersPanel : DockPanel
         return row;
     }
 
+    /// <summary>O cadeado ou o olho de uma linha. Clicar nele não seleciona a linha nem começa a arrastar.</summary>
+    private static Border RowToggle(string glyph, bool on, string tip, Action click)
+    {
+        var text = new TextBlock { Text = glyph, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        text.SetResourceReference(TextBlock.FontFamilyProperty, "IconFont");
+        text.SetResourceReference(TextBlock.ForegroundProperty, on ? "Accent" : "TextMuted");
+        var button = new Border { Child = text, Width = 22, Height = 22, CornerRadius = new CornerRadius(4), Background = Brushes.Transparent, ToolTip = tip, Cursor = Cursors.Hand };
+        System.Windows.Automation.AutomationProperties.SetName(button, tip);
+        button.MouseEnter += (_, _) => button.SetResourceReference(Border.BackgroundProperty, "BgActive");
+        button.MouseLeave += (_, _) => button.Background = Brushes.Transparent;
+        button.MouseLeftButtonDown += (_, e) =>
+        {
+            e.Handled = true;
+            click();
+        };
+        return button;
+    }
+
     /// <summary>O texto da peça (para achar "qual é qual"), ou o tipo dela.</summary>
     private static string Detail(Piece piece)
     {
-        var text = piece.Text?.ReplaceLineEndings(" ").Trim();
+        var text = piece.Options is { Count: > 0 } options ? string.Join(", ", options) : piece.Text?.ReplaceLineEndings(" ").Trim();
         if (string.IsNullOrEmpty(text)) return Piece.Describe(piece.Type).ToLowerInvariant();
         return text.Length > 28 ? "\"" + text[..27] + "…\"" : "\"" + text + "\"";
     }

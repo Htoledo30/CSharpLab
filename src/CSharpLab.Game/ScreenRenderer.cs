@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Markup;
+using System.Windows.Media.Animation;
 using System.Windows.Media;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
@@ -40,13 +41,24 @@ internal sealed class RenderContext
     public Action<Piece, FrameworkElement>? Created { get; init; }
     /// <summary>Onde estava a rolagem de cada Lista, para ela não voltar para o topo a cada clique.</summary>
     public Dictionary<string, double>? ScrollOffsets { get; init; }
+    /// <summary>
+    /// Quanto a barra mostrava antes deste desenho (de 0 a 1), para a barra com "animate" deslizar do valor antigo
+    /// até o novo (no jogo, e no "▶ Ver" do Estúdio). Null: a barra aparece direto no valor.
+    /// </summary>
+    public Func<Piece, double?>? BarBefore { get; init; }
+    /// <summary>No jogo: o jogador escolheu uma opção da Escolha.</summary>
+    public Action<Piece, string>? Choose { get; init; }
+    /// <summary>No jogo: o jogador apertou o − (-1) ou o + (+1) do Contador.</summary>
+    public Action<Piece, int>? Step { get; init; }
+    /// <summary>No jogo: o jogador clicou na casa (x, y) da Grade.</summary>
+    public Action<Piece, int, int>? CellClick { get; init; }
 }
 
 /// <summary>
 /// Desenha cada peça de uma tela desenhada. Usado pela janela do jogo e pelo Estúdio do CSharp Lab:
 /// o mesmo código, o mesmo resultado.
 /// </summary>
-internal static class ScreenRenderer
+internal static partial class ScreenRenderer
 {
     /// <summary>A peça desenhada no tamanho dela (quem chama posiciona em X e Y).</summary>
     public static FrameworkElement Create(Piece piece, RenderContext context)
@@ -55,12 +67,16 @@ internal static class ScreenRenderer
         {
             PieceType.Text => TextPiece(piece),
             PieceType.Button => ButtonPiece(piece, context),
-            PieceType.Bar => BarPiece(piece),
+            PieceType.Bar => BarPiece(piece, piece.Animate == true ? context.BarBefore?.Invoke(piece) : null),
             PieceType.Image => ImagePiece(piece, context),
             PieceType.Box => BoxPiece(piece),
             PieceType.Input => InputPiece(piece, context),
             PieceType.Messages => MessagesPiece(piece, context),
             PieceType.List => ListPiece(piece, context),
+            PieceType.Choice => ChoicePiece(piece, context),
+            PieceType.Counter => CounterPiece(piece, context),
+            PieceType.Wheel => WheelPiece(piece),
+            PieceType.Grid => GridPiece(piece, context),
             _ => new Border(),
         };
         element.Width = Math.Max(1, piece.Width);
@@ -79,23 +95,27 @@ internal static class ScreenRenderer
         PieceType.Text => piece.Scroll != true,
         PieceType.Box or PieceType.Bar => true,
         PieceType.Image => !(context.Click != null && piece.Enabled && context.IsClickable?.Invoke(piece) == true),
+        PieceType.Wheel => true,
+        PieceType.Grid => !(context.CellClick != null && piece.Enabled && context.IsClickable?.Invoke(piece) == true),
         _ => false,
     };
 
-    /// <summary>Fundo da tela (imagem da pasta Assets cobrindo o palco inteiro). Null sem fundo.</summary>
+    /// <summary>
+    /// Fundo da tela: a cor (ou o degradê de cima para baixo) e, por cima, a imagem da pasta Assets cobrindo o
+    /// palco inteiro. Null sem nada escolhido (aí aparece o fundo do tema).
+    /// </summary>
     public static FrameworkElement? Background(ScreenLayout layout)
     {
-        if (layout.Background == null) return null;
-        var image = Theme.LoadImage(layout.Background);
-        if (image == null) return null;
-        return new WpfImage
+        var image = layout.Background != null ? Theme.LoadImage(layout.Background) : null;
+        if (image == null && layout.BackgroundColor == null && layout.BackgroundGradient == null) return null;
+        var root = new Grid { Width = ScreenLayout.Width, Height = ScreenLayout.Height, IsHitTestVisible = false };
+        if (layout.BackgroundColor != null || layout.BackgroundGradient != null)
         {
-            Source = image,
-            Stretch = Stretch.UniformToFill,
-            Width = ScreenLayout.Width,
-            Height = ScreenLayout.Height,
-            IsHitTestVisible = false,
-        };
+            var top = layout.BackgroundColor is { } color ? Theme.Rgb(color) : Theme.Current.Background;
+            root.Background = layout.BackgroundGradient is { } bottom ? Theme.Vertical(top, Theme.Rgb(bottom)) : Theme.Freeze(top);
+        }
+        if (image != null) root.Children.Add(new WpfImage { Source = image, Stretch = Stretch.UniformToFill });
+        return root;
     }
 
     private static TextBlock Label(Piece piece, string text, Brush? foreground = null) => new()
@@ -179,12 +199,22 @@ internal static class ScreenRenderer
     /// <summary>Espaço dos lados do texto dentro do botão (o modelo do botão tem 18 de cada lado).</summary>
     private const double ButtonPadding = 36;
 
+    /// <summary>A barra mais fina que ainda aparece embaixo do nome e do número.</summary>
+    private const double MinTrack = 6;
+
     /// <summary>
     /// O texto cabe na peça? Para um Texto, a altura que ele precisa; para um Botão, a largura (o texto do
-    /// botão fica numa linha só e, sem espaço, termina em "…"). Null quando cabe, ou quando o Texto tem rolagem.
+    /// botão fica numa linha só e, sem espaço, termina em "…"); para uma Barra com o nome em cima, a altura para
+    /// o nome e a barra embaixo dele (baixa demais, a barra some). Null quando cabe, ou quando o Texto tem rolagem.
     /// </summary>
     public static TextFit? Overflow(Piece piece)
     {
+        if (piece.Type == PieceType.Bar)
+        {
+            if ((piece.BarText ?? BarText.Above) != BarText.Above) return null;
+            double needed = Math.Ceiling(BarHeaderHeight(piece) + MinTrack);
+            return needed > piece.Height + 0.5 ? new TextFit(piece.Width, needed) : null;
+        }
         if (string.IsNullOrEmpty(piece.Text)) return null;
         switch (piece.Type)
         {
@@ -208,6 +238,19 @@ internal static class ScreenRenderer
                 return null;
         }
     }
+
+    /// <summary>A altura da linha do nome e do número em cima da barra (com o espaço até a barra).</summary>
+    private static double BarHeaderHeight(Piece piece)
+    {
+        var font = piece.Font ?? Theme.Current.BodyFont;
+        var name = new TextBlock { Text = string.IsNullOrEmpty(piece.Text) ? "Vida" : piece.Text, FontFamily = Theme.FontOf(font), FontSize = piece.FontSize * Theme.FontScale(font) };
+        name.FontWeight = piece.IsBold ? FontWeights.SemiBold : FontWeights.Normal;
+        name.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        return name.DesiredSize.Height + BarHeaderGap;
+    }
+
+    /// <summary>O espaço entre o nome da barra e a barra.</summary>
+    private const double BarHeaderGap = 5;
 
     private static TextBlock ButtonLabel(Piece piece, Brush foreground)
     {
@@ -235,10 +278,15 @@ internal static class ScreenRenderer
 
     // ------------------------------------------------------------------ barras
 
-    private static FrameworkElement BarPiece(Piece piece)
+    /// <summary>Quanto da barra está cheio, de 0 a 1.</summary>
+    public static double BarFraction(Piece piece) => Math.Clamp((double)piece.BarValue / piece.BarMax, 0, 1);
+
+    /// <summary><paramref name="before"/>: quanto ela mostrava antes (barra animada); null aparece direto no valor.</summary>
+    private static FrameworkElement BarPiece(Piece piece, double? before = null)
     {
         int max = piece.BarMax, value = piece.BarValue;
-        double fraction = Math.Clamp((double)value / max, 0, 1);
+        double fraction = BarFraction(piece);
+        if (before is { } b && Math.Abs(b - fraction) < 0.0005) before = null;
         var style = piece.BarStyle ?? BarStyle.Smooth;
         var place = piece.BarText ?? BarText.Above;
         var color = Theme.Rgb(piece.Color ?? Color.Green, piece.Shade);
@@ -248,7 +296,7 @@ internal static class ScreenRenderer
         // Em cima: o nome e o número numa linha, a barra embaixo. Dentro ou sem texto: a barra ocupa a peça toda.
         double trackHeight = place == BarText.Above ? Math.Clamp(piece.Height - 27, 6, 28) : Math.Max(4, piece.Height);
         var corners = piece.Corner == Corner.Square ? new CornerRadius(2) : new CornerRadius(trackHeight / 2);
-        var track = style == BarStyle.Blocks ? BlocksTrack(piece, fraction, color, trackHeight) : FillTrack(style, fraction, color, trackHeight, corners);
+        var track = style == BarStyle.Blocks ? BlocksTrack(piece, fraction, color, trackHeight, before) : FillTrack(style, fraction, color, trackHeight, corners, before);
 
         if (place == BarText.Above)
         {
@@ -257,7 +305,7 @@ internal static class ScreenRenderer
             amount.FontWeight = FontWeights.Normal;
             if (piece.TextColor != null) amount.Opacity = 0.75;
             var header = BarLine(name, amount, piece.LetterAlign);
-            header.Margin = new Thickness(0, 0, 0, 5);
+            header.Margin = new Thickness(0, 0, 0, BarHeaderGap);
             track.VerticalAlignment = VerticalAlignment.Top;
             var panel = new DockPanel { LastChildFill = true };
             DockPanel.SetDock(header, Dock.Top);
@@ -305,8 +353,22 @@ internal static class ScreenRenderer
         return line;
     }
 
-    /// <summary>A barra inteira: o fundo e a parte cheia por cima (lisa ou com brilho).</summary>
-    private static FrameworkElement FillTrack(BarStyle style, double fraction, System.Windows.Media.Color color, double height, CornerRadius corners)
+    /// <summary>Quanto tempo a barra animada leva para deslizar até o valor novo.</summary>
+    private static readonly TimeSpan BarSlide = TimeSpan.FromMilliseconds(450);
+
+    /// <summary>Quanto o rastro do que a barra perdeu espera antes de encolher.</summary>
+    private static readonly TimeSpan TrailDelay = TimeSpan.FromMilliseconds(380);
+
+    /// <summary>A cor do rastro: a cor da barra bem clarinha.</summary>
+    private static Brush TrailBrush(System.Windows.Media.Color color) => Theme.Freeze(Theme.WithAlpha(Theme.Lighten(color, 0.65), 0xE6));
+
+    /// <summary>
+    /// A barra inteira: o fundo e a parte cheia por cima (lisa ou com brilho). Com <paramref name="before"/>, a barra
+    /// anima: ganhando, a parte cheia cresce até o valor novo; perdendo, ela já cai no valor novo e um rastro claro
+    /// mostra o pedaço perdido, que encolhe logo depois (como nos jogos de luta).
+    /// </summary>
+    private static FrameworkElement FillTrack(BarStyle style, double fraction, System.Windows.Media.Color color, double height, CornerRadius corners,
+        double? before = null)
     {
         bool shine = style == BarStyle.Shine;
         var fill = new Border
@@ -317,6 +379,11 @@ internal static class ScreenRenderer
             Width = 0,
         };
         var content = new Grid();
+        // O rastro fica atrás da parte cheia: só aparece o pedaço que a barra perdeu.
+        Border? trail = before > fraction
+            ? new Border { Background = TrailBrush(color), CornerRadius = corners, HorizontalAlignment = HorizontalAlignment.Left, Width = 0 }
+            : null;
+        if (trail != null) content.Children.Add(trail);
         content.Children.Add(fill);
         if (shine)
         {
@@ -345,12 +412,46 @@ internal static class ScreenRenderer
             Child = content,
             ClipToBounds = false,
         };
-        track.SizeChanged += (_, e) => fill.Width = Math.Max(0, (e.NewSize.Width - (shine ? 2 : 0)) * fraction);
+        bool started = false;
+        track.SizeChanged += (_, e) =>
+        {
+            double full = Math.Max(0, e.NewSize.Width - (shine ? 2 : 0));
+            if (before is not { } from || started)
+            {
+                // Sem animação (ou a janela mudou de tamanho depois): direto no valor.
+                fill.BeginAnimation(FrameworkElement.WidthProperty, null);
+                fill.Width = full * fraction;
+                if (trail != null)
+                {
+                    trail.BeginAnimation(FrameworkElement.WidthProperty, null);
+                    trail.Width = full * fraction;
+                }
+                return;
+            }
+            // A primeira vez que a barra ganha tamanho: começa onde estava e vai até o valor novo.
+            started = true;
+            var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+            fill.Width = full * fraction;
+            if (trail != null)
+            {
+                trail.Width = full * from;
+                trail.BeginAnimation(FrameworkElement.WidthProperty,
+                    new DoubleAnimation(full * from, full * fraction, BarSlide) { BeginTime = TrailDelay, EasingFunction = ease });
+            }
+            else
+            {
+                fill.BeginAnimation(FrameworkElement.WidthProperty,
+                    new DoubleAnimation(full * from, full * fraction, BarSlide) { EasingFunction = ease, FillBehavior = FillBehavior.Stop });
+            }
+        };
         return track;
     }
 
-    /// <summary>Em blocos: um pedaço por ponto (até 20; acima disso, 10 pedaços), o último pela metade se for o caso.</summary>
-    private static FrameworkElement BlocksTrack(Piece piece, double fraction, System.Windows.Media.Color color, double height)
+    /// <summary>
+    /// Em blocos: um pedaço por ponto (até 20; acima disso, 10 pedaços), o último pela metade se for o caso.
+    /// Com <paramref name="before"/>: os pedaços perdidos ficam claros e somem devagar; os ganhos acendem.
+    /// </summary>
+    private static FrameworkElement BlocksTrack(Piece piece, double fraction, System.Windows.Media.Color color, double height, double? before = null)
     {
         int count = piece.BarMax <= 20 ? piece.BarMax : 10;
         double filled = fraction * count;
@@ -363,10 +464,23 @@ internal static class ScreenRenderer
             double part = Math.Clamp(filled - i, 0, 1);
             var block = new Grid { Margin = new Thickness(i == 0 ? 0 : 1.5, 0, i == count - 1 ? 0 : 1.5, 0) };
             block.Children.Add(new Border { Background = empty, CornerRadius = new CornerRadius(radius) });
+            double was = before is { } from ? Math.Clamp(from * count - i, 0, 1) : part;
+            if (was > part)
+            {
+                // O pedaço que foi perdido: claro, e some devagar.
+                var lost = new Border { Background = TrailBrush(color), CornerRadius = new CornerRadius(radius), HorizontalAlignment = HorizontalAlignment.Left };
+                block.SizeChanged += (_, e) => lost.Width = e.NewSize.Width * was;
+                lost.Loaded += (_, _) => lost.BeginAnimation(UIElement.OpacityProperty,
+                    new DoubleAnimation(1, 0, BarSlide) { BeginTime = TrailDelay, FillBehavior = FillBehavior.HoldEnd });
+                block.Children.Add(lost);
+            }
             if (part > 0)
             {
                 var piecePart = new Border { Background = full, CornerRadius = new CornerRadius(radius), HorizontalAlignment = HorizontalAlignment.Left };
                 block.SizeChanged += (_, e) => piecePart.Width = e.NewSize.Width * part;
+                if (part > was)
+                    piecePart.Loaded += (_, _) => piecePart.BeginAnimation(UIElement.OpacityProperty,
+                        new DoubleAnimation(0, 1, BarSlide) { FillBehavior = FillBehavior.Stop });
                 block.Children.Add(piecePart);
             }
             grid.Children.Add(block);
@@ -431,31 +545,50 @@ internal static class ScreenRenderer
     {
         // Sem cor: o cinza dos painéis. Com cor: a cor no tom escolhido.
         var rgb = piece.Color is { } color ? Theme.Rgb(color, piece.Shade) : Theme.Tone(Theme.PanelColor, piece.Shade);
-        var fill = Theme.Freeze(Theme.WithAlpha(rgb, (byte)Math.Round(piece.BoxOpacity * 2.55)));
+        byte alpha = (byte)Math.Round(piece.BoxOpacity * 2.55);
+        var fill = piece.Gradient is { } second
+            ? Gradient(Theme.WithAlpha(rgb, alpha), Theme.WithAlpha(Theme.Rgb(second, piece.Shade), alpha), piece.GradientDirection ?? GradientDirection.Down)
+            : Theme.Freeze(Theme.WithAlpha(rgb, alpha));
         Brush? stroke = null;
         // Sem escolher, a borda segue o tema (no Fantasia e no Livro, as caixas sem cor têm borda).
-        if (piece.Border ?? (piece.Color != null || Theme.Current.PanelBorders))
+        if (piece.Border ?? (piece.Color != null || piece.BorderColor != null || Theme.Current.PanelBorders))
         {
-            // Borda bem visível: a própria cor numa caixa clarinha, um pouco mais clara numa caixa cheia.
-            stroke = piece.Color == null
-                ? Theme.PanelBorder
+            // Borda bem visível: a cor escolhida para ela; sem escolher, a própria cor numa caixa clarinha,
+            // um pouco mais clara numa caixa cheia.
+            stroke = piece.BorderColor is { } borderColor ? Theme.Brush(borderColor)
+                : piece.Color == null ? Theme.PanelBorder
                 : Theme.Freeze(piece.BoxOpacity <= 50 ? Theme.WithAlpha(rgb, 0xA0) : Theme.Lighten(rgb, 0.3));
         }
+        double thickness = stroke == null ? 0 : piece.BorderWidth is { } width ? Math.Clamp(width, 1, 20) : 1;
 
         if (piece.Corner == Corner.Circle)
         {
             var grid = new Grid();
-            grid.Children.Add(new Ellipse { Fill = fill, Stroke = stroke, StrokeThickness = stroke != null ? 1.5 : 0, Effect = piece.Shadow == true ? Theme.DropShadow : null });
+            grid.Children.Add(new Ellipse { Fill = fill, Stroke = stroke, StrokeThickness = piece.BorderWidth == null && stroke != null ? 1.5 : thickness, Effect = piece.Shadow == true ? Theme.DropShadow : null });
             return grid;
         }
         return new Border
         {
             Background = fill,
             BorderBrush = stroke,
-            BorderThickness = new Thickness(stroke != null ? 1 : 0),
+            BorderThickness = new Thickness(thickness),
             CornerRadius = new CornerRadius(piece.Corner == Corner.Square ? 0 : Theme.PanelRadius),
             Effect = piece.Shadow == true ? Theme.DropShadow : null,
         };
+    }
+
+    /// <summary>Degradê de uma cor para a outra, na direção escolhida.</summary>
+    private static Brush Gradient(System.Windows.Media.Color from, System.Windows.Media.Color to, GradientDirection direction)
+    {
+        var (start, end) = direction switch
+        {
+            GradientDirection.Right => (new Point(0, 0.5), new Point(1, 0.5)),
+            GradientDirection.Diagonal => (new Point(0, 0), new Point(1, 1)),
+            _ => (new Point(0.5, 0), new Point(0.5, 1)),
+        };
+        var brush = new LinearGradientBrush(from, to, start, end);
+        brush.Freeze();
+        return brush;
     }
 
     private static FrameworkElement InputPiece(Piece piece, RenderContext context)

@@ -191,9 +191,10 @@ public sealed partial class ScreenDesignerModel : IDisposable
             : _selected.Append(piece.Name));
     }
 
-    public void SelectAll() => SelectMany(Layout?.Pieces.Select(p => p.Name) ?? []);
+    /// <summary>Ctrl+A: todas as peças que o mouse alcança (as travadas e as escondidas aqui ficam de fora).</summary>
+    public void SelectAll() => SelectMany(Layout?.Pieces.Where(CanGrab).Select(p => p.Name) ?? []);
 
-    /// <summary>A peça de cima que está no ponto (as últimas da lista ficam por cima).</summary>
+    /// <summary>A peça de cima que está no ponto (as últimas da lista ficam por cima). Travadas e escondidas aqui não contam.</summary>
     internal Piece? HitTest(Point point, double tolerance = 0)
     {
         if (Layout == null) return null;
@@ -201,14 +202,14 @@ public sealed partial class ScreenDesignerModel : IDisposable
         for (int i = order.Count - 1; i >= 0; i--)
         {
             var p = order[i];
-            if (BoundsOf(p).Inflate(tolerance).Contains(point)) return p;
+            if (CanGrab(p) && BoundsOf(p).Inflate(tolerance).Contains(point)) return p;
         }
         return null;
     }
 
     /// <summary>As peças que o retângulo toca (para a seleção arrastando no palco).</summary>
     internal IReadOnlyList<Piece> PiecesIn(Rect area) =>
-        Layout == null ? [] : DrawOrder().Where(p => BoundsOf(p).IntersectsWith(area)).ToList();
+        Layout == null ? [] : DrawOrder().Where(p => CanGrab(p) && BoundsOf(p).IntersectsWith(area)).ToList();
 
     /// <summary>
     /// A ordem em que as peças aparecem: a da lista, com as peças do cartão de cada Lista logo depois dela
@@ -369,7 +370,7 @@ public sealed partial class ScreenDesignerModel : IDisposable
 
     /// <summary>
     /// Move várias peças juntas (arrastando a seleção ou com as setas). As peças do cartão de uma Lista
-    /// que também está sendo movida vão junto com ela.
+    /// que também está sendo movida vão junto com ela. As travadas ficam onde estão.
     /// </summary>
     internal void MoveBy(IEnumerable<string> names, double dx, double dy, string? mergeKey = null)
     {
@@ -379,7 +380,7 @@ public sealed partial class ScreenDesignerModel : IDisposable
         var moved = new List<Piece>();
         foreach (var piece in layout.Pieces)
         {
-            if (!set.Contains(piece.Name) || piece.List != null && set.Contains(piece.List)) continue;
+            if (!set.Contains(piece.Name) || piece.List != null && set.Contains(piece.List) || IsLocked(layout, piece)) continue;
             var abs = AbsoluteBounds(layout, piece);
             abs.Offset(dx, dy);
             Place(layout, piece, ClampInside(abs));
@@ -390,11 +391,14 @@ public sealed partial class ScreenDesignerModel : IDisposable
         Commit(layout, mergeKey);
     }
 
-    /// <summary>Setas do teclado: movem todas as selecionadas. Toques seguidos viram um passo só no desfazer.</summary>
+    /// <summary>
+    /// Setas do teclado: movem todas as selecionadas (uma Caixa leva junto o que está em cima dela). Toques
+    /// seguidos viram um passo só no desfazer.
+    /// </summary>
     public void Nudge(double dx, double dy)
     {
         if (_selected.Count == 0) return;
-        MoveBy(_selected, dx, dy, "nudge:" + string.Join(",", _selected));
+        MoveBy(_selected.Concat(Carried(_selected)), dx, dy, "nudge:" + string.Join(",", _selected));
     }
 
     /// <summary>
@@ -450,11 +454,13 @@ public sealed partial class ScreenDesignerModel : IDisposable
         if (RenameEdit is { } rename)
         {
             if (rename(piece.Name, newName, ScreenFile.Serialize(layout)) is { } error) return error;
+            if (_hiddenHere.Remove(piece.Name)) _hiddenHere.Add(newName);
             _selected = [newName];
             SelectionChanged?.Invoke();
             Renamed?.Invoke(piece.Name, newName);
             return null;
         }
+        if (_hiddenHere.Remove(piece.Name)) _hiddenHere.Add(newName);
         // A seleção acompanha o nome novo antes de avisar a tela, para nada piscar.
         _selected = [newName];
         Commit(layout);
@@ -533,6 +539,7 @@ public sealed partial class ScreenDesignerModel : IDisposable
             copy.Name = layout.Find(original.Name) == null ? original.Name : UniqueCopyName(layout, original.Name);
             names[original.Name] = copy.Name;
             copy.List = null;
+            copy.Locked = false;   // a cópia nasce solta, para dar para arrastar
             var abs = ClampInside(new Rect(original.X + shift, original.Y + shift, copy.Width, copy.Height));
             (copy.X, copy.Y) = (abs.X, abs.Y);
             layout.Pieces.Add(copy);
@@ -784,6 +791,10 @@ public sealed partial class ScreenDesignerModel : IDisposable
             PieceType.Image => $"{find}.Image = \"{Escape(piece.Image ?? "goblin.png")}\";",
             PieceType.Box => $"{find}.Visible = true;",
             PieceType.Input => $"{find}.OnAnswer(answer =>\n{{\n    \n}});",
+            PieceType.Choice => $"{find}.OnChoose(choice =>\n{{\n    \n}});",
+            PieceType.Counter => $"{find}.OnChange(value =>\n{{\n    \n}});",
+            PieceType.Wheel => $"string prize = {find}.Spin();   // dentro do OnClick de um botão",
+            PieceType.Grid => $"{find}.OnCellClick((x, y) =>\n{{\n    {find}.Cell(x, y).Text = \"X\";\n}});",
             PieceType.Messages => "game.Write(\"Você causou 7 de dano!\");",
             PieceType.List => $"{find}.Show(items, (card, item) =>\n{{\n    card.Find(\"Name\").Text = item.Name;\n}});",
             _ => find,

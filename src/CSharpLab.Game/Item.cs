@@ -28,6 +28,9 @@ public sealed class Item
     internal Piece Piece { get; }
     internal Action? Click { get; set; }
     internal Action<string>? Answer { get; set; }
+    internal Action<string>? Choose { get; set; }
+    internal Action<int>? Change { get; set; }
+    internal Action<int, int>? CellClick { get; set; }
 
     /// <summary>Peça de um cartão: o nome da Lista (para as mensagens de erro).</summary>
     internal string? CardOf { get; init; }
@@ -49,25 +52,177 @@ public sealed class Item
         set => Check(nameof(Text)).Text = value ?? "";
     }
 
-    /// <summary>Value = valor. Quanto a Barra tem agora (vida, mana…).</summary>
+    /// <summary>
+    /// Value = valor. Quanto a Barra tem agora (vida, mana…), ou o número do Contador (ele fica sempre entre o Min
+    /// e o Max).
+    /// </summary>
     /// <example><code>game.Find("PlayerHealth").Value = health;</code></example>
     public int Value
     {
-        get => Check(nameof(Value)).BarValue;
-        set => Check(nameof(Value)).Value = value;
+        get
+        {
+            var piece = Check(nameof(Value));
+            return piece.Type == PieceType.Counter ? piece.CounterValue : piece.BarValue;
+        }
+        set
+        {
+            var piece = Check(nameof(Value));
+            piece.Value = piece.Type == PieceType.Counter ? Math.Clamp(value, piece.CounterMin, piece.CounterMax) : value;
+        }
     }
 
-    /// <summary>Max = máximo. O valor da Barra cheia.</summary>
+    /// <summary>Max = máximo. O valor da Barra cheia, ou o maior número do Contador.</summary>
     /// <example><code>game.Find("PlayerHealth").Max = maxHealth;</code></example>
     public int Max
     {
-        get => Check(nameof(Max)).BarMax;
+        get
+        {
+            var piece = Check(nameof(Max));
+            return piece.Type == PieceType.Counter ? piece.CounterMax : piece.BarMax;
+        }
         set
         {
             var piece = Check(nameof(Max));
+            if (piece.Type == PieceType.Counter)
+            {
+                if (value < piece.CounterMin)
+                    throw new GameException($"O Max do contador \"{Name}\" ({value}) precisa ser maior ou igual ao Min ({piece.CounterMin}).");
+                piece.Max = value;
+                piece.Value = piece.CounterValue;
+                return;
+            }
             if (value <= 0) throw new GameException($"O Max da barra \"{Name}\" precisa ser maior que 0 (veio {value}).");
             piece.Max = value;
         }
+    }
+
+    /// <summary>Min = mínimo. O menor número do Contador (o − para nele).</summary>
+    /// <example><code>game.Find("Amount").Min = 1;</code></example>
+    public int Min
+    {
+        get => Check(nameof(Min)).CounterMin;
+        set
+        {
+            var piece = Check(nameof(Min));
+            if (value > piece.CounterMax)
+                throw new GameException($"O Min do contador \"{Name}\" ({value}) precisa ser menor ou igual ao Max ({piece.CounterMax}).");
+            piece.Min = value;
+            piece.Value = piece.CounterValue;
+        }
+    }
+
+    /// <summary>Step = passo. De quanto em quanto o Contador anda a cada clique no − ou no + (o normal é 1).</summary>
+    /// <example><code>game.Find("Bet").Step = 10;</code></example>
+    public int Step
+    {
+        get => Check(nameof(Step)).CounterStep;
+        set
+        {
+            var piece = Check(nameof(Step));
+            if (value <= 0) throw new GameException($"O Step do contador \"{Name}\" precisa ser maior que 0 (veio {value}).");
+            piece.Step = value;
+        }
+    }
+
+    /// <summary>
+    /// Options = opções. As opções da Escolha (um botão para cada uma) ou as fatias da Roleta. Para uma fatia sair
+    /// mais vezes na Roleta, repita ela.
+    /// </summary>
+    /// <example><code>game.Find("Class").Options = ["Guerreiro", "Mago", "Arqueiro"];</code></example>
+    public string[] Options
+    {
+        get => [.. Check(nameof(Options)).OptionList];
+        set
+        {
+            var piece = Check(nameof(Options));
+            var options = (value ?? []).Select(o => o?.Trim() ?? "").ToList();
+            if (options.Any(o => o.Length == 0))
+                throw new GameException($"As opções de \"{Name}\" não podem ter texto vazio.");
+            if (options.Count > ScreenFile.MaxOptions)
+                throw new GameException($"\"{Name}\" pode ter até {ScreenFile.MaxOptions} opções (vieram {options.Count}).");
+            piece.Options = options;
+            if (piece.SelectedOption == null) piece.Selected = null;
+        }
+    }
+
+    /// <summary>
+    /// Selected = escolhida. Na Escolha, a opção que o jogador escolheu ("" se nenhuma); na Roleta, onde a seta parou.
+    /// Mude pelo código para já começar com uma escolhida.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// if (game.Find("Difficulty").Selected == "Difícil") enemyHealth *= 2;
+    /// </code>
+    /// </example>
+    public string Selected
+    {
+        get => Check(nameof(Selected)).SelectedOption ?? "";
+        set
+        {
+            var piece = Check(nameof(Selected));
+            if (string.IsNullOrEmpty(value))
+            {
+                piece.Selected = null;
+                return;
+            }
+            piece.Selected = piece.OptionList.FirstOrDefault(o => string.Equals(o, value.Trim(), StringComparison.OrdinalIgnoreCase))
+                ?? throw new GameException($"\"{value}\" não é uma opção de \"{Name}\". Opções: {string.Join(", ", piece.OptionList.Select(o => $"\"{o}\""))}.");
+        }
+    }
+
+    /// <summary>Columns = colunas. Na Grade, quantas casas por linha (1 a 20); na Escolha, quantas opções por linha.</summary>
+    /// <example><code>game.Find("Board").Columns = 4;</code></example>
+    public int Columns
+    {
+        get
+        {
+            var piece = Check(nameof(Columns));
+            return piece.Type == PieceType.Grid ? piece.GridColumns : piece.ChoiceColumns;
+        }
+        set => Check(nameof(Columns)).Columns = InGridRange(value, nameof(Columns));
+    }
+
+    /// <summary>Rows = linhas. Quantas linhas de casas a Grade tem (1 a 20).</summary>
+    /// <example><code>game.Find("Board").Rows = 4;</code></example>
+    public int Rows
+    {
+        get => Check(nameof(Rows)).GridRows;
+        set => Check(nameof(Rows)).Rows = InGridRange(value, nameof(Rows));
+    }
+
+    private int InGridRange(int value, string property) => value is >= 1 and <= Piece.MaxCells
+        ? value
+        : throw new GameException($"O {property} de \"{Name}\" vai de 1 a {Piece.MaxCells} (veio {value}).");
+
+    /// <summary>
+    /// Cell = casa. Pega a casa (x, y) da Grade: x é a coluna (0 é a da esquerda) e y é a linha (0 é a de cima).
+    /// Depois, mude o Text e a Color dela.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// game.Find("Board").Cell(0, 0).Text = "X";
+    /// if (game.Find("Board").Cell(1, 1).IsEmpty) { ... }
+    /// </code>
+    /// </example>
+    public Cell Cell(int x, int y)
+    {
+        if (Piece.Type != PieceType.Grid) throw Wrong("Cell", "só a Grade tem Cell");
+        int columns = Piece.GridColumns, rows = Piece.GridRows;
+        if (x < 0 || x >= columns || y < 0 || y >= rows)
+            throw new GameException($"A grade \"{Name}\" tem {columns} colunas (x de 0 a {columns - 1}) e {rows} linhas (y de 0 a {rows - 1}). " +
+                                    $"Veio Cell({x}, {y}).");
+        return new Cell(Piece, x, y);
+    }
+
+    /// <summary>
+    /// Animate = animar. true: quando o Value muda, a Barra desliza até o valor novo e, se perdeu, deixa um rastro
+    /// claro do pedaço perdido (como nos jogos de luta).
+    /// </summary>
+    /// <example><code>game.Find("EnemyHealth").Animate = true;</code></example>
+    public bool Animate
+    {
+        get => Check(nameof(Animate)).Animate == true;
+        set => Check(nameof(Animate)).Animate = value ? true : null;
     }
 
     /// <summary>Visible = visível. false esconde a peça; true mostra de novo.</summary>
@@ -124,6 +279,54 @@ public sealed class Item
     {
         get => Check(nameof(Border)).HasBorder;
         set => Check(nameof(Border)).Border = value;
+    }
+
+    /// <summary>BorderColor = cor da borda da Caixa. Escolher uma cor já liga a borda.</summary>
+    /// <example><code>game.Find("Panel").BorderColor = Color.Gold;</code></example>
+    public Color BorderColor
+    {
+        get => Check(nameof(BorderColor)).BorderColor ?? Color;
+        set
+        {
+            var piece = Check(nameof(BorderColor));
+            piece.BorderColor = value;
+            piece.Border ??= true;
+        }
+    }
+
+    /// <summary>BorderWidth = grossura da borda da Caixa, de 1 (fininha) a 20.</summary>
+    /// <example><code>game.Find("Panel").BorderWidth = 3;</code></example>
+    public int BorderWidth
+    {
+        get => Check(nameof(BorderWidth)).BorderThickness;
+        set
+        {
+            var piece = Check(nameof(BorderWidth));
+            if (value is < 1 or > 20)
+                throw new GameException($"O BorderWidth da caixa \"{Name}\" vai de 1 (fininha) a 20. Veio {value}.");
+            piece.BorderWidth = value;
+        }
+    }
+
+    /// <summary>
+    /// Gradient = degradê. A segunda cor da Caixa: ela vai da cor dela (Color) até esta. null volta a ter uma cor só.
+    /// </summary>
+    /// <example><code>game.Find("Sky").Gradient = Color.Hex("#1A4F9C");</code></example>
+    public Color? Gradient
+    {
+        get => Check(nameof(Gradient)).Gradient;
+        set => Check(nameof(Gradient)).Gradient = value;
+    }
+
+    /// <summary>
+    /// GradientDirection = direção do degradê: GradientDirection.Down (de cima para baixo), Right (da esquerda para
+    /// a direita) ou Diagonal.
+    /// </summary>
+    /// <example><code>game.Find("Sky").GradientDirection = GradientDirection.Right;</code></example>
+    public GradientDirection GradientDirection
+    {
+        get => Check(nameof(GradientDirection)).GradientDirection ?? GradientDirection.Down;
+        set => Check(nameof(GradientDirection)).GradientDirection = value == GradientDirection.Down ? null : value;
     }
 
     /// <summary>
@@ -300,11 +503,19 @@ public sealed class Item
         game.WriteTo(Piece.Name, text ?? "", color);
     }
 
-    /// <summary>Clear = limpar. Apaga só as mensagens escritas nesta caixa de Mensagens (o game.Clear apaga todas).</summary>
-    /// <example><code>game.Find("EnemyLog").Clear();</code></example>
+    /// <summary>
+    /// Clear = limpar. Na Grade, apaga todas as casas (texto e cor). Nas Mensagens, apaga só as mensagens escritas
+    /// nesta caixa (o game.Clear apaga todas).
+    /// </summary>
+    /// <example><code>game.Find("Board").Clear();</code></example>
     public void Clear()
     {
-        if (Piece.Type != PieceType.Messages) throw Wrong("Clear", "só a peça Mensagens tem Clear");
+        if (Piece.Type == PieceType.Grid)
+        {
+            Piece.Cells = null;
+            return;
+        }
+        if (Piece.Type != PieceType.Messages) throw Wrong("Clear", "só a Grade e a peça Mensagens têm Clear");
         var game = _owner?.Game ?? throw new GameException($"\"{Name}\" não está numa cena desenhada.");
         game.ClearTarget(Piece.Name);
     }
@@ -359,6 +570,83 @@ public sealed class Item
     }
 
     /// <summary>
+    /// OnChoose = ao escolher. O código entre as chaves roda quando o jogador escolhe uma opção da Escolha;
+    /// choice é o texto da opção.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// game.Find("Class").OnChoose(choice =>
+    /// {
+    ///     heroClass = choice;
+    ///     game.Write($"Você escolheu {choice}.");
+    /// });
+    /// </code>
+    /// </example>
+    public void OnChoose(Action<string> action)
+    {
+        if (Piece.Type != PieceType.Choice) throw Wrong("OnChoose", "só a Escolha tem OnChoose");
+        Choose = action ?? throw new GameException($"O OnChoose de \"{Name}\" precisa dizer o que fazer: game.Find(\"{Name}\").OnChoose(choice => {{ ... }});");
+    }
+
+    /// <summary>
+    /// OnChange = ao mudar. O código entre as chaves roda quando o jogador aperta o − ou o + do Contador;
+    /// value é o número novo.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// game.Find("Amount").OnChange(value =>
+    /// {
+    ///     game.Find("Total").Text = $"Total: {value * price} moedas";
+    /// });
+    /// </code>
+    /// </example>
+    public void OnChange(Action<int> action)
+    {
+        if (Piece.Type != PieceType.Counter) throw Wrong("OnChange", "só o Contador tem OnChange");
+        Change = action ?? throw new GameException($"O OnChange de \"{Name}\" precisa dizer o que fazer: game.Find(\"{Name}\").OnChange(value => {{ ... }});");
+    }
+
+    /// <summary>
+    /// OnCellClick = ao clicar numa casa. O código entre as chaves roda quando o jogador clica numa casa da Grade;
+    /// x é a coluna e y é a linha da casa (a de cima à esquerda é 0, 0).
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// game.Find("Board").OnCellClick((x, y) =>
+    /// {
+    ///     var cell = game.Find("Board").Cell(x, y);
+    ///     if (cell.IsEmpty) cell.Text = "X";
+    /// });
+    /// </code>
+    /// </example>
+    public void OnCellClick(Action<int, int> action)
+    {
+        if (Piece.Type != PieceType.Grid) throw Wrong("OnCellClick", "só a Grade tem OnCellClick");
+        CellClick = action ?? throw new GameException($"O OnCellClick de \"{Name}\" precisa dizer o que fazer: game.Find(\"{Name}\").OnCellClick((x, y) => {{ ... }});");
+    }
+
+    /// <summary>
+    /// Spin = girar. Gira a Roleta, espera ela parar e devolve a opção sorteada. Funciona dentro de um clique
+    /// (o OnClick de um botão "Girar"), como o game.Wait: o jogador vê a roleta girando e o código continua depois.
+    /// </summary>
+    /// <returns>O texto da fatia onde a seta parou.</returns>
+    /// <example>
+    /// <code>
+    /// game.Find("SpinButton").OnClick(() =>
+    /// {
+    ///     string prize = game.Find("Wheel").Spin();
+    ///     game.Write($"Você ganhou: {prize}!");
+    /// });
+    /// </code>
+    /// </example>
+    public string Spin()
+    {
+        if (Piece.Type != PieceType.Wheel) throw Wrong("Spin", "só a Roleta tem Spin");
+        var game = _owner?.Game ?? throw new GameException($"\"{Name}\" não está numa cena desenhada.");
+        return game.SpinWheel(this);
+    }
+
+    /// <summary>
     /// Show = mostrar. Enche a Lista: um cartão para cada item. O código entre as chaves recebe o cartão
     /// e o item, e diz o que vai em cada peça do cartão. Com 3 itens aparecem 3 cartões; com 7, aparecem 7
     /// (com rolagem, se não couber).
@@ -410,10 +698,29 @@ public sealed class Item
     /// <example><code>game.Find("PlayerHealth").Flash();</code></example>
     public void Flash() => AddEffect(Effect.Flash);
 
-    private void AddEffect(Effect effect)
+    /// <summary>
+    /// Pop = saltar. Um texto aparece em cima da peça, sobe e some: o dano que o inimigo levou, a cura, o ouro
+    /// ganho. Funciona em qualquer peça (na barra de vida, no retrato do inimigo…).
+    /// </summary>
+    /// <param name="text">O que aparece. Exemplo: $"-{damage}".</param>
+    /// <param name="color">Cor opcional. Exemplo: Color.Red (dano), Color.Green (cura), Color.Gold (ouro).</param>
+    /// <example>
+    /// <code>
+    /// game.Find("EnemyHealth").Pop($"-{damage}", Color.Red);
+    /// game.Find("Gold").Pop("+10", Color.Gold);
+    /// </code>
+    /// </example>
+    public void Pop(string text, Color? color = null)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+            throw new GameException($"O Pop de \"{Name}\" precisa de um texto para mostrar, por exemplo: game.Find(\"{Name}\").Pop($\"-{{damage}}\", Color.Red);");
+        AddEffect(Effect.Pop, text.Trim(), color);
+    }
+
+    private void AddEffect(Effect effect, string? text = null, Color? color = null)
     {
         if (_owner == null) throw new GameException($"\"{Name}\" não está numa cena desenhada.");
-        _owner.AddEffect(Piece, effect);
+        _owner.AddEffect(new PieceEffect(Piece, effect, text, color));
     }
 
     /// <summary>Mostra "Attack (Botão)".</summary>
@@ -425,11 +732,17 @@ public sealed class Item
         throw Wrong(property, property switch
         {
             nameof(Text) => "só Texto, Botão, Barra, Campo de escrita e Lista têm Text",
-            nameof(Value) or nameof(Max) => $"só barras têm {property}",
+            nameof(Value) or nameof(Max) => $"só a Barra e o Contador têm {property}",
             nameof(Image) => "só imagens têm Image",
             nameof(Color) or nameof(Shade) => $"Imagem, Campo de escrita, Mensagens e Lista não têm {property}",
-            nameof(Opacity) or nameof(Border) => $"só a Caixa tem {property}",
-            nameof(Corner) => "só Caixa, Botão e Barra têm Corner",
+            nameof(Opacity) or nameof(Border) or nameof(BorderColor) or nameof(BorderWidth) or nameof(Gradient) or nameof(GradientDirection) =>
+                $"só a Caixa tem {property}",
+            nameof(Min) or nameof(Step) => $"só o Contador tem {property}",
+            nameof(Options) or nameof(Selected) => $"só a Escolha e a Roleta têm {property}",
+            nameof(Columns) => "só a Grade e a Escolha têm Columns",
+            nameof(Rows) => "só a Grade tem Rows",
+            nameof(Animate) => "só barras têm Animate",
+            nameof(Corner) => "só Caixa, Botão, Barra, Escolha, Contador e Grade têm Corner",
             nameof(Italic) or nameof(Bold) or nameof(Font) =>
                 $"só as peças com letras (Texto, Botão, Barra, Campo de escrita, Mensagens e Lista) têm {property}",
             nameof(Shadow) => "Imagem não tem Shadow",
@@ -441,7 +754,7 @@ public sealed class Item
                 : "só as peças com letras têm TextColor",
             nameof(BarStyle) or nameof(BarText) => $"só barras têm {property}",
             nameof(Shortcut) => "só botões têm Shortcut (atalho de teclado)",
-            nameof(Enabled) => "só botões, campos de escrita e imagens têm Enabled",
+            nameof(Enabled) => "só botões, campos de escrita, imagens, Escolha, Contador e Grade têm Enabled",
             _ => $"esta peça não tem {property}",
         });
     }

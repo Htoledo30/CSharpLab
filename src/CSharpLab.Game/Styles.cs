@@ -83,3 +83,17 @@ public enum BarText
     /// <summary>Sem texto: só a barra.</summary>
     None,
 }
+
+/// <summary>
+/// GradientDirection = direção do degradê da Caixa: de onde a primeira cor vai até a segunda.
+/// Exemplo: <c>game.Find("Panel").GradientDirection = GradientDirection.Right;</c>
+/// </summary>
+public enum GradientDirection
+{
+    /// <summary>De cima para baixo (o normal): a cor da caixa em cima, a do degradê embaixo.</summary>
+    Down,
+    /// <summary>Da esquerda para a direita.</summary>
+    Right,
+    /// <summary>Na diagonal, do canto de cima à esquerda até o canto de baixo à direita.</summary>
+    Diagonal,
+}

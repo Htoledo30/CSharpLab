@@ -240,6 +240,11 @@ public sealed class ScreenPropertiesPanel : Border
         }
 
         _content.Children.Add(Section("FUNDO"));
+        _content.Children.Add(FieldLabel("Cor", top: 0));
+        _content.Children.Add(ColorField(() => _model.Layout?.BackgroundColor, v => _model.SetBackgroundColor(v), "A cor do tema"));
+        _content.Children.Add(FieldLabel("Degradê até (embaixo)"));
+        _content.Children.Add(ColorField(() => _model.Layout?.BackgroundGradient, v => _model.SetBackgroundGradient(v), "Sem degradê: uma cor só"));
+        _content.Children.Add(FieldLabel("Imagem (fica por cima da cor)"));
         _content.Children.Add(ImagePicker(() => _model.Layout?.Background, image => _model.SetBackground(image), "Sem imagem de fundo"));
 
         _content.Children.Add(Section("NO CÓDIGO"));
@@ -262,6 +267,8 @@ public sealed class ScreenPropertiesPanel : Border
                      "Arraste os quadradinhos dos cantos para redimensionar. Shift mantém a proporção.",
                      "As peças grudam nas outras e nas bordas. Segure Alt para soltar livre.",
                      "Setas movem 1 (Shift: 10). Ctrl+D duplica, Del apaga, Ctrl+Z desfaz.",
+                     "Arrastar uma Caixa leva junto o que está em cima dela. Segure Ctrl para mover só a caixa.",
+                     "Nas Camadas, o cadeado trava uma peça (o mouse não pega mais) e o olho esconde ela só aqui.",
                      "A tela é um arquivo de texto: para ver, use Arquivo, lá em cima.",
                  })
         {
@@ -356,6 +363,7 @@ public sealed class ScreenPropertiesPanel : Border
             _content.Children.Add(Section(type switch
             {
                 PieceType.Bar => "RÓTULO",
+                PieceType.Counter => "RÓTULO (À ESQUERDA, SE QUISER)",
                 PieceType.Input => "PERGUNTA",
                 PieceType.List => "QUANDO ESTIVER VAZIA",
                 _ => "TEXTO",
@@ -378,11 +386,11 @@ public sealed class ScreenPropertiesPanel : Border
         // Logo depois do texto, o que a peça faz no código (o painel mostra onde, ou escreve a linha dela):
         // botão e campo de escrita, o OnClick/OnAnswer; as outras peças, a linha que muda elas.
         bool linksCode = CodeLinks != null && _model.ProjectDirectory != null;
-        bool showsHandler = type is PieceType.Button or PieceType.Input && linksCode;
-        if (showsHandler)
+        var handler = HandlerOf(type);
+        if (handler != null && linksCode)
         {
-            _content.Children.Add(Section(type == PieceType.Button ? "AO CLICAR" : "AO RESPONDER"));
-            _content.Children.Add(HandlerField(type == PieceType.Button ? "OnClick" : "OnAnswer", inCard: piece.List != null));
+            _content.Children.Add(Section(handler.Section));
+            _content.Children.Add(HandlerField(handler, inCard: piece.List != null));
         }
         else if (linksCode)
         {
@@ -436,6 +444,7 @@ public sealed class ScreenPropertiesPanel : Border
             row.Children.Add(Labeled("Valor", NumberField(() => Current()?.BarValue ?? 0, v => Edit(p => p.Value = (int)v, "value"), 0, 99999)));
             row.Children.Add(Labeled("Máximo", NumberField(() => Current()?.BarMax ?? 100, v => Edit(p => p.Max = (int)v, "max"), 1, 99999), left: 8));
             _content.Children.Add(row);
+            _content.Children.Add(OverflowWarning(Current));
             _content.Children.Add(Section("ESTILO DA BARRA"));
             _content.Children.Add(PreviewPicker(
                 [(BarStyle.Smooth, "Lisa", "BarStyle.Smooth: uma cor só"),
@@ -453,6 +462,19 @@ public sealed class ScreenPropertiesPanel : Border
             _content.Children.Add(Segmented(
                 [(Corner.Round, "Redondos", "Pontas redondas"), (Corner.Square, "Retos", "Pontas retas")],
                 () => Current()?.Corner == Corner.Square ? Corner.Square : Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
+            var animate = SwitchRow("Animar no jogo",
+                "Ligado: quando o valor muda, a barra desliza até o novo e mostra por um instante o pedaço perdido, como nos jogos de luta. " +
+                "No código: .Animate = true.",
+                () => Current()?.Animate == true, v => Edit(p => p.Animate = v ? true : null, "animate"));
+            var see = SmallAction("▶ Ver", "Mostra aqui no palco como a barra anima quando perde vida (a tela não muda).",
+                () => { if (_shownName != null) _model.Preview(_shownName, PiecePreview.Bar); });
+            see.Width = 64;
+            see.Margin = new Thickness(10, 0, 0, 0);
+            var animateRow = new DockPanel { Margin = new Thickness(0, 12, 0, 0) };
+            DockPanel.SetDock(see, Dock.Right);
+            animateRow.Children.Add(see);
+            animateRow.Children.Add(animate);
+            _content.Children.Add(animateRow);
         }
 
         if (type == PieceType.Image)
@@ -461,10 +483,95 @@ public sealed class ScreenPropertiesPanel : Border
             _content.Children.Add(ImagePicker(() => Current()?.Image, image => Edit(p => p.Image = image, "image"), "Escolher imagem…"));
         }
 
+        if (type is PieceType.Choice or PieceType.Wheel)
+        {
+            _content.Children.Add(Section(type == PieceType.Choice ? "OPÇÕES" : "FATIAS"));
+            _content.Children.Add(TextField(() => string.Join("\n", Current()?.OptionList ?? []),
+                v => Edit(p => p.Options = v.Split('\n').Select(line => line.Trim()).Where(line => line.Length > 0).Take(ScreenFile.MaxOptions).ToList(), "options"),
+                multiline: true));
+            var how = Muted(type == PieceType.Choice
+                ? "Uma opção por linha. No jogo, o jogador clica numa para escolher; ela fica cheia, com a cor da peça."
+                : "Uma fatia por linha. Para uma sair mais vezes, repita a linha (ex.: \"Nada\" duas vezes).");
+            how.Margin = new Thickness(0, 6, 0, 0);
+            _content.Children.Add(how);
+            if (type == PieceType.Choice)
+            {
+                _content.Children.Add(FieldLabel("Começa escolhida"));
+                _content.Children.Add(SelectedField(Current, v => Edit(p => p.Selected = v, "selected")));
+                _content.Children.Add(Labeled("Opções por linha (0 = automático)",
+                    NumberField(() => Current()?.Columns ?? 0, v => Edit(p => p.Columns = (int)v == 0 ? null : (int)v, "columns"), 0, Piece.MaxCells), top: 10));
+            }
+            else
+            {
+                var spin = SmallAction("▶ Girar", "Mostra aqui no palco a roleta girando (a tela não muda).",
+                    () => { if (_shownName != null) _model.Preview(_shownName, PiecePreview.Spin); });
+                spin.Margin = new Thickness(0, 10, 0, 0);
+                spin.HorizontalAlignment = HorizontalAlignment.Left;
+                spin.Width = 90;
+                _content.Children.Add(spin);
+                var spinHow = Muted($"No jogo, ela gira pelo código, dentro do clique de um botão: string prize = game.Find(\"{name}\").Spin();");
+                spinHow.Margin = new Thickness(0, 4, 0, 0);
+                _content.Children.Add(spinHow);
+            }
+        }
+
+        if (type == PieceType.Counter)
+        {
+            _content.Children.Add(Section("NÚMEROS"));
+            var numbers = new UniformGrid { Columns = 2 };
+            numbers.Children.Add(Labeled("Começa em", NumberField(() => Current()?.CounterValue ?? 0, v => Edit(p => p.Value = (int)v, "value"), -99999, 99999)));
+            numbers.Children.Add(Labeled("Passo (− e +)", NumberField(() => Current()?.CounterStep ?? 1, v => Edit(p => p.Step = (int)v == 1 ? null : (int)v, "step"), 1, 99999), left: 8));
+            numbers.Children.Add(Labeled("Mínimo", NumberField(() => Current()?.CounterMin ?? 0, v => Edit(p =>
+            {
+                p.Min = (int)v;
+                if (p.Max < p.Min) p.Max = p.Min;
+            }, "min"), -99999, 99999), top: 8));
+            numbers.Children.Add(Labeled("Máximo", NumberField(() => Current()?.CounterMax ?? 99, v => Edit(p =>
+            {
+                p.Max = (int)v;
+                if (p.Max < p.CounterMin) p.Min = p.Max;
+            }, "max"), -99999, 99999), left: 8, top: 8));
+            _content.Children.Add(numbers);
+            var how = Muted("O jogador muda com o − e o +, sem passar do mínimo nem do máximo. No código, o número está em .Value.");
+            how.Margin = new Thickness(0, 8, 0, 0);
+            _content.Children.Add(how);
+        }
+
+        if (type == PieceType.Grid)
+        {
+            _content.Children.Add(Section("CASAS"));
+            var size = new UniformGrid { Columns = 2 };
+            size.Children.Add(Labeled("Colunas", NumberField(() => Current()?.GridColumns ?? 3, v => Edit(p => p.Columns = (int)v, "columns"), 1, Piece.MaxCells)));
+            size.Children.Add(Labeled("Linhas", NumberField(() => Current()?.GridRows ?? 3, v => Edit(p => p.Rows = (int)v, "rows"), 1, Piece.MaxCells), left: 8));
+            _content.Children.Add(size);
+            var how = Muted($"Cada casa mostra aqui o x e o y dela (a de cima à esquerda é 0,0). No código: game.Find(\"{name}\").Cell(x, y).Text = \"X\";");
+            how.Margin = new Thickness(0, 8, 0, 0);
+            _content.Children.Add(how);
+        }
+
+        if (type is PieceType.Choice or PieceType.Counter or PieceType.Grid)
+        {
+            _content.Children.Add(Section("CANTOS"));
+            _content.Children.Add(Segmented(
+                [(Corner.Round, "Do tema", "Os cantos do tema do jogo"), (Corner.Square, "Retos", "Cantos em ângulo"),
+                 (Corner.Circle, type == PieceType.Grid ? "Bolinhas" : "Pílula", type == PieceType.Grid ? "Casas redondas" : "Pontas todas redondas")],
+                () => Current()?.Corner ?? Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
+        }
+
         if (Piece.Supports(type, nameof(Piece.Color)))
         {
-            _content.Children.Add(Section(type switch { PieceType.Button => "COR DO BOTÃO", PieceType.Bar => "COR DA BARRA", PieceType.Box => "COR DA CAIXA", PieceType.Text => "COR DA LETRA", _ => "COR" }));
-            _content.Children.Add(ColorField(() => Current()?.Color, v => Edit(p => p.Color = v, "color")));
+            _content.Children.Add(Section(type switch
+            {
+                PieceType.Button => "COR DO BOTÃO", PieceType.Bar => "COR DA BARRA", PieceType.Box => "COR DA CAIXA", PieceType.Text => "COR DA LETRA",
+                PieceType.Choice => "COR DA ESCOLHIDA", PieceType.Counter => "COR DOS BOTÕES", PieceType.Wheel => "COR DAS FATIAS", PieceType.Grid => "COR DAS CASAS",
+                _ => "COR",
+            }));
+            _content.Children.Add(ColorField(() => Current()?.Color, v => Edit(p => p.Color = v, "color"), type switch
+            {
+                PieceType.Wheel => "Arco-íris: cada fatia de uma cor do tema",
+                PieceType.Grid => "A cor dos painéis do tema",
+                _ => "Cor padrão",
+            }));
             var shade = Segmented(
                 [(Shade.Normal, "Normal", "A cor como ela é"), (Shade.Dark, "Escuro", "A cor mais escura (vermelho escuro, azul escuro…)"), (Shade.Light, "Claro", "A cor mais clarinha")],
                 () => Current()?.Shade ?? Shade.Normal, v => Edit(p => p.Shade = v == Shade.Normal ? null : v, "shade"));
@@ -548,6 +655,26 @@ public sealed class ScreenPropertiesPanel : Border
 
         if (type == PieceType.Box)
         {
+            _content.Children.Add(Section("DEGRADÊ"));
+            _content.Children.Add(ColorField(() => Current()?.Gradient, v => Edit(p => p.Gradient = v, "gradient"), "Sem degradê: uma cor só"));
+            var direction = Segmented(
+                [(GradientDirection.Down, "↓  Para baixo", "GradientDirection.Down: a cor da caixa em cima, esta embaixo"),
+                 (GradientDirection.Right, "→  Para o lado", "GradientDirection.Right: a cor da caixa à esquerda, esta à direita"),
+                 (GradientDirection.Diagonal, "↘  Diagonal", "GradientDirection.Diagonal: do canto de cima à esquerda até o de baixo à direita")],
+                () => Current()?.GradientDirection ?? GradientDirection.Down,
+                v => Edit(p => p.GradientDirection = v == GradientDirection.Down ? null : v, "gradientdirection"));
+            direction.Margin = new Thickness(0, 6, 0, 0);
+            _content.Children.Add(direction);
+            var gradientHint = Muted("A caixa vai da cor dela (lá em cima) até esta. Escolha uma para ligar o degradê.");
+            gradientHint.Margin = new Thickness(0, 6, 0, 0);
+            _content.Children.Add(gradientHint);
+            _refreshers.Add(() =>
+            {
+                bool on = Current()?.Gradient != null;
+                direction.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+                gradientHint.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
+            });
+
             _content.Children.Add(Section("PREENCHIMENTO"));
             var fill = new DockPanel();
             var percent = new TextBlock { Text = "%  (0 = invisível, 100 = cheia)", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
@@ -562,6 +689,22 @@ public sealed class ScreenPropertiesPanel : Border
             var border = SwitchRow("Borda", "Uma linha em volta da caixa.", () => Current()?.HasBorder == true, v => Edit(p => p.Border = v, "border"));
             border.Margin = new Thickness(0, 12, 0, 0);
             _content.Children.Add(border);
+            // Com a borda ligada: a cor e a grossura dela.
+            var borderOptions = new StackPanel();
+            borderOptions.Children.Add(FieldLabel("Cor da borda", top: 8));
+            borderOptions.Children.Add(ColorField(() => Current()?.BorderColor, v => Edit(p => p.BorderColor = v, "bordercolor"), "Automática: combina com a cor da caixa"));
+            var widthRow = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
+            var borderWidth = NumberField(() => Current()?.BorderThickness ?? 1, v => Edit(p => p.BorderWidth = (int)v == 1 ? null : (int)v, "borderwidth"), 1, 20);
+            borderWidth.Width = 64;
+            borderWidth.ToolTip = "Roda do mouse muda";
+            DockPanel.SetDock(borderWidth, Dock.Left);
+            widthRow.Children.Add(borderWidth);
+            var widthText = new TextBlock { Text = "grossura  (1 = fininha, até 20)", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
+            widthText.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+            widthRow.Children.Add(widthText);
+            borderOptions.Children.Add(widthRow);
+            _content.Children.Add(borderOptions);
+            _refreshers.Add(() => borderOptions.Visibility = Current()?.HasBorder == true ? Visibility.Visible : Visibility.Collapsed);
             var boxShadow = SwitchRow("Sombra embaixo", "Uma sombra embaixo da caixa: ela parece flutuar em cima do fundo.",
                 () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
             boxShadow.Margin = new Thickness(0, 10, 0, 0);
@@ -574,6 +717,21 @@ public sealed class ScreenPropertiesPanel : Border
 
         _content.Children.Add(Section("APARÊNCIA"));
         _content.Children.Add(StyleRow());
+
+        // Os movimentos do código, para ver antes de escrever: cada botão mostra no palco e diz a linha.
+        _content.Children.Add(Section("MOVIMENTOS (PELO CÓDIGO)"));
+        var moves = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -6, 0) };
+        foreach (var (text, kind, line, what) in new[]
+                 {
+                     ("▶ Tremer", PiecePreview.Shake, $"game.Find(\"{name}\").Shake();", "A peça treme (quem levou um golpe)."),
+                     ("▶ Piscar", PiecePreview.Flash, $"game.Find(\"{name}\").Flash();", "A peça pisca (dano, cura, algo que mudou)."),
+                     ("▶ Pop", PiecePreview.Pop, $"game.Find(\"{name}\").Pop(\"-7\", Color.Red);", "Um texto sobe e some em cima da peça (dano, cura, ouro)."),
+                 })
+        {
+            moves.Children.Add(SmallAction(text, $"{what}\nVer aqui no palco. No código, dentro de um clique:\n{line}",
+                () => { if (_shownName != null) _model.Preview(_shownName, kind); }));
+        }
+        _content.Children.Add(moves);
 
         _content.Children.Add(Section(piece.List != null ? "POSIÇÃO NO CARTÃO E TAMANHO" : "POSIÇÃO E TAMANHO"));
         var bounds = new UniformGrid { Columns = 2 };
@@ -598,6 +756,13 @@ public sealed class ScreenPropertiesPanel : Border
             enabled.Margin = new Thickness(0, 10, 0, 0);
             _content.Children.Add(enabled);
         }
+
+        var locked = SwitchRow("Travada no palco",
+            "Ligado: o mouse não pega nem arrasta esta peça no palco (bom para fundos e molduras). " +
+            "Também dá para usar o cadeado nas Camadas. No jogo não muda nada.",
+            () => Current()?.Locked == true, v => { if (_shownName != null) _model.SetLocked(_shownName, v); });
+        locked.Margin = new Thickness(0, 10, 0, 0);
+        _content.Children.Add(locked);
 
         if (linksCode) return;   // o código dela já aparece lá em cima ("Ao clicar" ou "No código")
 
@@ -656,14 +821,65 @@ public sealed class ScreenPropertiesPanel : Border
         }
     }
 
-    /// <summary>
-    /// O que o botão (ou o campo de escrita) faz: "Já faz algo — Program.cs, linha 34" com o caminho até lá,
-    /// ou "Ainda não faz nada" com um atalho que escreve a estrutura vazia na cena certa.
-    /// </summary>
-    private FrameworkElement HandlerField(string handler, bool inCard)
+    /// <summary>O que a peça faz quando o jogador mexe nela: o nome no código e os textos do painel.</summary>
+    private sealed record HandlerInfo(string Section, string Name, string Parameter, string Write, string Done, string Missing, string Explain);
+
+    private static HandlerInfo? HandlerOf(PieceType type) => type switch
     {
-        bool isButton = handler == "OnClick";
-        var card = new CodeStatusCard(this, isButton ? "Escrever o que ele faz" : "Escrever o que acontece");
+        PieceType.Button => new("AO CLICAR", "OnClick", "()", "Escrever o que ele faz", "Já faz algo", "Ainda não faz nada",
+            "O que acontece no clique está no código, dentro do OnClick."),
+        PieceType.Input => new("AO RESPONDER", "OnAnswer", "answer", "Escrever o que acontece", "Já responde", "Ainda não faz nada com a resposta",
+            "O que acontece com a resposta está no código, dentro do OnAnswer."),
+        PieceType.Choice => new("AO ESCOLHER", "OnChoose", "choice", "Escrever o que acontece", "Já reage à escolha", "Ainda não faz nada ao escolher",
+            "O que acontece quando o jogador escolhe está no código, dentro do OnChoose. A escolhida também fica em .Selected."),
+        PieceType.Counter => new("AO MUDAR", "OnChange", "value", "Escrever o que acontece", "Já reage ao número", "Ainda não faz nada ao mudar",
+            "O que acontece quando o número muda está no código, dentro do OnChange. O número também fica em .Value."),
+        PieceType.Grid => new("AO CLICAR NUMA CASA", "OnCellClick", "(x, y)", "Escrever o que acontece", "Já faz algo", "Ainda não faz nada",
+            "O que acontece no clique está no código, dentro do OnCellClick: x é a coluna e y é a linha da casa."),
+        _ => null,
+    };
+
+    /// <summary>A opção que já começa escolhida: um botão que abre a lista das opções (e "Nenhuma").</summary>
+    private FrameworkElement SelectedField(Func<Piece?> current, Action<string?> set)
+    {
+        var pick = new Button
+        {
+            Style = (Style)FindResource("DialogButton"),
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Height = 30,
+            Padding = new Thickness(10, 0, 10, 0),
+            Margin = new Thickness(0),
+            Focusable = false,
+        };
+        System.Windows.Automation.AutomationProperties.SetName(pick, "Começa escolhida");
+        pick.Click += (_, _) =>
+        {
+            var menu = new ContextMenu { PlacementTarget = pick, Placement = PlacementMode.Bottom, MinWidth = pick.ActualWidth };
+            foreach (var option in new string?[] { null }.Concat(current()?.OptionList ?? []))
+            {
+                var item = new MenuItem { Header = option ?? "Nenhuma (o jogador escolhe)", IsChecked = string.Equals(option, current()?.SelectedOption, StringComparison.OrdinalIgnoreCase) };
+                item.Click += (_, _) =>
+                {
+                    _model.EndMerge();
+                    set(option);
+                    _model.EndMerge();
+                };
+                menu.Items.Add(item);
+            }
+            menu.IsOpen = true;
+        };
+        _refreshers.Add(() => pick.Content = (current()?.SelectedOption ?? "Nenhuma (o jogador escolhe)") + "  ▾");
+        return pick;
+    }
+
+    /// <summary>
+    /// O que a peça faz quando o jogador mexe nela (clica, responde, escolhe…): "Já faz algo — Program.cs, linha 34"
+    /// com o caminho até lá, ou "Ainda não faz nada" com um atalho que escreve a estrutura vazia na cena certa.
+    /// </summary>
+    private FrameworkElement HandlerField(HandlerInfo info, bool inCard)
+    {
+        string handler = info.Name;
+        var card = new CodeStatusCard(this, info.Write);
         PieceCode? found = null;
         card.LinkClicked += () =>
         {
@@ -680,23 +896,21 @@ public sealed class ScreenPropertiesPanel : Border
             if (CodeLinks == null || _model.ProjectDirectory is not { } dir || _shownName is not { } name) return;
             found = CodeLinks.FindPieceCode(dir, _model.SceneName, name, handler);
             string where = found != null ? $"{System.IO.Path.GetFileName(found.File)}, linha {found.Line}" : "";
-            string snippet = isButton ? $"game.Find(\"{name}\").OnClick(() => {{ }});" : $"game.Find(\"{name}\").OnAnswer(answer => {{ }});";
+            string snippet = $"game.Find(\"{name}\").{handler}({info.Parameter} => {{ }});";
             if (found is { HasHandler: true })
             {
-                card.Show(ok: true, isButton ? "Já faz algo" : "Já responde", where, showAction: false,
-                    isButton ? "O que acontece no clique está no código, dentro do OnClick."
-                             : "O que acontece com a resposta está no código, dentro do OnAnswer.");
+                card.Show(ok: true, info.Done, where, showAction: false, info.Explain);
             }
             else if (inCard)
             {
                 // Botão de cartão: o OnClick vai dentro do Show da Lista (um para cada item), não solto na cena.
-                card.Show(ok: false, isButton ? "Ainda não faz nada" : "Ainda não faz nada com a resposta",
+                card.Show(ok: false, info.Missing,
                     found != null ? $"Usado em {where}" : null, showAction: false,
                     $"Dentro do Show da lista, escreva card.Find(\"{name}\").{handler}(...): cada cartão ganha o seu.");
             }
             else
             {
-                card.Show(ok: false, isButton ? "Ainda não faz nada" : "Ainda não faz nada com a resposta",
+                card.Show(ok: false, info.Missing,
                     found != null ? $"Usado em {where}" : null, showAction: true,
                     $"Escreve {snippet} na cena \"{_model.SceneName}\". O que acontece, você escreve entre as chaves.");
             }
@@ -718,6 +932,7 @@ public sealed class ScreenPropertiesPanel : Border
             PieceType.Image => "Trocar a imagem pelo código",
             PieceType.List => "Encher a lista pelo código",
             PieceType.Messages => "Escrever uma mensagem",
+            PieceType.Wheel => "Girar a roleta",
             _ => "Usar no código",
         });
         PieceCode? found = null;
@@ -752,6 +967,16 @@ public sealed class ScreenPropertiesPanel : Border
             }
             found = CodeLinks.FindPieceCode(dir, _model.SceneName, name, "");
             string where = found != null ? $"{System.IO.Path.GetFileName(found.File)}, linha {found.Line}" : "";
+            if (type == PieceType.Wheel)
+            {
+                // A Roleta gira dentro do clique de um botão (o Spin espera ela parar), não solta na cena.
+                if (found != null)
+                    card.Show(ok: true, "Já está no código", where, showAction: false, "Ali o código usa esta roleta. Clique para ir até lá.");
+                else
+                    card.Show(ok: false, "Ainda não gira", null, showAction: false,
+                        $"Ela gira pelo código, dentro do OnClick de um botão: string prize = game.Find(\"{name}\").Spin(); — o prize é a fatia sorteada.");
+                return;
+            }
             if (found != null)
                 card.Show(ok: true, "Já está no código", where, showAction: false,
                     inCard ? "Ali, dentro do Show da lista, cada cartão muda essa peça."
@@ -892,7 +1117,12 @@ public sealed class ScreenPropertiesPanel : Border
             var overflow = piece != null ? ScreenRenderer.Overflow(piece) : null;
             card.Visibility = overflow != null ? Visibility.Visible : Visibility.Collapsed;
             if (piece == null || overflow == null) return;
-            if (piece.Type == PieceType.Button)
+            if (piece.Type == PieceType.Bar)
+            {
+                message.Text = $"A barra está baixa demais: o nome e o número ocupam o espaço e a barra some no jogo. Faltam {Math.Ceiling(overflow.Height - piece.Height)} de altura (ou escolha o nome Dentro da barra).";
+                fit.Content = "Aumentar a altura até aparecer";
+            }
+            else if (piece.Type == PieceType.Button)
             {
                 message.Text = $"O texto não cabe no botão: no jogo ele termina em \"…\". Faltam {Math.Ceiling(overflow.Width - piece.Width)} de largura.";
                 fit.Content = "Aumentar a largura até caber";
@@ -951,9 +1181,36 @@ public sealed class ScreenPropertiesPanel : Border
             if (!box.IsKeyboardFocusWithin) box.Text = _model.SelectedName ?? "";
         });
 
+        // Nome automático (Text1, Button3…) e um texto que a lista de palavras conhece: sugere o nome em inglês.
+        var suggestion = new System.Windows.Documents.Run();
+        var use = new Button { Content = "Usar", Style = (Style)FindResource("LinkButton"), FontSize = 12, Margin = new Thickness(6, 0, 0, 0), Padding = new Thickness(4, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center };
+        var label = new TextBlock { FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "TextSecondary");
+        label.Inlines.Add(new System.Windows.Documents.Run("Nome sugerido: "));
+        suggestion.FontFamily = (FontFamily)FindResource("CodeFont");
+        suggestion.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextPrimary");
+        label.Inlines.Add(suggestion);
+        var suggest = new DockPanel { Margin = new Thickness(0, 6, 0, 0), ToolTip = "Tirado do texto da peça. Os nomes do código ficam em inglês; o texto que o jogador vê continua em português." };
+        DockPanel.SetDock(use, Dock.Right);
+        suggest.Children.Add(use);
+        suggest.Children.Add(label);
+        use.Click += (_, _) =>
+        {
+            if (_model.Selected is not { } piece || _model.SuggestedName(piece) is not { } name) return;
+            box.Text = name;
+            Commit();
+        };
+        _refreshers.Add(() =>
+        {
+            var name = _model.Selected is { } piece ? _model.SuggestedName(piece) : null;
+            suggest.Visibility = name != null ? Visibility.Visible : Visibility.Collapsed;
+            suggestion.Text = name ?? "";
+        });
+
         var panel = new StackPanel();
         panel.Children.Add(box);
         panel.Children.Add(error);
+        panel.Children.Add(suggest);
         panel.Children.Add(hint);
         return panel;
     }
@@ -1195,7 +1452,8 @@ public sealed class ScreenPropertiesPanel : Border
 
         // As cores próprias que esta tela já usa: para repetir a mesma cor em outra peça.
         var used = (_model.Layout?.Pieces ?? [])
-            .SelectMany(p => new[] { p.Color, p.TextColor })
+            .SelectMany(p => new[] { p.Color, p.TextColor, p.BorderColor, p.Gradient })
+            .Concat([_model.Layout?.BackgroundColor, _model.Layout?.BackgroundGradient])
             .OfType<GameColor>()
             .Where(c => !c.IsNamed)
             .Distinct()
@@ -1663,6 +1921,14 @@ public sealed class ScreenPropertiesPanel : Border
         }
         panel.Children.Add(stack);
         return panel;
+    }
+
+    /// <summary>O nome pequeno em cima de um campo ("Cor da borda", "Degradê até").</summary>
+    private static TextBlock FieldLabel(string text, double top = 12)
+    {
+        var label = new TextBlock { Text = text, FontSize = 11, Margin = new Thickness(0, top, 0, 6) };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        return label;
     }
 
     private static TextBlock Section(string text)

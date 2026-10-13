@@ -4,7 +4,10 @@ namespace CSharpLab.GameEngine;
 
 // Uma tela desenhada no Estúdio (arquivo Screens/<Cena>.json). O jogo e o editor visual usam este modelo.
 
-internal enum PieceType { Text, Button, Bar, Image, Box, Input, Messages, List }
+internal enum PieceType { Text, Button, Bar, Image, Box, Input, Messages, List, Choice, Counter, Wheel, Grid }
+
+/// <summary>O que uma casa da Grade mostra (só no jogo: o código escreve com game.Find("Board").Cell(x, y)).</summary>
+internal sealed record CellData(string Text, Color? Color);
 
 internal enum TextAlign { Left, Center, Right }
 
@@ -41,12 +44,26 @@ internal sealed class Piece
     /// <summary>Preenchimento da Caixa, de 0 (invisível) a 100 (cheia).</summary>
     public int? Opacity { get; set; }
     public bool? Border { get; set; }
+    /// <summary>Só a Caixa: cor da borda (null: a automática, que combina com a cor da caixa).</summary>
+    public Color? BorderColor { get; set; }
+    /// <summary>Só a Caixa: grossura da borda, de 1 a 20 (null: fininha).</summary>
+    public int? BorderWidth { get; set; }
+    /// <summary>Só a Caixa: a segunda cor do degradê (null: uma cor só).</summary>
+    public Color? Gradient { get; set; }
+    public GradientDirection? GradientDirection { get; set; }
     public Corner? Corner { get; set; }
     public ButtonStyle? Style { get; set; }
     /// <summary>Cor da letra do botão (null: automática, a que aparece bem em cima do fundo).</summary>
     public Color? TextColor { get; set; }
     public BarStyle? BarStyle { get; set; }
     public BarText? BarText { get; set; }
+    /// <summary>Só a Barra: quando o valor muda, ela desliza até o novo e deixa um rastro do que perdeu.</summary>
+    public bool? Animate { get; set; }
+    /// <summary>
+    /// Só no Estúdio: travada, o mouse não pega nem arrasta a peça no palco (bom para fundos e molduras).
+    /// O jogo ignora.
+    /// </summary>
+    public bool Locked { get; set; }
     /// <summary>false: o botão (ou campo, ou imagem) fica apagado e não responde.</summary>
     public bool Enabled { get; set; } = true;
 
@@ -67,25 +84,49 @@ internal sealed class Piece
     public double? CardHeight { get; set; }
     public double? Gap { get; set; }
 
-    public Piece Clone() => (Piece)MemberwiseClone();
+    /// <summary>Escolha e Roleta: as opções (na Roleta, cada uma é uma fatia).</summary>
+    public List<string>? Options { get; set; }
+    /// <summary>Escolha: a opção escolhida (null: nenhuma). Roleta: onde a seta aponta.</summary>
+    public string? Selected { get; set; }
+    /// <summary>Só o Contador: o menor valor e de quanto em quanto ele anda.</summary>
+    public int? Min { get; set; }
+    public int? Step { get; set; }
+    /// <summary>Escolha: quantas opções por linha (null: automático). Grade: quantas casas por linha.</summary>
+    public int? Columns { get; set; }
+    /// <summary>Só a Grade: quantas linhas.</summary>
+    public int? Rows { get; set; }
+    /// <summary>Só no jogo: o que o código pôs em cada casa da Grade (x, y).</summary>
+    public Dictionary<(int X, int Y), CellData>? Cells { get; set; }
+
+    public Piece Clone()
+    {
+        var copy = (Piece)MemberwiseClone();
+        copy.Options = Options?.ToList();
+        copy.Cells = Cells != null ? new Dictionary<(int X, int Y), CellData>(Cells) : null;
+        return copy;
+    }
 
     // Valores que valem quando o arquivo não diz nada.
     public double FontSize => Size ?? Type switch
     {
         PieceType.Button => 17,
-        PieceType.Bar or PieceType.Input or PieceType.Messages or PieceType.List => 16,
+        PieceType.Bar or PieceType.Input or PieceType.Messages or PieceType.List or PieceType.Choice => 16,
+        PieceType.Wheel => 15,
+        PieceType.Grid => 28,
         _ => 20,
     };
 
     /// <summary>As peças que têm letras: todas ganham as mesmas opções de letra (fonte, tamanho, negrito, itálico, alinhamento, sombra e cor).</summary>
     public static bool HasLetters(PieceType type) =>
-        type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.Messages or PieceType.List;
+        type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.Messages or PieceType.List
+            or PieceType.Choice or PieceType.Counter or PieceType.Wheel or PieceType.Grid;
 
-    /// <summary>Alinhamento quando o arquivo não diz nada: botão e lista vazia no centro, o resto à esquerda.</summary>
-    public static TextAlign DefaultAlign(PieceType type) => type is PieceType.Button or PieceType.List ? TextAlign.Center : TextAlign.Left;
+    /// <summary>Alinhamento quando o arquivo não diz nada: botão, lista vazia e as peças novas no centro, o resto à esquerda.</summary>
+    public static TextAlign DefaultAlign(PieceType type) =>
+        type is PieceType.Button or PieceType.List or PieceType.Choice or PieceType.Wheel or PieceType.Grid ? TextAlign.Center : TextAlign.Left;
 
-    /// <summary>Negrito quando o arquivo não diz nada: o nome da barra já vem em negrito.</summary>
-    public static bool DefaultBold(PieceType type) => type == PieceType.Bar;
+    /// <summary>Negrito quando o arquivo não diz nada: o nome da barra, o número do Contador e as fatias da Roleta já vêm em negrito.</summary>
+    public static bool DefaultBold(PieceType type) => type is PieceType.Bar or PieceType.Counter or PieceType.Wheel or PieceType.Grid;
 
     public TextAlign LetterAlign => Align ?? DefaultAlign(Type);
     public bool IsBold => Bold ?? DefaultBold(Type);
@@ -97,7 +138,30 @@ internal sealed class Piece
 
     /// <summary>Caixa sem cor: fundo cheio, sem borda. Com cor: a cor bem clarinha, com borda.</summary>
     public int BoxOpacity => Math.Clamp(Opacity ?? (Color != null ? 25 : 100), 0, 100);
-    public bool HasBorder => Border ?? Color != null;
+    public bool HasBorder => Border ?? (Color != null || BorderColor != null);
+    public int BorderThickness => Math.Clamp(BorderWidth ?? 1, 1, 20);
+
+    // Contador: valor entre o mínimo e o máximo, andando de Step em Step.
+    public int CounterMin => Min ?? 0;
+    public int CounterMax => Math.Max(CounterMin, Max ?? 99);
+    public int CounterStep => Step is > 0 ? Step.Value : 1;
+    public int CounterValue => Math.Clamp(Value ?? CounterMin, CounterMin, CounterMax);
+
+    /// <summary>As opções da Escolha ou da Roleta (vazia se a pessoa apagou todas).</summary>
+    public IReadOnlyList<string> OptionList => Options ?? [];
+
+    /// <summary>A opção escolhida, como está escrita na lista (null: nenhuma, ou não está mais na lista).</summary>
+    public string? SelectedOption => Selected != null ? OptionList.FirstOrDefault(o => string.Equals(o, Selected, StringComparison.OrdinalIgnoreCase)) : null;
+
+    /// <summary>Escolha: opções por linha. Sem escolher, todas numa linha (peça larga) ou uma embaixo da outra (peça alta).</summary>
+    public int ChoiceColumns => Columns is > 0 ? Math.Min(Columns.Value, Math.Max(1, OptionList.Count)) : Width >= Height ? Math.Max(1, OptionList.Count) : 1;
+
+    // Grade: de 1 a 20 casas por linha e por coluna.
+    public const int MaxCells = 20;
+    public int GridColumns => Math.Clamp(Columns ?? 3, 1, MaxCells);
+    public int GridRows => Math.Clamp(Rows ?? 3, 1, MaxCells);
+
+    public CellData CellAt(int x, int y) => Cells?.GetValueOrDefault((x, y)) ?? new CellData("", null);
 
     public double CardW => CardWidth is > 0 ? CardWidth.Value : 180;
     public double CardH => CardHeight is > 0 ? CardHeight.Value : 220;
@@ -106,25 +170,30 @@ internal sealed class Piece
     /// <summary>O que cada tipo de peça aceita, para o código e o editor mostrarem só o que faz sentido.</summary>
     public static bool Supports(PieceType type, string property) => property switch
     {
-        nameof(Text) => type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.List,
+        nameof(Text) => type is PieceType.Text or PieceType.Button or PieceType.Bar or PieceType.Input or PieceType.List or PieceType.Counter,
         nameof(Size) or nameof(Align) or nameof(Italic) or nameof(Bold) or nameof(Font) => HasLetters(type),
         nameof(Scroll) => type is PieceType.Text,
         nameof(GameWrite) => type is PieceType.Messages,
         nameof(Shadow) => HasLetters(type) || type is PieceType.Box,
         nameof(TextShadow) => type is PieceType.Button,
         nameof(Color) or nameof(Shade) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages or PieceType.List),
-        nameof(Opacity) or nameof(Border) => type is PieceType.Box,
-        nameof(Corner) => type is PieceType.Box or PieceType.Button or PieceType.Bar,
+        nameof(Opacity) or nameof(Border) or nameof(BorderColor) or nameof(BorderWidth) or nameof(Gradient) or nameof(GradientDirection) => type is PieceType.Box,
+        nameof(Animate) => type is PieceType.Bar,
+        nameof(Corner) => type is PieceType.Box or PieceType.Button or PieceType.Bar or PieceType.Choice or PieceType.Counter or PieceType.Grid,
         nameof(Style) => type is PieceType.Button,
         // O Texto usa o Color como cor da letra; as outras peças com letras têm a cor da letra separada.
         nameof(TextColor) => HasLetters(type) && type is not PieceType.Text,
         nameof(BarStyle) or nameof(BarText) => type is PieceType.Bar,
         nameof(Shortcut) => type is PieceType.Button,
-        nameof(Enabled) => type is PieceType.Button or PieceType.Input or PieceType.Image,
-        nameof(Value) or nameof(Max) => type is PieceType.Bar,
+        nameof(Enabled) => type is PieceType.Button or PieceType.Input or PieceType.Image or PieceType.Choice or PieceType.Counter or PieceType.Grid,
+        nameof(Value) or nameof(Max) => type is PieceType.Bar or PieceType.Counter,
+        nameof(Min) or nameof(Step) => type is PieceType.Counter,
+        nameof(Options) or nameof(Selected) => type is PieceType.Choice or PieceType.Wheel,
+        nameof(Columns) => type is PieceType.Choice or PieceType.Grid,
+        nameof(Rows) => type is PieceType.Grid,
         nameof(Image) => type is PieceType.Image,
         nameof(CardWidth) or nameof(CardHeight) or nameof(Gap) => type is PieceType.List,
-        nameof(List) => type is not (PieceType.List or PieceType.Messages),
+        nameof(List) => type is not (PieceType.List or PieceType.Messages or PieceType.Choice or PieceType.Counter or PieceType.Wheel or PieceType.Grid),
         _ => true,
     };
 
@@ -158,6 +227,18 @@ internal sealed class Piece
             case PieceType.List:
                 (piece.Width, piece.Height, piece.CardWidth, piece.CardHeight, piece.Gap) = (592, 240, 180, 240, 16);
                 break;
+            case PieceType.Choice:
+                (piece.Width, piece.Height, piece.Options, piece.Selected) = (480, 52, ["Fácil", "Normal", "Difícil"], "Normal");
+                break;
+            case PieceType.Counter:
+                (piece.Width, piece.Height, piece.Value, piece.Min, piece.Max) = (200, 52, 1, 0, 10);
+                break;
+            case PieceType.Wheel:
+                (piece.Width, piece.Height, piece.Options) = (300, 300, ["10 moedas", "Nada", "50 moedas", "Poção", "Nada", "100 moedas"]);
+                break;
+            case PieceType.Grid:
+                (piece.Width, piece.Height, piece.Columns, piece.Rows) = (300, 300, 3, 3);
+                break;
         }
         return piece;
     }
@@ -173,6 +254,10 @@ internal sealed class Piece
         PieceType.Input => "Campo de escrita",
         PieceType.Messages => "Mensagens",
         PieceType.List => "Lista",
+        PieceType.Choice => "Escolha",
+        PieceType.Counter => "Contador",
+        PieceType.Wheel => "Roleta",
+        PieceType.Grid => "Grade",
         _ => type.ToString(),
     };
 }
@@ -184,9 +269,19 @@ internal sealed class ScreenLayout
     public const double Width = 960, Height = 540;
 
     public string? Background { get; set; }
+    /// <summary>Cor do fundo da tela (null: a do tema). Fica atrás da imagem de fundo, se tiver.</summary>
+    public Color? BackgroundColor { get; set; }
+    /// <summary>Segunda cor do fundo: degradê de cima (BackgroundColor) para baixo (esta).</summary>
+    public Color? BackgroundGradient { get; set; }
     public List<Piece> Pieces { get; set; } = [];
 
-    public ScreenLayout Clone() => new() { Background = Background, Pieces = Pieces.Select(p => p.Clone()).ToList() };
+    public ScreenLayout Clone() => new()
+    {
+        Background = Background,
+        BackgroundColor = BackgroundColor,
+        BackgroundGradient = BackgroundGradient,
+        Pieces = Pieces.Select(p => p.Clone()).ToList(),
+    };
 
     public Piece? Find(string name) => Pieces.FirstOrDefault(p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
 

@@ -252,7 +252,10 @@ game.Start("Start");
 | `Find("Log").Write` | escrever numa caixa | Uma mensagem só para aquela caixa de Mensagens: `game.Find("EnemyLog").Write("O goblin atacou!");`. Desligue **Recebe o game.Write** na caixa para ela mostrar só as dela (uma caixa para você, outra para o inimigo). |
 | `Clear` | limpar | Dentro de um clique, apaga as mensagens que a cena já mostrou, como o `Console.Clear()`: `game.Clear();`. O que for escrito depois aparece normalmente. |
 | `Shake` / `Flash` | tremer / piscar | `game.Find("EnemyIcon").Shake();` treme a peça; `.Flash();` faz piscar. Bom ao levar dano. |
+| `Pop` | saltar | `game.Find("EnemyHealth").Pop("-7", Color.Red);` mostra um texto em cima da peça, que sobe e some (dano, cura, ouro). |
+| `Animate` | animar | Na barra (ou no Estúdio, **Animar no jogo**): `game.Find("EnemyHealth").Animate = true;` faz a barra deslizar até o valor novo e mostrar o pedaço perdido. |
 | `Background` | fundo | A imagem de fundo da tela (pasta `Assets`), para a mesma tela servir a lugares diferentes: `game.Background = "tower.png";`. |
+| `BackgroundColor` | cor do fundo | A cor do fundo da tela: `game.BackgroundColor = Color.Hex("#3A0D0D");`. No Estúdio, o fundo também pode ser um degradê. |
 | `Test` | testar | Valores para testar uma cena sem jogar tudo até ela: `game.Test("Fight", () => { health = 3; });`. Com a cena aberta, **Ctrl+F5** (Jogar esta cena) começa o jogo nela com esses valores. No F5 normal ele não roda. |
 | `Start` | começar | Abre a janela na primeira cena. Sempre na última linha. |
 
@@ -309,8 +312,64 @@ Selecione a peça no Estúdio e mude no painel ao lado da tela. Cada opção mos
 - **Botão**: cinco estilos com miniatura (Cheio, Degradê, Suave, Contorno, Só texto), cor do botão, cor da letra,
   cantos (do tema, retos ou pílula), negrito e sombra embaixo.
 - **Barra**: três estilos (Lisa, Brilhante, Em blocos), o nome e o número em cima, dentro ou escondidos, cantos e fonte.
-  Vida, mana e energia podem ter cara diferente, não só cor diferente.
-- **Caixa**: cor, preenchimento, borda, cantos e sombra embaixo.
+  Vida, mana e energia podem ter cara diferente, não só cor diferente. **Animar no jogo**: quando o valor muda, a barra
+  desliza até o novo e mostra por um instante o pedaço perdido.
+- **Caixa**: cor, **degradê** (uma segunda cor, para baixo, para o lado ou na diagonal), preenchimento, borda (com cor
+  e grossura próprias), cantos e sombra embaixo.
+- **Fundo da tela** (clique fora das peças): cor, degradê de cima para baixo e imagem por cima.
+
+### Escolha, Contador, Roleta e Grade
+
+Quatro peças para jogos de todo tipo (loja, quiz, sorteio, tabuleiro). Arraste do painel **PEÇAS**, personalize no
+painel da direita e use pelo código com `game.Find`:
+
+| Peça | Para que serve | No código |
+|---|---|---|
+| **Escolha** (`Choice`) | Uma opção entre várias: dificuldade, classe, resposta de quiz. O jogador clica numa; ela fica cheia, com a cor da peça | `.Selected` (a escolhida, `""` se nenhuma), `.Options`, `.OnChoose(choice => { ... })` |
+| **Contador** (`Counter`) | Um número com − e +: quantidade na loja, aposta, distribuir pontos. Não passa do mínimo nem do máximo | `.Value`, `.Min`, `.Max`, `.Step`, `.OnChange(value => { ... })` |
+| **Roleta** (`Wheel`) | Uma roda da sorte com uma fatia para cada opção (repita uma opção para ela sair mais vezes) | `string prize = .Spin();` dentro do clique de um botão: ela gira, para, e o código continua com a fatia sorteada |
+| **Grade** (`Grid`) | Casas em linhas e colunas: jogo da velha, memória, campo minado, inventário em quadradinhos | `.Cell(x, y).Text = "X";`, `.Cell(x, y).Color`, `.Cell(x, y).IsEmpty`, `.Clear()`, `.OnCellClick((x, y) => { ... })` |
+
+```csharp
+game.Scene("Shop", () =>
+{
+    game.Find("Amount").OnChange(value =>
+    {
+        game.Find("Total").Text = $"Total: {value * price} moedas";
+    });
+    game.Find("Spin").OnClick(() =>
+    {
+        string prize = game.Find("Wheel").Spin();
+        game.Write($"Você ganhou: {prize}!");
+    });
+});
+
+game.Scene("TicTacToe", () =>
+{
+    game.Find("Board").OnCellClick((x, y) =>
+    {
+        var cell = game.Find("Board").Cell(x, y);
+        if (cell.IsEmpty) cell.Text = "X";
+    });
+});
+```
+
+Na Grade, a casa de cima à esquerda é `(0, 0)`: `x` é a coluna e `y` é a linha. No Estúdio, cada casa mostra o `x,y` dela.
+
+### Mexer na tela sem brigar com ela
+
+- **Cadeado** (nas Camadas, com o mouse em cima da linha): a peça fica travada, o mouse não pega nem arrasta mais.
+  Bom para o fundo e as molduras, que viviam sendo pegos sem querer. Destrave no mesmo cadeado.
+- **Olho** (nas Camadas): esconde a peça só no Estúdio, para mexer no que está atrás. No jogo ela aparece normalmente.
+- **A Caixa leva o que está em cima**: arrastar uma Caixa leva junto os textos, botões e barras que estão inteiros
+  dentro dela (e na frente dela, nas Camadas). Segure **Ctrl** enquanto arrasta para mover só a caixa.
+- **Nome sugerido**: enquanto a peça tem o nome automático (`Text1`, `Button3`…), o painel sugere um nome em inglês
+  tirado do texto dela ("Ataque Pesado" → `HeavyAttack`, "Suas ações" → `YourActions`). **Usar** troca o nome e
+  atualiza o código. Só sugere quando conhece todas as palavras.
+- **▶ Ver**: no painel, **MOVIMENTOS** mostra no palco como a peça treme (`Shake`), pisca (`Flash`) ou faz um `Pop`,
+  e diz a linha de código. Na barra, o **▶ Ver** ao lado de **Animar no jogo** mostra a animação. A tela não muda.
+- **Barra baixa demais**: com o nome em cima e pouca altura, a barra sumiria no jogo. O palco marca em laranja e o
+  painel oferece **Aumentar a altura até aparecer**.
 
 ### Lista: um cartão para cada item
 
