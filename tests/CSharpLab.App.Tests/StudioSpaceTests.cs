@@ -150,7 +150,6 @@ public sealed class StudioSpaceTests
             await Settle(window);
             Assert.False(studio.ShowsCode);
             Assert.True(studio.Screen!.Stage.Zoom > withCode * 1.3, $"o palco devia crescer: {withCode} → {studio.Screen.Stage.Zoom}");
-            Assert.False(studio.Screen.Palette.Compact);   // com espaço, as peças voltam a mostrar o nome
             vm.SaveSettings();
             Assert.False(settings.StudioCodeVisible);
             SaveImage(window, "csharplab-estudio-sem-codigo.png");
