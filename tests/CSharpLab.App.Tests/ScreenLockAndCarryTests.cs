@@ -154,6 +154,7 @@ public sealed class ScreenLockAndCarryTests
         var (doc, model) = Open();
         using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
         var view = new ScreenEditorView(doc, vm);
+        view.Properties.AllTabs = true;   // confere o painel inteiro, com as três abas juntas
         var layers = new LayersPanel { Model = view.Model, Width = 260 };
         var root = new DockPanel();
         DockPanel.SetDock(layers, Dock.Left);
@@ -245,6 +246,7 @@ public sealed class ScreenLockAndCarryTests
         var (doc, model) = Open();
         using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
         var view = new ScreenEditorView(doc, vm);
+        view.Properties.AllTabs = true;   // confere o painel inteiro, com as três abas juntas
         var window = new Window { Content = view, Width = 1400, Height = 900, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Left = -10000, Top = -10000 };
         window.Show();
         try

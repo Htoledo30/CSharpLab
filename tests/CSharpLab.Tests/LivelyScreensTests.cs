@@ -200,7 +200,9 @@ public sealed class LivelyScreensTests : IDisposable
         // Uma caixa sem borda ganha a borda ao escolher a cor dela.
         frame.Border = false;
         frame.BorderColor = Color.Cyan;
-        Assert.False(frame.Border);   // quem desligou de propósito continua desligado
+        Assert.True(frame.Border);    // BorderColor segue o contrato: escolher a cor liga a borda
+        frame.Border = false;         // desligar depois de escolher a cor continua possível
+        Assert.False(frame.Border);
         game.BackgroundColor = Color.Hex("#000000");
         Assert.Equal(Color.Hex("#000000"), game.BackgroundColor);
     }

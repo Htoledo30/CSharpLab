@@ -28,6 +28,7 @@ public sealed class PiecePalette : Border
         (PieceType.Button, "O jogador clica e o código roda: game.Find(\"Nome\").OnClick(() => { });"),
         (PieceType.Bar, "Vida, mana, energia: game.Find(\"Nome\").Value = health;"),
         (PieceType.Image, "Uma imagem da pasta Assets do projeto."),
+        (PieceType.Icon, "Um desenho pronto (espada, goblin, poção, coração…), da cor que você quiser: game.Find(\"Nome\").Icon = Icon.Goblin;"),
         (PieceType.Box, "Um fundo colorido para agrupar outras peças."),
         (PieceType.Input, "Uma pergunta com campo para o jogador escrever: OnAnswer(answer => { });"),
         (PieceType.Messages, "Onde aparecem os textos do game.Write, com as mensagens antigas apagadinhas."),
@@ -35,6 +36,7 @@ public sealed class PiecePalette : Border
         (PieceType.Choice, "Uma opção entre várias (dificuldade, classe, resposta de quiz): game.Find(\"Nome\").OnChoose(choice => { });"),
         (PieceType.Counter, "Um número com − e + (quantidade na loja, aposta, pontos): game.Find(\"Nome\").Value"),
         (PieceType.Wheel, "Uma roleta da sorte (prêmios, eventos): string prize = game.Find(\"Nome\").Spin();"),
+        (PieceType.Dice, "Um dado de RPG (d4, d6, d8, d10, d12, d20, d100) que rola na tela: int roll = game.Find(\"Nome\").Roll();"),
         (PieceType.Grid, "Casas em linhas e colunas (jogo da velha, memória, tabuleiro): game.Find(\"Nome\").Cell(x, y).Text = \"X\";"),
     ];
 
@@ -221,6 +223,18 @@ public sealed class PiecePalette : Border
                 Add(new Ellipse { Width = 15, Height = 15, Fill = B(0xE8, 0x6A, 0x4E) }, 3.5, 0.5);
                 Add(new Path { Data = Geometry.Parse("M 7.5,7.5 L 7.5,0 A 7.5,7.5 0 0 1 15,7.5 Z M 7.5,7.5 L 7.5,15 A 7.5,7.5 0 0 1 0,7.5 Z"), Fill = B(0xF2, 0xC1, 0x4E) }, 3.5, 0.5);
                 Add(new Polygon { Points = [new(8, 0), new(14, 0), new(11, 4)], Fill = light }, 0, -1);
+                break;
+            case PieceType.Icon:
+            {
+                var star = GameEngine.ScreenRenderer.IconShape(GameEngine.Icon.Star, B(0xF2, 0xC1, 0x4E));
+                star.Width = 16;
+                star.Height = 16;
+                Add(star, 3, 0);
+                break;
+            }
+            case PieceType.Dice:
+                Add(new Polygon { Points = [new(8, 0), new(15, 4), new(15, 12), new(8, 16), new(1, 12), new(1, 4)], Fill = B(0xE0, 0x4E, 0x5A) }, 3, 0);
+                Add(new Polygon { Points = [new(8, 4), new(12, 10.5), new(4, 10.5)], Stroke = B(0xFF, 0xC4, 0xC8), StrokeThickness = 1 }, 3, 0);
                 break;
             case PieceType.Grid:
                 for (int row = 0; row < 3; row++)

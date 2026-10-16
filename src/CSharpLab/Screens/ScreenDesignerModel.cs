@@ -765,6 +765,7 @@ public sealed partial class ScreenDesignerModel : IDisposable
             PieceType.Bar => $"{find}.Value = $0;",
             PieceType.Image => $"{find}.Image = \"$0\";",
             PieceType.Box => $"{find}.Visible = $0;",
+            PieceType.Icon => $"{find}.Icon = Icon.$0;",
             // Uma caixa que não recebe o game.Write só mostra o que for escrito nela.
             PieceType.Messages => piece.GameWrite ? "game.Write(\"$0\");" : $"{find}.Write(\"$0\");",
             PieceType.List => $"{find}.Show($0, (card, item) =>\n{{\n    {CardHint(piece, layout)}\n}});",
@@ -794,6 +795,8 @@ public sealed partial class ScreenDesignerModel : IDisposable
             PieceType.Choice => $"{find}.OnChoose(choice =>\n{{\n    \n}});",
             PieceType.Counter => $"{find}.OnChange(value =>\n{{\n    \n}});",
             PieceType.Wheel => $"string prize = {find}.Spin();   // dentro do OnClick de um botão",
+            PieceType.Icon => $"{find}.Icon = Icon.{piece.Icon ?? GameEngine.Icon.Star};",
+            PieceType.Dice => $"int roll = {find}.Roll();   // dentro do OnClick de um botão",
             PieceType.Grid => $"{find}.OnCellClick((x, y) =>\n{{\n    {find}.Cell(x, y).Text = \"X\";\n}});",
             PieceType.Messages => "game.Write(\"Você causou 7 de dano!\");",
             PieceType.List => $"{find}.Show(items, (card, item) =>\n{{\n    card.Find(\"Name\").Text = item.Name;\n}});",

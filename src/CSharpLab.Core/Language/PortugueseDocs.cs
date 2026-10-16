@@ -341,7 +341,14 @@ public static partial class PortugueseDocs
         m[item + ".Name"] = D("Name = nome. O nome da peça no Estúdio.");
         m[item + ".Text"] = D("Text = texto. O texto de um Texto ou Botão, o rótulo de uma Barra ou a pergunta de um Campo de escrita.",
             "game.Find(\"Story\").Text = $\"Ouro: {gold}\";");
-        m[item + ".Value"] = D("Value = valor. Quanto a Barra tem agora, ou o número do Contador.", "game.Find(\"PlayerHealth\").Value = health;");
+        m[item + ".Value"] = D("Value = valor. Quanto a Barra tem agora, o número do Contador ou a face que o Dado mostra.", "game.Find(\"PlayerHealth\").Value = health;");
+        m[item + ".Icon"] = D("Icon = ícone. O desenho da peça Ícone, ou o desenho antes do texto de um Botão (null tira o do botão).",
+            "game.Find(\"EnemyIcon\").Icon = Icon.Goblin;\ngame.Find(\"Attack\").Icon = Icon.Sword;");
+        m[item + ".Frame"] = D("Frame = moldura. A moldura atrás do desenho do Ícone: IconFrame.None, IconFrame.Circle ou IconFrame.Square.",
+            "game.Find(\"EnemyIcon\").Frame = IconFrame.Circle;");
+        m[item + ".Sides"] = D("Sides = lados. Quantos lados o Dado tem: 4, 6, 8, 10, 12, 20 ou 100.", "game.Find(\"Dice\").Sides = 6;");
+        m[item + ".Roll"] = D("Roll = rolar. Rola o Dado: ele gira, os números passam e ele para num deles, que volta para o código. Só dentro de um clique (o OnClick de um botão).",
+            "int roll = game.Find(\"D20\").Roll();\nif (roll == 20) game.Write(\"Crítico!\", Color.Gold);");
         m[item + ".Max"] = D("Max = máximo. O valor da Barra cheia, ou o maior número do Contador.", "game.Find(\"PlayerHealth\").Max = maxHealth;");
         m[item + ".Visible"] = D("Visible = visível. false esconde a peça; true mostra de novo.", "game.Find(\"Potion\").Visible = potions > 0;");
         m[item + ".Color"] = D("Color = cor. A cor do texto, do botão, da barra ou da caixa.", "game.Find(\"Story\").Color = Color.Red;");
@@ -498,6 +505,42 @@ public static partial class PortugueseDocs
         m[engine + "GradientDirection.Down"] = D("Down = para baixo: a cor da caixa em cima, a do degradê embaixo (o normal).");
         m[engine + "GradientDirection.Right"] = D("Right = para a direita: a cor da caixa à esquerda, a do degradê à direita.");
         m[engine + "GradientDirection.Diagonal"] = D("Diagonal: do canto de cima à esquerda até o canto de baixo à direita.");
+
+        m[engine + "Icon"] = D("Icon = ícone. Os desenhos prontos da peça Ícone e do ícone do Botão: Icon.Sword (espada), Icon.Shield (escudo), Icon.Goblin, Icon.Potion (poção), Icon.Heart (coração)… Ficam da cor da peça.",
+            "game.Find(\"EnemyIcon\").Icon = Icon.Goblin;\ngame.Find(\"Attack\").Icon = Icon.Sword;");
+        foreach (var (name, text) in new[]
+                 {
+                     ("Sword", "espada"), ("Swords", "espadas cruzadas"), ("Shield", "escudo"), ("Bow", "arco"), ("Axe", "machado"), ("Hammer", "martelo"),
+                     ("Pick", "picareta"), ("Spear", "tridente"), ("Knife", "faca"), ("Bomb", "bomba"), ("Target", "alvo"), ("Fist", "soco"),
+                     ("Boom", "explosão"), ("Skull", "caveira"), ("Crossbones", "caveira e ossos"), ("Chains", "correntes"), ("Muscle", "força"), ("Fencer", "esgrimista"),
+                     ("Goblin", "Goblin"), ("Ogre", "ogro"), ("Ghost", "fantasma"), ("Dragon", "dragão"), ("Wolf", "lobo"), ("Spider", "aranha"),
+                     ("Snake", "cobra"), ("Bat", "morcego"), ("Zombie", "zumbi"), ("Vampire", "vampiro"), ("Mage", "mago"), ("Elf", "elfo"),
+                     ("Fairy", "fada"), ("Genie", "gênio"), ("Alien", "alienígena"), ("Robot", "robô"), ("Scorpion", "escorpião"), ("Rat", "rato"),
+                     ("Boar", "javali"), ("Bear", "urso"), ("Lion", "leão"), ("Eagle", "águia"), ("Owl", "coruja"), ("Fox", "raposa"),
+                     ("Horse", "cavalo"), ("Unicorn", "unicórnio"), ("Octopus", "polvo"), ("Shark", "tubarão"), ("Crab", "caranguejo"), ("Dino", "dinossauro"),
+                     ("Cat", "gato"), ("Dog", "cachorro"), ("Person", "pessoa"), ("King", "rei"), ("Queen", "rainha"), ("Guard", "guarda"),
+                     ("Running", "correndo"), ("Potion", "poção"), ("Heart", "coração"), ("Gem", "joia"), ("Coin", "moeda"), ("Gold", "saco de ouro"),
+                     ("Key", "chave"), ("Scroll", "pergaminho"), ("Book", "livro"), ("Map", "mapa"), ("Ring", "anel"), ("Crown", "coroa"),
+                     ("Apple", "maçã"), ("Meat", "carne"), ("Bread", "pão"), ("Cheese", "queijo"), ("Mushroom", "cogumelo"), ("Herb", "erva"),
+                     ("Pill", "remédio"), ("Candle", "vela"), ("Lantern", "lanterna"), ("Hourglass", "ampulheta"), ("Bell", "sino"), ("Lock", "cadeado"),
+                     ("Unlock", "cadeado aberto"), ("Gift", "presente"), ("Backpack", "mochila"), ("Boot", "bota"), ("Hat", "chapéu"), ("Shirt", "roupa"),
+                     ("Wine", "taça"), ("Beer", "caneca"), ("Toolbox", "ferramentas"), ("Bone", "osso"), ("Feather", "pena"), ("Fire", "fogo"),
+                     ("Ice", "gelo"), ("Lightning", "raio"), ("Water", "água"), ("Star", "estrela"), ("Sparkles", "brilhos"), ("Moon", "lua"),
+                     ("Sun", "sol"), ("Cloud", "nuvem"), ("Rain", "chuva"), ("Tornado", "tornado"), ("Wind", "vento"), ("CrystalBall", "bola de cristal"),
+                     ("Wand", "varinha"), ("Eye", "olho"), ("Poison", "veneno"), ("Dizzy", "tontura"), ("Web", "teia"), ("Rose", "rosa"),
+                     ("Leaf", "folha"), ("Flower", "flor"), ("Tree", "árvore"), ("Cactus", "cacto"), ("Paw", "pegadas de bicho"), ("Castle", "castelo"),
+                     ("House", "casa"), ("Tent", "barraca"), ("Mountain", "montanha"), ("Volcano", "vulcão"), ("Church", "templo"), ("Door", "porta"),
+                     ("Ship", "barco"), ("Anchor", "âncora"), ("Compass", "bússola"), ("Check", "certo"), ("Cross", "errado"), ("Warning", "atenção"),
+                     ("Question", "pergunta"), ("Exclamation", "exclamação"), ("Trophy", "troféu"), ("Medal", "medalha"), ("Flag", "bandeira"), ("Dice", "dado"),
+                     ("Clock", "relógio"), ("Gear", "engrenagem"), ("Music", "música"), ("Speech", "fala"), ("Sleep", "sono"), ("Footprints", "pegadas"),
+                     ("Brain", "cérebro"), ("Hand", "mão"), ("ThumbsUp", "joinha"), ("Puzzle", "quebra-cabeça"), ("Joker", "coringa"), ("Rocket", "foguete"),
+                 })
+            m[engine + "Icon." + name] = D($"{name} = {text}.");
+
+        m[engine + "IconFrame"] = D("IconFrame = moldura do ícone: None (sem moldura), Circle (círculo) ou Square (quadrado de cantos redondos).", "game.Find(\"EnemyIcon\").Frame = IconFrame.Circle;");
+        m[engine + "IconFrame.None"] = D("None = nenhuma: só o desenho, sem moldura.");
+        m[engine + "IconFrame.Circle"] = D("Circle = círculo: o desenho num círculo (bom para retratos).");
+        m[engine + "IconFrame.Square"] = D("Square = quadrado: o desenho num quadrado de cantos redondos (bom para itens e habilidades).");
 
         m[engine + "GameException"] = D("Erro do motor do jogo. A mensagem explica em português o que fazer.");
     }

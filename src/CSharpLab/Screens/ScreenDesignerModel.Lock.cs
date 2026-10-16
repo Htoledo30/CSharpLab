@@ -4,7 +4,7 @@ using CSharpLab.GameEngine;
 namespace CSharpLab.Screens;
 
 /// <summary>O que o "▶ Ver" do painel mostra no palco: um movimento da peça ou a barra animada.</summary>
-public enum PiecePreview { Shake, Flash, Pop, Bar, Spin }
+public enum PiecePreview { Shake, Flash, Pop, Bar, Spin, Roll }
 
 // Mexer na tela sem brigar com ela: travar uma peça (o mouse não pega nem arrasta), esconder uma peça só aqui
 // no Estúdio (para alcançar o que está atrás) e a Caixa que leva junto o que está em cima dela.

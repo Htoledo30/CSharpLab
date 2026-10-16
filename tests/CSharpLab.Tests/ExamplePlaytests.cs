@@ -61,6 +61,10 @@ public sealed class ExamplePlaytests : IDisposable
             game.ClickPiece(button.Piece);
         }
 
+        public void Choose(string name, string option) => game.ChoosePiece(Designed.Layout.Pieces.Single(p => p.Name == name), option);
+        public void Step(string name, int direction) => game.StepPiece(Designed.Layout.Pieces.Single(p => p.Name == name), direction);
+        public void Cell(string name, int x, int y) => game.ClickCell(Designed.Layout.Pieces.Single(p => p.Name == name), x, y);
+
         public void Answer(string name, string text) =>
             game.AnswerPiece(Designed.Layout.Pieces.Single(p => p.Name == name), text);
     }
@@ -92,6 +96,7 @@ public sealed class ExamplePlaytests : IDisposable
         {
             game.Screens = new ScreenLibrary { Roots = [directory] };
             game.PlayFrom = playFrom;
+            game.SaveFolder = Path.Combine(directory, "saves-de-teste");   // o templo salva aqui, não em Documentos
             Theme.ImageRoots = [directory];   // as imagens da pasta Assets do jogo, para as fotos
             game.Begin(first, view);
             started = game;
@@ -154,105 +159,125 @@ public sealed class ExamplePlaytests : IDisposable
         Assert.EndsWith("(visita 10)", test.Text("Story"));
     });
 
+    /// <summary>
+    /// A Coroa Perdida (23 cenas) jogada do começo ao fim: passa por todas as cenas e mexe em todas as peças
+    /// (Lista, Escolha, Contador, Roleta, Grade, Dado, Ícone, Campo de escrita, salvar no templo).
+    /// </summary>
     [Fact]
     public void A_Coroa_Perdida_do_comeco_ao_fim() => OnSta(() =>
     {
         var p = Load("RpgAdventure");
         Assert.Equal("Title", p.Scene);
+        Assert.False(p.Visible("Continue"));   // sem jogo salvo, sem "Continuar"
         Photo(p, "01-titulo");
 
         p.Answer("NameField", "Henrique");
         Assert.Equal("ChooseClass", p.Scene);
         Assert.Contains("Henrique", p.Text("Subtitle"));
-        // As classes vêm da lista do código: um cartão para cada uma.
         Assert.Equal(["Guerreiro", "Maga", "Ladino"], p.Cards("Classes").Select(c => c.Find("Name").Text));
-        Assert.Contains("Golpe brutal", p.Cards("Classes")[0].Find("Stats").Text);
+        Assert.Equal(Icon.Mage, p.Cards("Classes")[1].Find("Icon").Icon);
         Photo(p, "02-classes");
 
         p.ClickCard("Classes", 0, "Pick");
         Assert.Equal("Village", p.Scene);
-        Assert.Equal("Henrique · Guerreiro · Nível 1", p.Text("PlayerInfo"));
+        Assert.Equal("Henrique\nGuerreiro · Nível 1", p.Text("PlayerInfo"));
         Assert.Equal((130, 130), (p.Piece("Health").Value, p.Piece("Health").Max));
-        // Sem a chave, a torre fica apagada.
-        Assert.Equal("🔒 Trancada", p.Text("Tower"));
-        Assert.False(p.Enabled("Tower"));
         Photo(p, "03-vila");
 
-        // Loja: a Lista mostra as 5 coisas; compra uma poção; a espada é cara demais por enquanto.
+        // Loja: 6 coisas; compra uma poção; a espada é cara demais por enquanto.
         p.Click("Shop");
-        Assert.Equal(5, p.Cards("Goods").Count);
+        Assert.Equal(6, p.Cards("Goods").Count);
         p.ClickCard("Goods", 0, "Buy");
-        Assert.Equal("🧪 2", p.Text("Potions"));
-        Assert.Equal("💰 7", p.Text("Gold"));
-        var sword = p.Cards("Goods")[3];
+        Assert.Equal(("2", "7"), (p.Text("Potions"), p.Text("Gold")));
+        var sword = p.Cards("Goods")[4];
         Assert.Equal(("Espada de aço", "Falta ouro", false), (sword.Find("Name").Text, sword.Find("Buy").Text, sword.Find("Buy").Enabled));
-        Assert.Contains(p.News, m => m.Contains("Você comprou: Poção de vida"));
         Photo(p, "04-loja");
         p.Click("Back");
 
-        // Caverna: erra o enigma, depois acerta e pega a chave.
-        p.Click("Cave");
-        p.Answer("Riddle", "uma pedra");
-        Assert.Equal(122, p.Piece("Health").Value);
-        Photo(p, "05-caverna-erro");
-        p.Answer("Riddle", "Buraco");
-        Assert.False(p.Visible("Riddle"));
-        Assert.Contains(p.News, m => m.Contains("chave da torre"));
-        // A mensagem do erro continua lá, apagadinha (o histórico da cena).
-        Assert.Contains(p.Screen.Messages, m => m.IsOld && m.Text.Contains("Errado"));
+        // Taverna: aposta no Contador, rola os dados, vai à cigana e gira a roleta.
+        p.Click("Tavern");
+        p.Step("Bet", +1);
+        Assert.Equal(6, p.Piece("Bet").Value);
+        p.Click("Play");
+        Assert.Contains(p.News, m => m.Contains("Bartô tirou") || m.Contains("Os dois tiraram"));
+        Photo(p, "05-taverna");
+        p.Click("Fortune");
+        Assert.Equal("Fortune", p.Scene);
+        if (p.Enabled("Spin"))
+        {
+            p.Click("Spin");
+            Assert.Contains(p.Piece("Wheel").Selected, p.Piece("Wheel").Options);
+        }
+        Photo(p, "06-roleta");
         p.Click("Back");
-        Assert.Equal("Entrar", p.Text("Tower"));
-        Assert.True(p.Enabled("Tower"));
+        p.Click("Back");
 
-        // Floresta: explora até ter visto uma luta e um encontro (curando na taverna quando preciso).
-        bool sawFight = false, sawEvent = false;
+        // Ferreiro: trocar a Escolha muda o texto e o preço.
+        p.Click("Smith");
+        p.Choose("Upgrade", "Escudo de ferro");
+        Assert.Contains("2 a menos", p.Text("Details"));
+        Assert.Equal("30 de ouro", p.Text("Price"));
+        Photo(p, "07-ferreiro");
+        p.Click("Back");
+
+        // Templo: rezar (game.Pause) e salvar; o título passa a mostrar o "Continuar".
+        p.Click("Temple");
+        p.Click("Pray");
+        p.Click("Save");
+        Assert.True(p.Game.HasSave);
+        Photo(p, "08-templo");
+        p.Click("Back");
+
+        p.Click("Quests");
+        Assert.Equal(4, p.Cards("Board").Count);
+        Photo(p, "09-missoes");
+        p.Click("Back");
+
+        p.Click("Bag");
+        Assert.Equal("Poção de vida", p.Cards("Items")[0].Find("Name").Text);
+        Photo(p, "10-mochila");
+        p.Click("Back");
+        p.Click("Sheet");
+        Assert.Equal("Henrique", p.Text("Name"));
+        Photo(p, "11-ficha");
+        p.Click("Back");
+
+        // Mapa: a caverna e a torre começam trancadas.
+        p.Click("Gate");
+        Assert.Equal("Map", p.Scene);
+        Assert.False(p.Enabled("Cave"));
+        Assert.False(p.Enabled("Tower"));
+        Photo(p, "12-mapa");
+
+        // Floresta: explora até ver uma luta e um encontro.
         p.Click("Forest");
-        Photo(p, "05b-floresta");
+        bool sawFight = false, sawEvent = false;
         for (int step = 0; step < 400 && !(sawFight && sawEvent); step++)
         {
             switch (p.Scene)
             {
                 case "Forest":
-                    if (p.Piece("Health").Value < 50)
-                    {
-                        p.Click("Back");
-                        if (p.Text("Gold") is var g && int.Parse(g["💰 ".Length..]) >= 5) p.Click("Tavern");
-                        p.Click("Forest");
-                    }
-                    else p.Click("Explore");
+                    p.Click("Explore");
                     break;
                 case "Fight":
                     if (!sawFight)
                     {
                         sawFight = true;
                         p.Click("Attack");
-                        // O herói ataca, o inimigo responde: as duas mensagens ficam no histórico da luta.
-                        if (p.Scene == "Fight" && !p.Visible("Continue"))
-                        {
-                            Assert.Contains(p.Screen.Messages, m => m.IsOld && m.Text.StartsWith("Você causou"));
-                            Assert.Contains(p.Screen.Messages, m => m.IsNews && (m.Text.Contains("ataca") || m.Text.Contains("atordoado")));
-                            Photo(p, "06-luta");
-                        }
-                        break;
+                        Photo(p, "13-luta");
                     }
-                    if (p.Visible("Continue"))
-                    {
-                        Photo(p, "07-luta-vencida");
-                        p.Click("Continue");
-                    }
-                    else p.Click("Attack");
+                    Fight(p);
                     break;
                 case "Event":
-                    if (!sawEvent) Photo(p, "08-encontro");
+                    if (!sawEvent) Photo(p, "14-encontro");
                     sawEvent = true;
                     if (p.Visible("Leave")) p.Click("Leave");
-                    else if (p.Enabled("ChoiceA")) p.Click("ChoiceA");
-                    else p.Click("ChoiceB");
+                    else p.Click(p.Enabled("ChoiceA") ? "ChoiceA" : "ChoiceB");
                     break;
                 case "GameOver":
-                    Photo(p, "09-fim-de-jogo");
-                    p.Click("Again");
-                    p.ClickCard("Classes", 0, "Pick");
+                    Revive(p);
+                    p.Click("Back");
+                    p.Click("Gate");
                     p.Click("Forest");
                     break;
                 default:
@@ -260,39 +285,96 @@ public sealed class ExamplePlaytests : IDisposable
             }
         }
         Assert.True(sawFight && sawEvent, "Em 400 passos não apareceu luta e encontro.");
+        ToMap(p);
 
-        // O chefe: vai até a torre (pega a chave de novo se o jogo recomeçou) e luta até o fim.
-        for (int step = 0; step < 50 && p.Scene != "Village"; step++)
+        // Pântano: cava a Grade até achar o baú (ou a cobra sair da lama).
+        p.Click("Swamp");
+        for (int y = 0; y < 4 && p.Scene == "Swamp"; y++)
+            for (int x = 0; x < 6 && p.Scene == "Swamp" && p.Text("Digs") != "Você achou o baú!"; x++)
+                p.Cell("Mud", x, y);
+        if (p.Scene == "Swamp") Photo(p, "15-pantano");
+        else Fight(p);
+        ToMap(p);
+
+        // Acampamento: dormir é um d20; ouvir a noite usa game.Choose.
+        p.Click("Camp");
+        p.Click("Sleep");
+        if (p.Scene == "Camp")
         {
+            Assert.Contains(p.News, m => m.StartsWith("Tirou "));   // noite tranquila (8 ou mais no d20)
+            Photo(p, "16-acampamento");
+        }
+        else Fight(p);   // tirou menos de 8: um lobo atacou
+        ToMap(p);
+
+        // Ponte: as três respostas certas abrem a caverna.
+        p.Click("Bridge");
+        Photo(p, "17-ponte");
+        foreach (var answer in new[] { "12", "Pente", "8" })
+        {
+            p.Choose("Answers", answer);
+            p.Click("Reply");
+        }
+        Assert.False(p.Visible("Answers"));
+        p.Click("Back");
+        Assert.True(p.Enabled("Cave"));
+
+        // Caverna: erra o enigma, depois acerta e pega a chave.
+        p.Click("Cave");
+        p.Answer("Riddle", "uma pedra");
+        Assert.Contains(p.News, m => m.Contains("Errado"));
+        p.Answer("Riddle", "Buraco");
+        Assert.True(p.Visible("KeyIcon"));
+        Photo(p, "18-caverna");
+        p.Click("Back");
+        Assert.True(p.Enabled("Tower"));
+
+        // Torre: as três armadilhas (d20) e o chefe.
+        p.Click("Tower");
+        p.Click("Enter");
+        Assert.Equal("TowerHall", p.Scene);
+        for (int i = 0; i < 3; i++) p.Click("Jump");
+        Assert.Equal(3, p.Piece("Steps").Value);
+        Photo(p, "19-armadilhas");
+        p.Click("Throne");
+        Assert.Equal("Fight", p.Scene);
+        Assert.False(p.Visible("Flee"));   // do chefe não se foge
+        Photo(p, "20-chefe");
+        Fight(p);
+        Assert.Contains(p.Scene, new[] { "Victory", "GameOver" });
+        Photo(p, p.Scene == "Victory" ? "21-vitoria" : "21-derrota");
+        Assert.Contains("Henrique", p.Text("Story"));
+
+        static void Fight(Player p)
+        {
+            for (int turn = 0; turn < 200 && p.Scene == "Fight" && !p.Visible("Continue"); turn++)
+            {
+                if (p.Enabled("Potion") && p.Piece("Health").Value * 3 < p.Piece("Health").Max) p.Click("Potion");
+                else if (p.Enabled("Skill")) p.Click("Skill");
+                else p.Click("Attack");
+            }
+            if (p.Scene == "Fight") p.Click("Continue");
+        }
+
+        static void Revive(Player p)
+        {
+            Assert.True(p.Visible("Load"));   // salvou no templo: volta de lá
+            p.Click("Load");
+            Assert.Equal("Temple", p.Scene);
+        }
+
+        static void ToMap(Player p)
+        {
+            if (p.Scene == "Fight") Fight(p);
+            if (p.Scene == "Event") p.Click(p.Visible("Leave") ? "Leave" : "ChoiceB");   // volta para a floresta
             if (p.Scene == "GameOver")
             {
-                p.Click("Again");
-                p.ClickCard("Classes", 0, "Pick");
+                Revive(p);
+                p.Click("Back");
+                p.Click("Gate");
             }
-            else if (p.Scene == "Fight") p.Click(p.Visible("Continue") ? "Continue" : "Flee");
-            else if (p.Scene == "Event") p.Click(p.Visible("Leave") ? "Leave" : "ChoiceB");
-            else p.Click("Back");
+            if (p.Scene is "Forest" or "Swamp" or "Camp" or "Bridge" or "Cave") p.Click("Back");
+            Assert.Equal("Map", p.Scene);
         }
-        if (p.Text("Tower") != "Entrar")
-        {
-            p.Click("Cave");
-            p.Answer("Riddle", "buraco");
-            p.Click("Back");
-        }
-        p.Click("Tower");
-        Photo(p, "10-torre");
-        p.Click("Challenge");
-        Assert.False(p.Visible("Flee"));   // do chefe não se foge
-        Photo(p, "10b-chefe");
-        for (int turn = 0; turn < 200 && p.Scene == "Fight"; turn++)
-        {
-            if (p.Visible("Continue")) p.Click("Continue");
-            else if (p.Enabled("Potion") && p.Piece("Health").Value < 40) p.Click("Potion");
-            else if (p.Enabled("Skill")) p.Click("Skill");
-            else p.Click("Attack");   // sem mana, o botão da habilidade fica apagado
-        }
-        Assert.Contains(p.Scene, new[] { "Victory", "GameOver" });
-        Photo(p, p.Scene == "Victory" ? "11-vitoria" : "11-derrota");
-        Assert.Contains("Henrique", p.Text("Story"));
     });
 }

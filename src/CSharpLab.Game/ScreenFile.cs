@@ -23,7 +23,7 @@ internal static class ScreenFile
         ["type", "name", "list", "x", "y", "width", "height", "text", "size", "bold", "italic", "shadow", "textshadow", "scroll", "font", "align", "color", "shade",
          "opacity", "border", "corner", "style", "textcolor", "barstyle", "bartext", "shortcut", "value", "max", "image", "cardwidth", "cardheight", "gap", "enabled", "gamewrite", "visible",
          "bordercolor", "borderwidth", "gradient", "gradientdirection", "animate", "locked",
-         "options", "selected", "min", "step", "columns", "rows"];
+         "options", "selected", "min", "step", "columns", "rows", "icon", "frame", "back", "sides"];
 
     /// <summary>Quantas opções uma Escolha ou uma Roleta pode ter.</summary>
     public const int MaxOptions = 24;
@@ -160,7 +160,7 @@ internal static class ScreenFile
                 "height" => Number(value, label, key, v => piece.Height = v, positive: true),
                 "size" => Number(value, label, key, v => piece.Size = Math.Clamp(v, 6, 200), positive: true),
                 "value" => Integer(value, label, key, v => piece.Value = v),
-                "max" => Integer(value, label, key, v => piece.Max = v, positive: true),
+                "max" => Integer(value, label, key, v => piece.Max = v, positive: type != PieceType.Counter),
                 "text" => Text(value, label, key, v => piece.Text = v),
                 "image" => Text(value, label, key, v => piece.Image = v),
                 "bold" => Boolean(value, label, key, v => piece.Bold = v),
@@ -191,6 +191,12 @@ internal static class ScreenFile
                 "step" => Integer(value, label, key, v => piece.Step = v, positive: true),
                 "columns" => Integer(value, label, key, v => piece.Columns = v, range: (1, Piece.MaxCells)),
                 "rows" => Integer(value, label, key, v => piece.Rows = v, range: (1, Piece.MaxCells)),
+                "icon" => ReadEnum<Icon>(value, label, key, v => piece.Icon = v),
+                "frame" => ReadEnum<IconFrame>(value, label, key, v => piece.Frame = v),
+                "back" => ReadColor(value, label, key, v => piece.Back = v),
+                "sides" => Integer(value, label, key, v => piece.Sides = v) ?? (Array.IndexOf(Piece.DiceSizes, piece.Sides ?? 20) < 0
+                    ? $"{label}: \"sides\" é quantos lados o dado tem: 4, 6, 8, 10, 12, 20 ou 100."
+                    : null),
                 "barstyle" => ReadEnum<BarStyle>(value, label, key, v => piece.BarStyle = v),
                 "bartext" => ReadEnum<BarText>(value, label, key, v => piece.BarText = v),
                 "font" => ReadEnum<Font>(value, label, key, v => piece.Font = v),
@@ -389,6 +395,9 @@ internal static class ScreenFile
         return sb.ToString();
     }
 
+    /// <summary>Uma peça só, numa linha (para guardar estilos e copiar peças).</summary>
+    public static string SerializeOne(Piece piece) => SerializePiece(piece);
+
     private static string SerializePiece(Piece p)
     {
         var parts = new List<string>
@@ -399,19 +408,19 @@ internal static class ScreenFile
         if (p.List != null && Piece.Supports(p.Type, nameof(Piece.List))) parts.Add($"\"list\": {Quote(p.List)}");
         parts.AddRange(
         [
-            $"\"x\": {Round(p.X)}",
-            $"\"y\": {Round(p.Y)}",
-            $"\"width\": {Round(p.Width)}",
-            $"\"height\": {Round(p.Height)}",
+            $"\"x\": {FormatNumber(p.X)}",
+            $"\"y\": {FormatNumber(p.Y)}",
+            $"\"width\": {FormatNumber(p.Width)}",
+            $"\"height\": {FormatNumber(p.Height)}",
         ]);
         if (p.Text != null && Piece.Supports(p.Type, nameof(Piece.Text))) parts.Add($"\"text\": {Quote(p.Text)}");
-        if (p.Size != null && Piece.Supports(p.Type, nameof(Piece.Size))) parts.Add($"\"size\": {Round(p.Size.Value)}");
+        if (p.Size != null && Piece.Supports(p.Type, nameof(Piece.Size))) parts.Add($"\"size\": {FormatNumber(p.Size.Value)}");
         if (p.Bold is { } bold && bold != Piece.DefaultBold(p.Type) && Piece.Supports(p.Type, nameof(Piece.Bold))) parts.Add($"\"bold\": {(bold ? "true" : "false")}");
         if (p.Italic == true && Piece.Supports(p.Type, nameof(Piece.Italic))) parts.Add("\"italic\": true");
         if (p.Shadow == true && Piece.Supports(p.Type, nameof(Piece.Shadow))) parts.Add("\"shadow\": true");
         if (p.TextShadow == true && Piece.Supports(p.Type, nameof(Piece.TextShadow))) parts.Add("\"textShadow\": true");
         if (p.Scroll == true && Piece.Supports(p.Type, nameof(Piece.Scroll))) parts.Add("\"scroll\": true");
-        if (p.Font is { } font and not Font.Normal && Piece.Supports(p.Type, nameof(Piece.Font))) parts.Add($"\"font\": \"{font}\"");
+        if (p.Font is { } font && Piece.Supports(p.Type, nameof(Piece.Font))) parts.Add($"\"font\": \"{font}\"");
         if (p.Align is { } align && align != Piece.DefaultAlign(p.Type) && Piece.Supports(p.Type, nameof(Piece.Align))) parts.Add($"\"align\": \"{align}\"");
         if (p.Color is { } color && Piece.Supports(p.Type, nameof(Piece.Color))) parts.Add($"\"color\": \"{color}\"");
         if (p.Shade is { } shade and not Shade.Normal && Piece.Supports(p.Type, nameof(Piece.Shade))) parts.Add($"\"shade\": \"{shade}\"");
@@ -444,12 +453,16 @@ internal static class ScreenFile
         }
         else if (p.Columns is { } columns && Piece.Supports(p.Type, nameof(Piece.Columns))) parts.Add($"\"columns\": {columns.ToString(CultureInfo.InvariantCulture)}");
         if (p.Animate == true && Piece.Supports(p.Type, nameof(Piece.Animate))) parts.Add("\"animate\": true");
+        if (p.Icon is { } icon && Piece.Supports(p.Type, nameof(Piece.Icon))) parts.Add($"\"icon\": \"{icon}\"");
+        if (p.Frame is { } frame and not IconFrame.None && Piece.Supports(p.Type, nameof(Piece.Frame))) parts.Add($"\"frame\": \"{frame}\"");
+        if (p.Back is { } back && Piece.Supports(p.Type, nameof(Piece.Back))) parts.Add($"\"back\": \"{back}\"");
+        if (p.Type == PieceType.Dice) parts.Add($"\"sides\": {p.DiceSides.ToString(CultureInfo.InvariantCulture)}");
         if (p.Image != null && p.Type == PieceType.Image) parts.Add($"\"image\": {Quote(p.Image)}");
         if (p.Type == PieceType.List)
         {
-            parts.Add($"\"cardWidth\": {Round(p.CardW)}");
-            parts.Add($"\"cardHeight\": {Round(p.CardH)}");
-            parts.Add($"\"gap\": {Round(p.CardGap)}");
+            parts.Add($"\"cardWidth\": {FormatNumber(p.CardW)}");
+            parts.Add($"\"cardHeight\": {FormatNumber(p.CardH)}");
+            parts.Add($"\"gap\": {FormatNumber(p.CardGap)}");
         }
         if (!p.Enabled && Piece.Supports(p.Type, nameof(Piece.Enabled))) parts.Add("\"enabled\": false");
         if (!p.GameWrite && Piece.Supports(p.Type, nameof(Piece.GameWrite))) parts.Add("\"gameWrite\": false");
@@ -458,7 +471,7 @@ internal static class ScreenFile
         return "{ " + string.Join(", ", parts) + " }";
     }
 
-    private static string Round(double value) => Math.Round(value).ToString(CultureInfo.InvariantCulture);
+    private static string FormatNumber(double value) => value.ToString("R", CultureInfo.InvariantCulture);
 
     private static string Quote(string text) => JsonSerializer.Serialize(text, StringOptions);
 }

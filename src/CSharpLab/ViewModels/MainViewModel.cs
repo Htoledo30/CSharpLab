@@ -57,6 +57,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         RecentItems = new ObservableCollection<RecentItem>(settings.Recent);
         EditorFontSize = settings.FontSize;
         IsExplorerVisible = settings.ExplorerVisible;
+        IsStudioCodeVisible = settings.StudioCodeVisible;
         ExplorerWidth = Math.Clamp(settings.ExplorerWidth, 160, 600);
         IsPanelOpen = settings.PanelOpen;
         PanelHeight = settings.PanelHeight;
@@ -123,6 +124,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     public partial double ExplorerWidth { get; set; }
+
+    /// <summary>O código ao lado da tela, no Estúdio.</summary>
+    [ObservableProperty]
+    public partial bool IsStudioCodeVisible { get; set; }
 
     [ObservableProperty]
     public partial bool IsPanelOpen { get; set; }
@@ -201,6 +206,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     partial void OnEditorFontSizeChanged(double value) => ScheduleSettingsSave();
     partial void OnIsExplorerVisibleChanged(bool value) => ScheduleSettingsSave();
+    partial void OnIsStudioCodeVisibleChanged(bool value) => ScheduleSettingsSave();
     partial void OnExplorerWidthChanged(double value) => ScheduleSettingsSave();
     partial void OnPanelHeightChanged(double value) => ScheduleSettingsSave();
     partial void OnIsPanelOpenChanged(bool value) => ScheduleSettingsSave();
@@ -337,6 +343,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         Settings.FontSize = EditorFontSize;
         Settings.ExplorerVisible = IsExplorerVisible;
+        Settings.StudioCodeVisible = IsStudioCodeVisible;
         Settings.ExplorerWidth = ExplorerWidth;
         Settings.PanelOpen = IsPanelOpen;
         Settings.PanelHeight = PanelHeight;

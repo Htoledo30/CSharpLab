@@ -38,6 +38,8 @@ public sealed class AppSettings
     public WindowPlacement? Window { get; set; }
     public double ExplorerWidth { get; set; } = 230;
     public bool ExplorerVisible { get; set; } = true;
+    /// <summary>O código aparece ao lado da tela no Estúdio (desligado: a tela ganha o espaço todo).</summary>
+    public bool StudioCodeVisible { get; set; } = true;
     /// <summary>0 significa "25% da altura" na primeira abertura do painel.</summary>
     public double PanelHeight { get; set; }
     public bool PanelOpen { get; set; }

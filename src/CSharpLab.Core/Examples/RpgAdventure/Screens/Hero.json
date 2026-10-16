@@ -1,0 +1,32 @@
+{
+  "format": 1,
+  "backgroundColor": "#1A1424",
+  "backgroundGradient": "#0C0812",
+  "pieces": [
+    { "type": "Box", "name": "StatusBar", "x": 16, "y": 12, "width": 928, "height": 72, "shadow": true, "border": true },
+    { "type": "Icon", "name": "HeroBadge", "x": 26, "y": 18, "width": 60, "height": 60, "color": "Red", "icon": "Swords", "frame": "Circle" },
+    { "type": "Text", "name": "PlayerInfo", "x": 94, "y": 20, "width": 170, "height": 58, "text": "Herói\nGuerreiro · Nível 1", "size": 14, "bold": true },
+    { "type": "Bar", "name": "Health", "x": 272, "y": 24, "width": 200, "height": 48, "text": "Vida", "color": "Green", "value": 100, "max": 100, "animate": true },
+    { "type": "Bar", "name": "Mana", "x": 484, "y": 24, "width": 170, "height": 48, "text": "Mana", "color": "Blue", "barStyle": "Shine", "value": 30, "max": 30, "animate": true },
+    { "type": "Bar", "name": "Xp", "x": 666, "y": 24, "width": 140, "height": 48, "text": "XP", "color": "Purple", "value": 0, "max": 30, "animate": true },
+    { "type": "Icon", "name": "GoldIcon", "x": 820, "y": 21, "width": 26, "height": 26, "color": "Gold", "icon": "Gold" },
+    { "type": "Text", "name": "Gold", "x": 852, "y": 18, "width": 84, "height": 30, "text": "15", "size": 18, "bold": true, "color": "Gold" },
+    { "type": "Icon", "name": "PotionIcon", "x": 820, "y": 51, "width": 26, "height": 26, "color": "Green", "icon": "Potion" },
+    { "type": "Text", "name": "Potions", "x": 852, "y": 48, "width": 84, "height": 30, "text": "1", "size": 18, "bold": true, "color": "Green" },
+    { "type": "Icon", "name": "Portrait", "x": 40, "y": 104, "width": 200, "height": 200, "shadow": true, "color": "Red", "icon": "Swords", "frame": "Circle" },
+    { "type": "Text", "name": "PortraitHint", "x": 40, "y": 316, "width": 200, "height": 48, "text": "A bondade muda o final do jogo.", "size": 13, "italic": true, "align": "Center", "color": "Gray" },
+    { "type": "Text", "name": "Name", "x": 260, "y": 100, "width": 440, "height": 50, "text": "Herói", "size": 36, "shadow": true, "font": "Fantasy" },
+    { "type": "Text", "name": "Class", "x": 260, "y": 152, "width": 440, "height": 30, "text": "Guerreiro · Nível 1", "size": 18, "bold": true, "color": "Red" },
+    { "type": "Box", "name": "Stats", "x": 260, "y": 194, "width": 440, "height": 200, "border": true },
+    { "type": "Text", "name": "Damage", "x": 276, "y": 206, "width": 410, "height": 28, "text": "Dano: 7 a 12", "size": 15 },
+    { "type": "Text", "name": "Skill", "x": 276, "y": 238, "width": 410, "height": 28, "text": "Especial: Golpe brutal", "size": 15 },
+    { "type": "Text", "name": "Defense", "x": 276, "y": 270, "width": 410, "height": 28, "text": "Sem escudo", "size": 15 },
+    { "type": "Text", "name": "Crit", "x": 276, "y": 302, "width": 410, "height": 28, "text": "Crítico: tirar 20 no d20", "size": 15 },
+    { "type": "Text", "name": "QuestCount", "x": 276, "y": 334, "width": 410, "height": 28, "text": "Missões cumpridas: 0 de 4", "size": 15 },
+    { "type": "Box", "name": "Soul", "x": 716, "y": 194, "width": 228, "height": 200, "border": true },
+    { "type": "Bar", "name": "Kindness", "x": 732, "y": 204, "width": 196, "height": 48, "text": "Bondade", "color": "Pink", "value": 5, "max": 10 },
+    { "type": "Icon", "name": "KeyIcon", "x": 732, "y": 272, "width": 60, "height": 60, "color": "Gray", "icon": "Key", "frame": "Circle" },
+    { "type": "Text", "name": "KeyText", "x": 800, "y": 274, "width": 136, "height": 60, "text": "A chave está na caverna", "size": 13 },
+    { "type": "Button", "name": "Back", "x": 752, "y": 464, "width": 192, "height": 52, "text": "Voltar", "style": "Text", "icon": "Map" }
+  ]
+}

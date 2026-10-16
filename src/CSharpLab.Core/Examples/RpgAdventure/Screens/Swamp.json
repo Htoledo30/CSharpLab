@@ -1,0 +1,26 @@
+{
+  "format": 1,
+  "backgroundColor": "#14201C",
+  "backgroundGradient": "#0A1210",
+  "pieces": [
+    { "type": "Box", "name": "StatusBar", "x": 16, "y": 12, "width": 928, "height": 72, "shadow": true, "border": true },
+    { "type": "Icon", "name": "HeroBadge", "x": 26, "y": 18, "width": 60, "height": 60, "color": "Red", "icon": "Swords", "frame": "Circle" },
+    { "type": "Text", "name": "PlayerInfo", "x": 94, "y": 20, "width": 170, "height": 58, "text": "Herói\nGuerreiro · Nível 1", "size": 14, "bold": true },
+    { "type": "Bar", "name": "Health", "x": 272, "y": 24, "width": 200, "height": 48, "text": "Vida", "color": "Green", "value": 100, "max": 100, "animate": true },
+    { "type": "Bar", "name": "Mana", "x": 484, "y": 24, "width": 170, "height": 48, "text": "Mana", "color": "Blue", "barStyle": "Shine", "value": 30, "max": 30, "animate": true },
+    { "type": "Bar", "name": "Xp", "x": 666, "y": 24, "width": 140, "height": 48, "text": "XP", "color": "Purple", "value": 0, "max": 30, "animate": true },
+    { "type": "Icon", "name": "GoldIcon", "x": 820, "y": 21, "width": 26, "height": 26, "color": "Gold", "icon": "Gold" },
+    { "type": "Text", "name": "Gold", "x": 852, "y": 18, "width": 84, "height": 30, "text": "15", "size": 18, "bold": true, "color": "Gold" },
+    { "type": "Icon", "name": "PotionIcon", "x": 820, "y": 51, "width": 26, "height": 26, "color": "Green", "icon": "Potion" },
+    { "type": "Text", "name": "Potions", "x": 852, "y": 48, "width": 84, "height": 30, "text": "1", "size": 18, "bold": true, "color": "Green" },
+    { "type": "Text", "name": "Title", "x": 32, "y": 92, "width": 560, "height": 44, "text": "Pântano das Brumas", "size": 30, "shadow": true, "font": "Fantasy", "color": "Cyan" },
+    { "type": "Text", "name": "Story", "x": 32, "y": 136, "width": 560, "height": 52, "text": "Dizem que um baú afundou aqui. Cave a lama: as pistas dizem se está quente ou frio.", "size": 15, "font": "Book" },
+    { "type": "Grid", "name": "Mud", "x": 32, "y": 196, "width": 560, "height": 330, "color": "Brown", "shade": "Dark", "columns": 6, "rows": 4 },
+    { "type": "Box", "name": "Info", "x": 608, "y": 196, "width": 336, "height": 150, "color": "Cyan", "shade": "Dark", "opacity": 25, "border": true },
+    { "type": "Text", "name": "Digs", "x": 624, "y": 206, "width": 304, "height": 30, "text": "Tentativas: 6", "size": 20, "bold": true },
+    { "type": "Bar", "name": "Shovels", "x": 624, "y": 242, "width": 304, "height": 32, "color": "Brown", "barStyle": "Blocks", "barText": "None", "value": 6, "max": 6 },
+    { "type": "Text", "name": "Legend", "x": 624, "y": 286, "width": 304, "height": 50, "text": "\uD83D\uDD25 quente      ~ morno      ❄ frio", "size": 15, "align": "Center" },
+    { "type": "Messages", "name": "Log", "x": 608, "y": 356, "width": 336, "height": 110, "size": 15 },
+    { "type": "Button", "name": "Back", "x": 608, "y": 476, "width": 336, "height": 50, "text": "Voltar ao mapa", "style": "Text", "icon": "Map" }
+  ]
+}

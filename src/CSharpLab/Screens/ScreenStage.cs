@@ -61,6 +61,13 @@ public sealed class ScreenStage : Grid
     private readonly List<Line> _guides = [];
 
     private double _zoom = 1;
+    private double? _userZoom;              // null: a tela inteira cabendo no espaço
+    private Vector _pan;                    // quanto a tela ampliada andou a partir do meio
+    private bool _panning;                  // arrastando com o botão do meio
+    private Point _panFrom;
+    private readonly TextBlock _zoomText = new() { FontSize = 11.5 };
+    private readonly Button _fitButton = new();
+    private readonly Border _zoomBar;
 
     /// <summary>Marca o quadro tracejado das peças que começam escondidas.</summary>
     private static readonly object HiddenHolder = new();
@@ -149,6 +156,8 @@ public sealed class ScreenStage : Grid
             Foreground = Theme.Muted,
         };
         Children.Add(_emptyHint);
+        _zoomBar = CreateZoomBar();
+        Children.Add(_zoomBar);
 
         _hover.Stroke = HoverBrush;
         _overlay.Children.Add(_slotHint);
@@ -225,6 +234,11 @@ public sealed class ScreenStage : Grid
                 var wheel = element.Tag is RotateTransform ? element : (element as Grid)?.Children.OfType<FrameworkElement>().FirstOrDefault(c => c.Tag is RotateTransform);
                 if (wheel?.Tag is RotateTransform turn) EffectPlayer.Spin(wheel, turn.Angle);
                 break;
+            case PiecePreview.Roll when piece.Type == PieceType.Dice:
+                // Rola até um número sorteado e volta para a face do arquivo depois de ver.
+                EffectPlayer.Roll(element, piece.DiceSides, Random.Shared.Next(1, piece.DiceSides + 1));
+                RebuildLater(2600, element);
+                break;
             case PiecePreview.Bar when piece.Type == PieceType.Bar:
             {
                 // Perde 40% da barra (ou ganha, se ela está quase vazia) e anima como no jogo.
@@ -252,6 +266,18 @@ public sealed class ScreenStage : Grid
                 break;
             }
         }
+    }
+
+    /// <summary>Depois do "▶ Ver", a peça volta a ser a do arquivo (se ninguém mexeu na tela nesse meio-tempo).</summary>
+    private void RebuildLater(int milliseconds, FrameworkElement shown)
+    {
+        var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(milliseconds) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (_drag == Drag.None && _elements.ContainsValue(shown)) Rebuild();
+        };
+        timer.Start();
     }
 
     private static Brush Freeze(WpfColor color)
@@ -288,22 +314,176 @@ public sealed class ScreenStage : Grid
 
     // ------------------------------------------------------------------ zoom e desenho
 
-    /// <summary>O palco ocupa o espaço disponível, sem distorcer (como a janela do jogo).</summary>
+    /// <summary>O zoom que faz a tela inteira caber no espaço disponível.</summary>
+    private double FitZoom => Math.Clamp(Math.Min((ActualWidth - Padding * 2) / ScreenLayout.Width, (ActualHeight - Padding * 2) / ScreenLayout.Height), MinZoom, MaxZoom);
+
+    /// <summary>
+    /// Sem zoom escolhido, o palco ocupa o espaço disponível, sem distorcer (como a janela do jogo).
+    /// Com zoom (Ctrl+roda, os botões do canto), a tela pode ficar maior que o espaço: a roda e o botão
+    /// do meio do mouse passeiam por ela.
+    /// </summary>
     private void Fit()
     {
         double width = ActualWidth, height = ActualHeight;
         if (width <= 0 || height <= 0) return;
-        _zoom = Math.Clamp(Math.Min((width - Padding * 2) / ScreenLayout.Width, (height - Padding * 2) / ScreenLayout.Height), 0.2, 2);
+        _zoom = _userZoom ?? FitZoom;
         _scale.ScaleX = _scale.ScaleY = _zoom;
-        double left = Math.Round((width - ScreenLayout.Width * _zoom) / 2);
-        double top = Math.Round((height - ScreenLayout.Height * _zoom) / 2);
+        double stageWidth = ScreenLayout.Width * _zoom, stageHeight = ScreenLayout.Height * _zoom;
+        // Maior que o espaço: anda até a borda da tela encostar na margem, nunca além.
+        _pan.X = stageWidth + Padding * 2 <= width ? 0 : Math.Clamp(_pan.X, (width - stageWidth) / 2 - Padding, (stageWidth - width) / 2 + Padding);
+        _pan.Y = stageHeight + Padding * 2 <= height ? 0 : Math.Clamp(_pan.Y, (height - stageHeight) / 2 - Padding, (stageHeight - height) / 2 + Padding);
+        double left = Math.Round((width - stageWidth) / 2 + _pan.X);
+        double top = Math.Round((height - stageHeight) / 2 + _pan.Y);
         Canvas.SetLeft(_stage, left);
         Canvas.SetTop(_stage, top);
         Canvas.SetLeft(_frame, left - 1);
         Canvas.SetTop(_frame, top - 1);
         _frame.Width = ScreenLayout.Width * _zoom + 2;
         _frame.Height = ScreenLayout.Height * _zoom + 2;
+        _zoomText.Text = $"{Math.Round(_zoom * 100)}%";
+        _fitButton.IsEnabled = _userZoom != null;
         UpdateOverlay();
+    }
+
+    public const double MinZoom = 0.2;
+    public const double MaxZoom = 4;
+    private const double ZoomStep = 1.2;
+
+    /// <summary>A tela inteira cabendo no espaço (o normal).</summary>
+    public bool IsFitting => _userZoom == null;
+
+    /// <summary>Volta a caber no espaço (Ctrl+0).</summary>
+    public void ZoomToFit()
+    {
+        _userZoom = null;
+        _pan = default;
+        Fit();
+    }
+
+    /// <summary>Muda o zoom mantendo parado o ponto do palco que está embaixo de <paramref name="anchor"/> (no meio, se não vier).</summary>
+    public void SetZoom(double zoom, Point? anchor = null)
+    {
+        double width = ActualWidth, height = ActualHeight;
+        if (width <= 0 || height <= 0) return;
+        zoom = Math.Clamp(zoom, MinZoom, MaxZoom);
+        var at = anchor ?? new Point(width / 2, height / 2);
+        double left = Canvas.GetLeft(_stage), top = Canvas.GetTop(_stage);
+        if (double.IsNaN(left) || double.IsNaN(top)) { left = (width - ScreenLayout.Width * _zoom) / 2; top = (height - ScreenLayout.Height * _zoom) / 2; }
+        var onStage = new Point((at.X - left) / _zoom, (at.Y - top) / _zoom);
+        // Onde o palco precisa começar para aquele ponto continuar embaixo do mouse.
+        double newLeft = at.X - onStage.X * zoom, newTop = at.Y - onStage.Y * zoom;
+        _pan = new Vector(newLeft - (width - ScreenLayout.Width * zoom) / 2, newTop - (height - ScreenLayout.Height * zoom) / 2);
+        // Chegando perto do tamanho que cabe, fica nele (sem sobrar 1% de diferença).
+        _userZoom = Math.Abs(zoom - FitZoom) < 0.01 ? null : zoom;
+        if (_userZoom == null) _pan = default;
+        Fit();
+    }
+
+    public void ZoomIn(Point? anchor = null) => SetZoom(_zoom * ZoomStep, anchor);
+
+    public void ZoomOut(Point? anchor = null) => SetZoom(_zoom / ZoomStep, anchor);
+
+    /// <summary>Passeia pela tela ampliada (roda do mouse, botão do meio).</summary>
+    private void Pan(double dx, double dy)
+    {
+        if (_userZoom == null) return;
+        _pan += new Vector(dx, dy);
+        Fit();
+    }
+
+    /// <summary>Os botões de zoom no canto de baixo do palco: −, a porcentagem (clique = 100%), + e Caber.</summary>
+    private Border CreateZoomBar()
+    {
+        Button Make(object content, string tip, Action action, double width = 26)
+        {
+            var button = new Button { Content = content, ToolTip = tip, Height = 24, MinWidth = width, Padding = new Thickness(6, 0, 6, 0), Focusable = false, Cursor = Cursors.Hand };
+            button.SetResourceReference(StyleProperty, "TextButton");
+            button.Click += (_, _) =>
+            {
+                action();
+                Focus();
+            };
+            return button;
+        }
+
+        var bar = new StackPanel { Orientation = Orientation.Horizontal };
+        bar.Children.Add(Make("−", "Diminuir (Ctrl+−, ou Ctrl+roda do mouse)", () => ZoomOut()));
+        _zoomText.MinWidth = 38;
+        _zoomText.TextAlignment = TextAlignment.Center;
+        bar.Children.Add(Make(_zoomText, "Ver no tamanho real do jogo: 100% (Ctrl+1)", () => SetZoom(1), 46));
+        bar.Children.Add(Make("+", "Aumentar (Ctrl++, ou Ctrl+roda do mouse)", () => ZoomIn()));
+        _fitButton.Content = "Caber";
+        _fitButton.ToolTip = "A tela inteira cabendo no espaço (Ctrl+0)";
+        _fitButton.Height = 24;
+        _fitButton.Padding = new Thickness(8, 0, 8, 0);
+        _fitButton.Focusable = false;
+        _fitButton.Cursor = Cursors.Hand;
+        _fitButton.SetResourceReference(StyleProperty, "TextButton");
+        _fitButton.Click += (_, _) =>
+        {
+            ZoomToFit();
+            Focus();
+        };
+        bar.Children.Add(_fitButton);
+        var border = new Border
+        {
+            Child = bar,
+            CornerRadius = new CornerRadius(6),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(2),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            Margin = new Thickness(0, 0, 8, 6),
+            Opacity = 0.92,
+        };
+        border.SetResourceReference(Border.BackgroundProperty, "BgElevated");
+        border.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        System.Windows.Automation.AutomationProperties.SetName(border, "Zoom do palco");
+        return border;
+    }
+
+    protected override void OnPreviewMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnPreviewMouseWheel(e);
+        if (_drag != Drag.None) return;
+        var mods = Keyboard.Modifiers;
+        if ((mods & ModifierKeys.Control) != 0)
+        {
+            var at = e.GetPosition(this);
+            if (e.Delta > 0) ZoomIn(at); else ZoomOut(at);
+            e.Handled = true;
+        }
+        else if (_userZoom != null)
+        {
+            // Ampliada: a roda sobe e desce pela tela (Shift: para os lados).
+            double step = e.Delta / 120.0 * 60;
+            if ((mods & ModifierKeys.Shift) != 0) Pan(step, 0); else Pan(0, step);
+            e.Handled = true;
+        }
+    }
+
+    protected override void OnMouseDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.ChangedButton != MouseButton.Middle || _drag != Drag.None) return;
+        // Botão do meio: arrasta a tela ampliada (como "a mãozinha" dos programas de desenho).
+        Focus();
+        if (_userZoom == null) return;
+        _panFrom = e.GetPosition(this);
+        _panning = true;
+        Cursor = Cursors.ScrollAll;
+        CaptureMouse();
+        e.Handled = true;
+    }
+
+    protected override void OnMouseUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (e.ChangedButton != MouseButton.Middle || !_panning) return;
+        _panning = false;
+        Cursor = null;
+        if (IsMouseCaptured) ReleaseMouseCapture();
+        e.Handled = true;
     }
 
     /// <summary>Desenha todas as peças de novo (depois de qualquer mudança no arquivo).</summary>
@@ -643,6 +823,13 @@ public sealed class ScreenStage : Grid
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
+        if (_panning)
+        {
+            var now = e.GetPosition(this);
+            Pan(now.X - _panFrom.X, now.Y - _panFrom.Y);
+            _panFrom = now;
+            return;
+        }
         var p = StagePoint(e);
         if (_drag == Drag.None)
         {
@@ -807,6 +994,11 @@ public sealed class ScreenStage : Grid
     protected override void OnLostMouseCapture(MouseEventArgs e)
     {
         base.OnLostMouseCapture(e);
+        if (_panning)
+        {
+            _panning = false;
+            Cursor = null;
+        }
         // Perdeu o mouse no meio (ex.: outra janela apareceu): grava o que já foi feito.
         if (_drag != Drag.None) Finish(commit: true);
     }
@@ -1116,6 +1308,10 @@ public sealed class ScreenStage : Grid
             case Key.OemCloseBrackets when ctrl: _model.BringToFront(); break;
             case Key.OemOpenBrackets when ctrl: _model.SendToBack(); break;
             case Key.Enter: EditTextRequested?.Invoke(); break;
+            case Key.D0 or Key.NumPad0 when ctrl: ZoomToFit(); break;
+            case Key.D1 or Key.NumPad1 when ctrl: SetZoom(1); break;
+            case Key.OemPlus or Key.Add when ctrl: ZoomIn(); break;
+            case Key.OemMinus or Key.Subtract when ctrl: ZoomOut(); break;
             default: handled = false; break;
         }
         e.Handled = handled;

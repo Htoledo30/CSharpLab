@@ -106,6 +106,8 @@ public static class GameScreens
         "counter" => "Contador",
         "wheel" => "Roleta",
         "grid" => "Grade",
+        "icon" => "Ícone",
+        "dice" => "Dado",
         _ => type,
     };
 }

@@ -122,9 +122,12 @@ public sealed partial class ScreenDesignerModel
     }
 
     /// <summary>Cola a aparência copiada em todas as selecionadas. Retorna quantas mudaram.</summary>
-    public int PasteStyle()
+    public int PasteStyle() => _style is { } style ? UseStyle(style) : 0;
+
+    /// <summary>Passa a aparência de <paramref name="style"/> (um estilo copiado ou um de Meus estilos) para as selecionadas. Retorna quantas mudaram.</summary>
+    internal int UseStyle(Piece style)
     {
-        if (_style is not { } style || Layout == null || _selected.Count == 0) return 0;
+        if (Layout == null || _selected.Count == 0) return 0;
         var layout = Layout.Clone();
         int changed = 0;
         foreach (var name in _selected)
@@ -153,6 +156,8 @@ public sealed partial class ScreenDesignerModel
                 (from.Color, from.Shade, from.Opacity, from.Border, from.Corner, from.Style, from.BarStyle, from.BarText);
             (to.BorderColor, to.BorderWidth, to.Gradient, to.GradientDirection, to.Animate) =
                 (from.BorderColor, from.BorderWidth, from.Gradient, from.GradientDirection, from.Animate);
+            // No Ícone, a moldura é aparência; o desenho (goblin, espada) é o que a peça mostra e fica.
+            (to.Frame, to.Back) = (from.Frame, from.Back);
             return;
         }
         if (Piece.HasLetters(from.Type) && Piece.HasLetters(to.Type))

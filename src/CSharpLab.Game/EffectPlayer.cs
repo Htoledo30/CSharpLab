@@ -120,6 +120,96 @@ internal static class EffectPlayer
         WhenShown(wheel, () => rotate.BeginAnimation(RotateTransform.AngleProperty, spin));
     }
 
+    /// <summary>Quanto o dado rola até parar.</summary>
+    public static readonly TimeSpan RollTime = TimeSpan.FromMilliseconds(1100);
+
+    /// <summary>
+    /// O dado rola: chacoalha e gira, os números passam cada vez mais devagar e ele para em <paramref name="result"/>.
+    /// O maior número (o 20 do d20) acende dourado; o 1 dá uma tremidinha.
+    /// </summary>
+    public static void Roll(FrameworkElement dice, int sides, int result)
+    {
+        var body = Find<ScreenRenderer.DiceFace>(dice, out var face);
+        if (body == null || face == null) return;
+        WhenShown(body, () =>
+        {
+            var turn = new RotateTransform();
+            var grow = new ScaleTransform(1, 1);
+            body.RenderTransformOrigin = new Point(0.5, 0.5);
+            body.RenderTransform = new TransformGroup { Children = { grow, turn } };
+            var spin = new DoubleAnimationUsingKeyFrames { Duration = RollTime };
+            double[] angles = [0, -28, 22, -16, 12, -6, 3, 0];
+            for (int i = 0; i < angles.Length; i++)
+                spin.KeyFrames.Add(new EasingDoubleKeyFrame(angles[i], KeyTime.FromPercent((double)i / (angles.Length - 1))));
+            turn.BeginAnimation(RotateTransform.AngleProperty, spin);
+            var bounce = new DoubleAnimationUsingKeyFrames { Duration = RollTime };
+            bounce.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(0)));
+            bounce.KeyFrames.Add(new EasingDoubleKeyFrame(0.86, KeyTime.FromPercent(0.15)));
+            bounce.KeyFrames.Add(new EasingDoubleKeyFrame(1.06, KeyTime.FromPercent(0.55)));
+            bounce.KeyFrames.Add(new EasingDoubleKeyFrame(0.96, KeyTime.FromPercent(0.8)));
+            bounce.KeyFrames.Add(new EasingDoubleKeyFrame(1, KeyTime.FromPercent(1)));
+            grow.BeginAnimation(ScaleTransform.ScaleXProperty, bounce);
+            grow.BeginAnimation(ScaleTransform.ScaleYProperty, bounce);
+
+            // Os números passando: rápido no começo, cada vez mais devagar, até o resultado.
+            var timer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Render, body.Dispatcher);
+            var started = DateTime.UtcNow;
+            double wait = 45;
+            int last = 0;
+            timer.Interval = TimeSpan.FromMilliseconds(wait);
+            timer.Tick += (_, _) =>
+            {
+                if (DateTime.UtcNow - started >= RollTime - TimeSpan.FromMilliseconds(120))
+                {
+                    timer.Stop();
+                    face.Show(result);
+                    if (result == sides && sides > 1) Glow(body);
+                    else if (result == 1) Play(body, Effect.Shake);
+                    return;
+                }
+                int value;
+                do value = Random.Shared.Next(1, sides + 1);
+                while (value == last && sides > 1);
+                last = value;
+                face.Show(value);
+                wait *= 1.22;
+                timer.Interval = TimeSpan.FromMilliseconds(wait);
+            };
+            face.Show(Random.Shared.Next(1, sides + 1));
+            timer.Start();
+        });
+    }
+
+    /// <summary>Um brilho dourado que acende e apaga em volta da peça (o acerto crítico).</summary>
+    private static void Glow(FrameworkElement element)
+    {
+        // O brilho fica aceso até a tela ser desenhada de novo (o próximo clique).
+        var glow = new DropShadowEffect { Color = Theme.Rgb(Color.Gold), ShadowDepth = 0, BlurRadius = 0, Opacity = 1 };
+        element.Effect = glow;
+        var pulse = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromMilliseconds(1300) };
+        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(0, KeyTime.FromPercent(0)));
+        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(34, KeyTime.FromPercent(0.25)));
+        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(20, KeyTime.FromPercent(0.6)));
+        pulse.KeyFrames.Add(new EasingDoubleKeyFrame(28, KeyTime.FromPercent(1)));
+        glow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, pulse);
+    }
+
+    /// <summary>Acha, dentro do desenho de uma peça, a parte que guarda <typeparamref name="T"/> no Tag (o Estúdio põe as peças dentro de quadros).</summary>
+    private static FrameworkElement? Find<T>(FrameworkElement root, out T? tag) where T : class
+    {
+        if (root.Tag is T found)
+        {
+            tag = found;
+            return root;
+        }
+        foreach (var child in LogicalTreeHelper.GetChildren(root).OfType<FrameworkElement>())
+        {
+            if (Find(child, out tag) is { } inner) return inner;
+        }
+        tag = null;
+        return null;
+    }
+
     /// <summary>Roda já, se o elemento já está na tela; senão, quando ele aparecer.</summary>
     private static void WhenShown(FrameworkElement element, Action start)
     {

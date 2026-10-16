@@ -4,7 +4,7 @@ namespace CSharpLab.GameEngine;
 
 // Uma tela desenhada no Estúdio (arquivo Screens/<Cena>.json). O jogo e o editor visual usam este modelo.
 
-internal enum PieceType { Text, Button, Bar, Image, Box, Input, Messages, List, Choice, Counter, Wheel, Grid }
+internal enum PieceType { Text, Button, Bar, Image, Box, Input, Messages, List, Choice, Counter, Wheel, Grid, Icon, Dice }
 
 /// <summary>O que uma casa da Grade mostra (só no jogo: o código escreve com game.Find("Board").Cell(x, y)).</summary>
 internal sealed record CellData(string Text, Color? Color);
@@ -14,6 +14,8 @@ internal enum TextAlign { Left, Center, Right }
 /// <summary>Uma peça da tela. As posições são no palco de 960×540.</summary>
 internal sealed class Piece
 {
+    /// <summary>Identidade no jogo, preservada quando o Show redesenha o mesmo item da lista.</summary>
+    public object RuntimeId { get; set; } = new();
     public PieceType Type { get; set; }
     public string Name { get; set; } = "";
     public double X { get; set; }
@@ -95,12 +97,21 @@ internal sealed class Piece
     public int? Columns { get; set; }
     /// <summary>Só a Grade: quantas linhas.</summary>
     public int? Rows { get; set; }
+    /// <summary>Ícone: o desenho. Botão: o desenho antes do texto (null: sem ícone).</summary>
+    public Icon? Icon { get; set; }
+    /// <summary>Só o Ícone: a moldura atrás do desenho (null: sem moldura).</summary>
+    public IconFrame? Frame { get; set; }
+    /// <summary>Só o Ícone: a cor da moldura (null: a cor do ícone, escurinha).</summary>
+    public Color? Back { get; set; }
+    /// <summary>Só o Dado: quantos lados ele tem (4, 6, 8, 10, 12, 20 ou 100).</summary>
+    public int? Sides { get; set; }
     /// <summary>Só no jogo: o que o código pôs em cada casa da Grade (x, y).</summary>
     public Dictionary<(int X, int Y), CellData>? Cells { get; set; }
 
     public Piece Clone()
     {
         var copy = (Piece)MemberwiseClone();
+        copy.RuntimeId = new object();
         copy.Options = Options?.ToList();
         copy.Cells = Cells != null ? new Dictionary<(int X, int Y), CellData>(Cells) : null;
         return copy;
@@ -113,6 +124,7 @@ internal sealed class Piece
         PieceType.Bar or PieceType.Input or PieceType.Messages or PieceType.List or PieceType.Choice => 16,
         PieceType.Wheel => 15,
         PieceType.Grid => 28,
+        PieceType.Dice => 32,
         _ => 20,
     };
 
@@ -161,6 +173,13 @@ internal sealed class Piece
     public int GridColumns => Math.Clamp(Columns ?? 3, 1, MaxCells);
     public int GridRows => Math.Clamp(Rows ?? 3, 1, MaxCells);
 
+    /// <summary>Os dados que existem (de RPG): d4, d6, d8, d10, d12, d20 e d100.</summary>
+    public static readonly int[] DiceSizes = [4, 6, 8, 10, 12, 20, 100];
+
+    public int DiceSides => Sides is { } sides && Array.IndexOf(DiceSizes, sides) >= 0 ? sides : 20;
+    /// <summary>A face que o dado mostra (de 1 até o número de lados). Sem escolher, o maior.</summary>
+    public int DiceValue => Math.Clamp(Value ?? DiceSides, 1, DiceSides);
+
     public CellData CellAt(int x, int y) => Cells?.GetValueOrDefault((x, y)) ?? new CellData("", null);
 
     public double CardW => CardWidth is > 0 ? CardWidth.Value : 180;
@@ -174,7 +193,7 @@ internal sealed class Piece
         nameof(Size) or nameof(Align) or nameof(Italic) or nameof(Bold) or nameof(Font) => HasLetters(type),
         nameof(Scroll) => type is PieceType.Text,
         nameof(GameWrite) => type is PieceType.Messages,
-        nameof(Shadow) => HasLetters(type) || type is PieceType.Box,
+        nameof(Shadow) => HasLetters(type) || type is PieceType.Box or PieceType.Icon or PieceType.Dice,
         nameof(TextShadow) => type is PieceType.Button,
         nameof(Color) or nameof(Shade) => type is not (PieceType.Image or PieceType.Input or PieceType.Messages or PieceType.List),
         nameof(Opacity) or nameof(Border) or nameof(BorderColor) or nameof(BorderWidth) or nameof(Gradient) or nameof(GradientDirection) => type is PieceType.Box,
@@ -186,14 +205,18 @@ internal sealed class Piece
         nameof(BarStyle) or nameof(BarText) => type is PieceType.Bar,
         nameof(Shortcut) => type is PieceType.Button,
         nameof(Enabled) => type is PieceType.Button or PieceType.Input or PieceType.Image or PieceType.Choice or PieceType.Counter or PieceType.Grid,
-        nameof(Value) or nameof(Max) => type is PieceType.Bar or PieceType.Counter,
+        nameof(Value) => type is PieceType.Bar or PieceType.Counter or PieceType.Dice,
+        nameof(Max) => type is PieceType.Bar or PieceType.Counter,
+        nameof(Icon) => type is PieceType.Icon or PieceType.Button,
+        nameof(Frame) or nameof(Back) => type is PieceType.Icon,
+        nameof(Sides) => type is PieceType.Dice,
         nameof(Min) or nameof(Step) => type is PieceType.Counter,
         nameof(Options) or nameof(Selected) => type is PieceType.Choice or PieceType.Wheel,
         nameof(Columns) => type is PieceType.Choice or PieceType.Grid,
         nameof(Rows) => type is PieceType.Grid,
         nameof(Image) => type is PieceType.Image,
         nameof(CardWidth) or nameof(CardHeight) or nameof(Gap) => type is PieceType.List,
-        nameof(List) => type is not (PieceType.List or PieceType.Messages or PieceType.Choice or PieceType.Counter or PieceType.Wheel or PieceType.Grid),
+        nameof(List) => type is not (PieceType.List or PieceType.Messages or PieceType.Choice or PieceType.Counter or PieceType.Wheel or PieceType.Grid or PieceType.Dice),
         _ => true,
     };
 
@@ -239,6 +262,12 @@ internal sealed class Piece
             case PieceType.Grid:
                 (piece.Width, piece.Height, piece.Columns, piece.Rows) = (300, 300, 3, 3);
                 break;
+            case PieceType.Icon:
+                (piece.Width, piece.Height, piece.Icon) = (120, 120, GameEngine.Icon.Star);
+                break;
+            case PieceType.Dice:
+                (piece.Width, piece.Height, piece.Sides, piece.Color) = (120, 120, 20, GameEngine.Color.Red);
+                break;
         }
         return piece;
     }
@@ -258,6 +287,8 @@ internal sealed class Piece
         PieceType.Counter => "Contador",
         PieceType.Wheel => "Roleta",
         PieceType.Grid => "Grade",
+        PieceType.Icon => "Ícone",
+        PieceType.Dice => "Dado",
         _ => type.ToString(),
     };
 }

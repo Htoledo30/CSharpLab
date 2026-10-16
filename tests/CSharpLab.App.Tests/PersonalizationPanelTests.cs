@@ -40,6 +40,7 @@ public sealed class PersonalizationPanelTests
         var doc = new DocumentViewModel(Json, path, TextFileIO.Utf8NoBom, null);
         using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
         var view = new ScreenEditorView(doc, vm);
+        view.Properties.AllTabs = true;   // confere o painel inteiro, com as três abas juntas
         var window = new Window { Content = view, Width = 1280, Height = 2000, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Left = -10000, Top = -10000 };
         window.Show();
         try

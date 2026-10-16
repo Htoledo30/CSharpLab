@@ -139,6 +139,8 @@ game.Start("Name");
 | `Value`, `Min`, `Max`, `Step`, `OnChange(value => { })` | Counter (o número fica sempre entre `Min` e `Max`) |
 | `string prize = Spin();` | Wheel: **só dentro de um clique**. Gira, espera parar e devolve a fatia sorteada (repita uma opção para ela sair mais) |
 | `Cell(x, y)` (`.Text`, `.Color`, `.IsEmpty`), `Clear()`, `Columns`, `Rows`, `OnCellClick((x, y) => { })` | Grid: `x` é a coluna e `y` a linha; a casa de cima à esquerda é `(0, 0)` |
+| `Icon` (`Icon.Sword`, `Icon.Goblin`, `Icon.Potion`, `Icon.Heart`…), `Frame` (`IconFrame.None`, `Circle`, `Square`) | Icon (desenho pronto, da cor do `Color`). `Icon` também no Button: o desenho antes do texto (`null` tira) |
+| `int roll = Roll();`, `Value` (a face), `Sides` (4, 6, 8, 10, 12, 20 ou 100) | Dice: `Roll()` **só dentro de um clique**. Rola, espera parar e devolve o número (o maior acende dourado) |
 
 Cores com nome (`Color`, combinam com o tema): `White`, `Gray`, `Black`, `Red`, `Pink`, `Orange`, `Gold`, `Green`, `Cyan`,
 `Blue`, `Purple`, `Brown`. Qualquer outra cor: `Color.Hex("#8A2BE2")` ou `Color.Rgb(138, 43, 226)` (no arquivo da tela,
@@ -236,7 +238,7 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 
 | Chave | Valor |
 |---|---|
-| `type` | `Text`, `Button`, `Bar`, `Image`, `Box`, `Input`, `Messages`, `List`, `Choice`, `Counter`, `Wheel`, `Grid` |
+| `type` | `Text`, `Button`, `Bar`, `Image`, `Box`, `Input`, `Messages`, `List`, `Choice`, `Counter`, `Wheel`, `Grid`, `Icon`, `Dice` |
 | `name` | Nome único na tela, em inglês, só letras sem acento, números e `_` (é o nome do `game.Find`/`card.Find`) |
 | `list` | Peça do cartão modelo de uma Lista: o nome da Lista. Aí `x`/`y` contam do canto do cartão |
 | `x`, `y`, `width`, `height` | Posição e tamanho (números) |
@@ -256,6 +258,9 @@ Palco de **960 × 540**: `x` vai da esquerda para a direita, `y` de cima para ba
 | `options`, `selected` | Choice e Wheel: as opções (`["Fácil", "Normal", "Difícil"]`, até 24) e a que começa escolhida |
 | `value`, `min`, `max`, `step` | Counter: o número, os limites e de quanto em quanto ele anda |
 | `columns`, `rows` | Grid: casas por linha e linhas (1 a 20). Choice: `columns` = opções por linha (sem ele, automático) |
+| `icon` | Icon: o desenho (`"Sword"`, `"Goblin"`, `"Potion"`…, os nomes do `Icon` do código). Button: desenho antes do texto |
+| `frame`, `back` | Só Icon: moldura (`None`, `Circle`, `Square`) e a cor dela (sem `back`: a cor do ícone, escurinha) |
+| `sides`, `value` | Dice: quantos lados (4, 6, 8, 10, 12, 20 ou 100) e a face que aparece |
 | `locked` | `true` = travada no Estúdio (o mouse não pega no palco). O jogo ignora |
 | `style` | Só Button: `Filled`, `Outline`, `Text` |
 | `shortcut` | Só Button: tecla do mesmo `OnClick` (`Space`, `Enter`, `Escape`, `Up`, `Down`, `Left`, `Right`, `A` a `Z` ou `D0` a `D9`); vazio/null tira |

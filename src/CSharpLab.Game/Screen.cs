@@ -17,7 +17,7 @@ internal sealed record ButtonItem(string Text, Action OnClick);
 internal sealed record BarItem(string Label, int Value, int Max, Color Color);
 
 /// <summary>Um movimento curto de uma peça (tremer, piscar ou um texto que salta), tocado uma vez quando a tela aparece.</summary>
-internal enum Effect { Shake, Flash, Pop, Spin }
+internal enum Effect { Shake, Flash, Pop, Spin, Roll }
 
 /// <summary>O movimento de uma peça. No Pop: o texto que salta e a cor dele. No Spin: a opção de onde a roleta saiu.</summary>
 internal sealed record PieceEffect(Piece Piece, Effect Effect, string? Text = null, Color? Color = null);
@@ -25,6 +25,9 @@ internal sealed record PieceEffect(Piece Piece, Effect Effect, string? Text = nu
 internal sealed class Screen
 {
     private IReadOnlyList<MessageLine>? _messages;
+
+    /// <summary>Identifica esta visita, inclusive ao voltar para a mesma cena.</summary>
+    public object? Visit { get; set; }
 
     /// <summary>A cena que montou esta tela (null nos testes que montam a tela na mão).</summary>
     public string? SceneName { get; set; }

@@ -128,7 +128,7 @@ public sealed class StudioTests
         }
     }, timeoutSeconds: 180);
 
-    /// <summary>O mapa de A Coroa Perdida (11 cenas). A imagem fica em %TEMP%\csharplab-mapa-coroa.png.</summary>
+    /// <summary>O mapa de A Coroa Perdida (23 cenas). A imagem fica em %TEMP%\csharplab-mapa-coroa.png.</summary>
     [Fact]
     public void Mapa_do_exemplo_grande_liga_todas_as_cenas() => Ui.Run(async () =>
     {
@@ -148,9 +148,9 @@ public sealed class StudioTests
             studio.Open(null);
             studio.ShowMap();
             await Settle(window);
-            Assert.Equal(11, studio.Map.Placed.Count);
+            Assert.Equal(23, studio.Map.Placed.Count);
             Assert.Equal(0, studio.Map.Placed[0].Column);
-            Assert.True(studio.Map.Arrows.Count >= 10);
+            Assert.True(studio.Map.Arrows.Count >= 22);
             SaveImage(window, "csharplab-mapa-coroa.png");
         }
         finally

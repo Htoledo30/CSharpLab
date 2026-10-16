@@ -43,7 +43,13 @@ public sealed class StudioView : Grid
     private readonly SceneMapView _map = new() { Visibility = Visibility.Collapsed };
     private bool _mapMode;
     private readonly TextBlock _gameName = new() { VerticalAlignment = VerticalAlignment.Center, FontSize = 12, Margin = new Thickness(10, 1, 0, 0) };
-    private readonly ColumnDefinition _codeColumn = new() { Width = new GridLength(0.36, GridUnitType.Star), MinWidth = 260 };
+    private readonly ColumnDefinition _codeColumn = new() { Width = new GridLength(0.36, GridUnitType.Star), MinWidth = CodeMinWidth };
+    private const double CodeMinWidth = 260;
+    private GridLength _codeWidth = new(0.36, GridUnitType.Star);   // a largura do código antes de esconder
+    private GridSplitter? _splitter;
+    private FrameworkElement? _codePane;
+    private readonly Button _codeToggle = new();
+    private readonly TextBlock _codeToggleLabel = new() { VerticalAlignment = VerticalAlignment.Center };
     private readonly DispatcherTimer _caretTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(350) };
     private readonly DispatcherTimer _refreshTimer = new(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(700) };
     private MainViewModel? _vm;
@@ -96,13 +102,14 @@ public sealed class StudioView : Grid
         SetColumn(_center, 1);
         body.Children.Add(_center);
 
-        var splitter = new GridSplitter { HorizontalAlignment = HorizontalAlignment.Stretch, ResizeBehavior = GridResizeBehavior.PreviousAndNext };
+        var splitter = _splitter = new GridSplitter { HorizontalAlignment = HorizontalAlignment.Stretch, ResizeBehavior = GridResizeBehavior.PreviousAndNext };
         splitter.SetResourceReference(StyleProperty, "Splitter");
         splitter.SetResourceReference(BackgroundProperty, "BgSidebar");
         SetColumn(splitter, 2);
         body.Children.Add(splitter);
 
         var code = CodePane();
+        _codePane = code;
         SetColumn(code, 3);
         body.Children.Add(code);
 
@@ -184,6 +191,20 @@ public sealed class StudioView : Grid
         DockPanel.SetDock(_play, Dock.Right);
         header.Children.Add(_play);
 
+        var toggleContent = WithIcon(CodeGlyph, "");
+        toggleContent.Children.RemoveAt(1);
+        toggleContent.Children.Add(_codeToggleLabel);
+        _codeToggle.Content = toggleContent;
+        _codeToggle.VerticalAlignment = VerticalAlignment.Center;
+        _codeToggle.Margin = new Thickness(0, 0, 6, 0);
+        _codeToggle.Cursor = Cursors.Hand;
+        _codeToggle.SetResourceReference(StyleProperty, "TextButton");
+        _codeToggle.Click += (_, _) =>
+        {
+            if (_vm != null) _vm.IsStudioCodeVisible = !_vm.IsStudioCodeVisible;
+        };
+        DockPanel.SetDock(_codeToggle, Dock.Right);
+
         var exportContent = WithIcon("\uE7B8", "Exportar");
         exportContent.Children.RemoveAt(1);
         exportContent.Children.Add(_exportLabel);
@@ -197,6 +218,7 @@ public sealed class StudioView : Grid
         export.Click += (_, _) => _vm?.ExportOrCancelCommand.Execute(null);
         DockPanel.SetDock(export, Dock.Right);
         header.Children.Add(export);
+        header.Children.Add(_codeToggle);
 
         var icon = new TextBlock { Text = ScreenGlyph, FontSize = 13, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 1, 8, 0) };
         icon.SetResourceReference(TextBlock.FontFamilyProperty, "IconFont");
@@ -337,6 +359,52 @@ public sealed class StudioView : Grid
         return pane;
     }
 
+    /// <summary>O código está à vista, ao lado da tela? (para os testes)</summary>
+    internal bool ShowsCode => _codePane?.Visibility == Visibility.Visible;
+
+    /// <summary>
+    /// Mostra ou esconde o código ao lado da tela. Escondido, a tela ganha o espaço todo (o palco cresce e as
+    /// peças voltam a mostrar o nome). Ir até uma linha do código (um link "Program.cs, linha N", "Escrever o
+    /// que ele faz") mostra ele de novo.
+    /// </summary>
+    private void ApplyCodeVisibility()
+    {
+        bool visible = _vm?.IsStudioCodeVisible != false;
+        UpdateCodeToggle(visible);
+        if (_codePane == null || _splitter == null || visible == (_codePane.Visibility == Visibility.Visible)) return;
+        if (visible)
+        {
+            _codeColumn.MinWidth = CodeMinWidth;
+            _codeColumn.Width = _codeWidth;
+        }
+        else
+        {
+            _codeWidth = _codeColumn.Width;
+            _codeColumn.MinWidth = 0;
+            _codeColumn.Width = new GridLength(0);
+        }
+        _codePane.Visibility = _splitter.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        if (!visible && _codeFocusedLast)
+        {
+            _codeFocusedLast = false;
+            FocusActive();
+        }
+    }
+
+    private void UpdateCodeToggle(bool visible)
+    {
+        _codeToggleLabel.Text = visible ? "Esconder código" : "Mostrar código";
+        _codeToggle.ToolTip = visible
+            ? "Esconde o código desta cena: a tela fica maior para montar. Clicar num link do código (\"Program.cs, linha…\") mostra ele de novo."
+            : "Mostra o código desta cena ao lado da tela.";
+    }
+
+    /// <summary>Alguém pediu para ver uma linha do código: se ele estava escondido, aparece.</summary>
+    private void RevealCode()
+    {
+        if (_vm is { IsStudioCodeVisible: false }) _vm.IsStudioCodeVisible = true;
+    }
+
     // ------------------------------------------------------------------ ligação com o resto do app
 
     public void Bind(MainViewModel vm)
@@ -345,6 +413,7 @@ public sealed class StudioView : Grid
         _exportLabel.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding(nameof(MainViewModel.ExportButtonText)) { Source = vm });
         _export.SetBinding(IsEnabledProperty, new System.Windows.Data.Binding(nameof(MainViewModel.CanUseExportButton)) { Source = vm });
         vm.PropertyChanged += OnVmPropertyChanged;
+        ApplyCodeVisibility();
         vm.GoToRequested += OnGoToRequested;
         vm.SceneRenamed += (oldName, newName) =>
         {
@@ -367,6 +436,7 @@ public sealed class StudioView : Grid
     {
         if (e.PropertyName == nameof(MainViewModel.IsBusy))
             _play.IsEnabled = _canPlayScene && _vm?.IsBusy == false;
+        if (e.PropertyName == nameof(MainViewModel.IsStudioCodeVisible)) ApplyCodeVisibility();
         if (_vm == null || !IsOpen || _syncing) return;
         switch (e.PropertyName)
         {
@@ -395,6 +465,7 @@ public sealed class StudioView : Grid
         }
         else if (_code?.Doc != doc)
         {
+            RevealCode();
             ShowCode(doc);
         }
     }
@@ -413,6 +484,7 @@ public sealed class StudioView : Grid
             _screen?.GoTo(line, column, offset);
             return;
         }
+        RevealCode();
         var editor = ShowCode(doc);
         // A cena pode ter acabado de ser escrita ("Escrever a cena"): o aviso de que ela falta sai.
         if (_scene != null && _vm.GameDirectory is { } dir && _vm.FindSceneCode(dir, _scene) != null)

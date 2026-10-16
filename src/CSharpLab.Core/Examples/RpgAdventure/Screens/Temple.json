@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "backgroundColor": "#0F1E26",
+  "backgroundGradient": "#081016",
+  "pieces": [
+    { "type": "Box", "name": "StatusBar", "x": 16, "y": 12, "width": 928, "height": 72, "shadow": true, "border": true },
+    { "type": "Icon", "name": "HeroBadge", "x": 26, "y": 18, "width": 60, "height": 60, "color": "Red", "icon": "Swords", "frame": "Circle" },
+    { "type": "Text", "name": "PlayerInfo", "x": 94, "y": 20, "width": 170, "height": 58, "text": "Herói\nGuerreiro · Nível 1", "size": 14, "bold": true },
+    { "type": "Bar", "name": "Health", "x": 272, "y": 24, "width": 200, "height": 48, "text": "Vida", "color": "Green", "value": 100, "max": 100, "animate": true },
+    { "type": "Bar", "name": "Mana", "x": 484, "y": 24, "width": 170, "height": 48, "text": "Mana", "color": "Blue", "barStyle": "Shine", "value": 30, "max": 30, "animate": true },
+    { "type": "Bar", "name": "Xp", "x": 666, "y": 24, "width": 140, "height": 48, "text": "XP", "color": "Purple", "value": 0, "max": 30, "animate": true },
+    { "type": "Icon", "name": "GoldIcon", "x": 820, "y": 21, "width": 26, "height": 26, "color": "Gold", "icon": "Gold" },
+    { "type": "Text", "name": "Gold", "x": 852, "y": 18, "width": 84, "height": 30, "text": "15", "size": 18, "bold": true, "color": "Gold" },
+    { "type": "Icon", "name": "PotionIcon", "x": 820, "y": 51, "width": 26, "height": 26, "color": "Green", "icon": "Potion" },
+    { "type": "Text", "name": "Potions", "x": 852, "y": 48, "width": 84, "height": 30, "text": "1", "size": 18, "bold": true, "color": "Green" },
+    { "type": "Icon", "name": "Candle", "x": 50, "y": 110, "width": 130, "height": 130, "shadow": true, "color": "Gold", "icon": "Candle" },
+    { "type": "Icon", "name": "Church", "x": 760, "y": 100, "width": 170, "height": 170, "color": "Gray", "icon": "Church" },
+    { "type": "Text", "name": "Title", "x": 200, "y": 102, "width": 520, "height": 44, "text": "Templo da Luz", "size": 30, "shadow": true, "font": "Fantasy", "color": "Cyan" },
+    { "type": "Text", "name": "Story", "x": 200, "y": 148, "width": 540, "height": 64, "text": "A sacerdotisa Lúmen acende velas para os viajantes. Doe ouro para ser curado, ou reze em silêncio.", "size": 15, "font": "Book" },
+    { "type": "Box", "name": "Offer", "x": 200, "y": 222, "width": 540, "height": 110, "color": "Cyan", "shade": "Dark", "opacity": 30, "border": true },
+    { "type": "Counter", "name": "Donation", "x": 216, "y": 238, "width": 240, "height": 52, "text": "Doação", "color": "Cyan", "value": 5, "min": 5, "max": 50, "step": 5 },
+    { "type": "Button", "name": "Donate", "x": 472, "y": 238, "width": 252, "height": 52, "text": "Doar e ser curado", "color": "Cyan", "icon": "Heart" },
+    { "type": "Text", "name": "OfferText", "x": 216, "y": 298, "width": 508, "height": 26, "text": "Cura o dobro do que você doa. 20 ou mais é uma boa ação.", "size": 13, "color": "Gray" },
+    { "type": "Button", "name": "Pray", "x": 200, "y": 346, "width": 262, "height": 50, "text": "Rezar em silêncio", "color": "Blue", "style": "Outline", "icon": "Hand" },
+    { "type": "Button", "name": "Save", "x": 478, "y": 346, "width": 262, "height": 50, "text": "Acender uma vela (salvar)", "size": 15, "color": "Gold", "style": "Gradient", "icon": "Candle" },
+    { "type": "Messages", "name": "Log", "x": 16, "y": 410, "width": 720, "height": 116, "size": 15 },
+    { "type": "Button", "name": "Back", "x": 752, "y": 448, "width": 192, "height": 52, "text": "Voltar à vila", "style": "Text", "icon": "House" }
+  ]
+}

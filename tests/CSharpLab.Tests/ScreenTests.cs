@@ -274,7 +274,7 @@ public sealed class DesignedSceneTests : IDisposable
         Assert.Contains("\"Atack\" não existe na tela \"Fight\". Você quis dizer \"Attack\"?", error.Message);
 
         error = Assert.Throws<GameException>(() => Started(g => g.Scene("Fight", () => g.Find("Story").Value = 3), "Fight"));
-        Assert.Contains("\"Story\" (na tela \"Fight\") é do tipo Texto: só a Barra e o Contador têm Value.", error.Message);
+        Assert.Contains("\"Story\" (na tela \"Fight\") é do tipo Texto: só a Barra, o Contador e o Dado têm Value.", error.Message);
 
         error = Assert.Throws<GameException>(() => Started(g => g.Scene("Fight", () => g.Find("Story").OnClick(() => { })), "Fight"));
         Assert.Contains("só botões e imagens têm OnClick", error.Message);

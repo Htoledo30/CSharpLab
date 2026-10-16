@@ -51,7 +51,7 @@ internal sealed partial class GameWindow : Window, IGameView
     /// Quanto cada barra mostrava no último desenho (de 0 a 1), para a barra animada deslizar do valor antigo.
     /// As peças são novas a cada visita da cena, então ao chegar numa cena as barras aparecem direto no valor.
     /// </summary>
-    private Dictionary<Piece, double> _barShown = new(ReferenceEqualityComparer.Instance);
+    private Dictionary<object, double> _barShown = new(ReferenceEqualityComparer.Instance);
 
     public GameWindow(Game game)
     {
@@ -60,7 +60,9 @@ internal sealed partial class GameWindow : Window, IGameView
         Background = Theme.Background;
         FontFamily = Theme.BodyFamily;
         UseLayoutRounding = true;
-        SizeToContent = SizeToContent.WidthAndHeight;
+        SizeToContent = SizeToContent.Manual;
+        Width = Math.Min(1024, SystemParameters.WorkArea.Width);
+        Height = Math.Min(640, SystemParameters.WorkArea.Height);
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         MinWidth = 480;
         MinHeight = 300;
@@ -102,13 +104,12 @@ internal sealed partial class GameWindow : Window, IGameView
         root.Children.Add(_curtain);
         Content = new Viewbox { Stretch = Stretch.Uniform, Child = root };
 
-        // Abre com 960×540 e depois deixa o jogador redimensionar à vontade.
-        ContentRendered += (_, _) => SizeToContent = SizeToContent.Manual;
         PreviewKeyDown += OnKey;
     }
 
     public void Show(Screen screen)
     {
+        BeginInputRedraw(screen);
         _answerBox = null;
         bool newScene = screen.SceneName != null && !string.Equals(screen.SceneName, _shownScene, StringComparison.OrdinalIgnoreCase);
         if (newScene)
@@ -133,10 +134,7 @@ internal sealed partial class GameWindow : Window, IGameView
             ShowAutomatic(screen);
         }
 
-        if (_answerBox != null)
-            Dispatcher.BeginInvoke(() => _answerBox?.Focus(), DispatcherPriority.Input);
-        else
-            Dispatcher.BeginInvoke(() => Keyboard.Focus(this), DispatcherPriority.Input);
+        RestoreInputFocus();
     }
 
     /// <summary>
@@ -224,6 +222,11 @@ internal sealed partial class GameWindow : Window, IGameView
     /// <summary>Uma ação por pressionamento; digitar, combinações de teclas e transições não acionam botões.</summary>
     internal bool HandleKey(Key key, ModifierKeys modifiers, bool isRepeat, bool isTyping)
     {
+        if (key == Key.F11 && modifiers == ModifierKeys.None)
+        {
+            if (!isRepeat) ToggleFullScreen();
+            return true;
+        }
         if (isTyping || _transition || modifiers != ModifierKeys.None) return false;
         if (!isRepeat && ButtonShortcuts.FromKey(key) is { } shortcut && _game.PressShortcut(shortcut)) return true;
         if (_game.PressKey(key)) return true;   // game.OnKey da cena (segurar a tecla repete)
@@ -245,25 +248,26 @@ internal sealed partial class GameWindow : Window, IGameView
     {
         var scene = screen.Designed!;
         var messages = screen.Messages;
-        var elements = new Dictionary<Piece, FrameworkElement>(ReferenceEqualityComparer.Instance);
+        var elements = new Dictionary<object, FrameworkElement>(ReferenceEqualityComparer.Instance);
         var barsBefore = _barShown;
-        var barsNow = new Dictionary<Piece, double>(ReferenceEqualityComparer.Instance);
+        var barsNow = new Dictionary<object, double>(ReferenceEqualityComparer.Instance);
         var context = new RenderContext
         {
             Live = true,
             Click = _game.ClickPiece,
-            Answer = _game.AnswerPiece,
+            Answer = AnswerInput,
             Messages = messages,
             MessagesByPiece = screen.MessagesByPiece,
             IsClickable = _game.IsClickable,
             Cards = _game.CardsOf,
             Created = (piece, element) =>
             {
-                elements[piece] = element;
-                if (piece.Type == PieceType.Bar) barsNow[piece] = ScreenRenderer.BarFraction(piece);
+                elements[piece.RuntimeId] = element;
+                if (piece.Type == PieceType.Bar) barsNow[piece.RuntimeId] = ScreenRenderer.BarFraction(piece);
+                if (piece.Type == PieceType.Input && element.Tag is TextBox box) RegisterInput(piece.RuntimeId, box);
             },
             ScrollOffsets = _scrollOffsets,
-            BarBefore = piece => barsBefore.TryGetValue(piece, out var before) ? before : null,
+            BarBefore = piece => barsBefore.TryGetValue(piece.RuntimeId, out var before) ? before : null,
             Choose = _game.ChoosePiece,
             Step = _game.StepPiece,
             CellClick = _game.ClickCell,
@@ -283,7 +287,6 @@ internal sealed partial class GameWindow : Window, IGameView
             Canvas.SetLeft(element, piece.X);
             Canvas.SetTop(element, piece.Y);
             _designed.Children.Add(element);
-            if (_answerBox == null && element.Tag is TextBox box) _answerBox = box;
         }
 
         // Sem a peça Mensagens, o que o game.Write escreveu aparece num aviso por cima da tela,
@@ -300,14 +303,14 @@ internal sealed partial class GameWindow : Window, IGameView
 
         _barShown = barsNow;
 
-        var pops = new Dictionary<Piece, int>(ReferenceEqualityComparer.Instance);
+        var pops = new Dictionary<object, int>(ReferenceEqualityComparer.Instance);
         foreach (var effect in screen.Effects)
         {
-            elements.TryGetValue(effect.Piece, out var element);
+            elements.TryGetValue(effect.Piece.RuntimeId, out var element);
             if (effect.Effect == GameEngine.Effect.Pop)
             {
                 // Vários Pop na mesma peça saem um depois do outro, um pouco para os lados.
-                int index = pops[effect.Piece] = pops.GetValueOrDefault(effect.Piece, -1) + 1;
+                int index = pops[effect.Piece.RuntimeId] = pops.GetValueOrDefault(effect.Piece.RuntimeId, -1) + 1;
                 // Peça escondida (ou de um cartão que não apareceu): usa o lugar dela no arquivo da tela.
                 if (element == null && effect.Piece.List != null) continue;
                 var piece = effect.Piece;
@@ -316,6 +319,10 @@ internal sealed partial class GameWindow : Window, IGameView
             else if (effect.Effect == GameEngine.Effect.Spin)
             {
                 if (element != null) EffectPlayer.Spin(element, ScreenRenderer.WheelAngle(effect.Piece, effect.Text));
+            }
+            else if (effect.Effect == GameEngine.Effect.Roll)
+            {
+                if (element != null) EffectPlayer.Roll(element, effect.Piece.DiceSides, effect.Piece.DiceValue);
             }
             else if (element != null)
             {
@@ -361,6 +368,7 @@ internal sealed partial class GameWindow : Window, IGameView
 
         _items.Children.Clear();
         bool hasNews = false;
+        int questionIndex = 0;
         foreach (var item in screen.Items)
         {
             switch (item)
@@ -375,7 +383,7 @@ internal sealed partial class GameWindow : Window, IGameView
                     _items.Children.Add(ImageView(image.Path));
                     break;
                 case AskItem ask:
-                    _items.Children.Add(AskView(ask));
+                    _items.Children.Add(AskView(ask, questionIndex++));
                     break;
             }
         }
@@ -413,7 +421,7 @@ internal sealed partial class GameWindow : Window, IGameView
         return new WpfImage { Source = image, MaxHeight = 240, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 0, 0, 12) };
     }
 
-    private FrameworkElement AskView(AskItem item)
+    private FrameworkElement AskView(AskItem item, int index)
     {
         var question = new TextBlock { Text = item.Question, FontSize = 19, TextWrapping = TextWrapping.Wrap, Foreground = Theme.Text, Margin = new Thickness(0, 4, 0, 8) };
         var box = new TextBox
@@ -426,7 +434,7 @@ internal sealed partial class GameWindow : Window, IGameView
             BorderBrush = Theme.PanelBorder,
             MinWidth = 320,
         };
-        _answerBox ??= box;
+        RegisterInput((item.Question, index), box);
         void Submit()
         {
             var answer = box.Text.Trim();
@@ -435,7 +443,11 @@ internal sealed partial class GameWindow : Window, IGameView
                 box.Focus();
                 return;
             }
-            _game.Act(() => item.OnAnswer(answer));
+            _game.Act(() =>
+            {
+                box.Clear();
+                item.OnAnswer(answer);
+            });
         }
         box.KeyDown += (_, e) =>
         {

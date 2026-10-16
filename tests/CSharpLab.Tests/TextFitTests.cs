@@ -112,4 +112,26 @@ public sealed class TextFitTests
         var error = Assert.Throws<GameException>(() => new Item(new Piece { Type = PieceType.Button, Name = "Buy" }, "Start").Scroll = true);
         Assert.Contains("Scroll", error.Message);
     }
+
+    [Fact]
+    public void Letra_dentro_da_barra_clara_fica_escura() => OnSta(() =>
+    {
+        TextBlock Label(GameEngine.Color color)
+        {
+            var bar = new Piece { Type = PieceType.Bar, Name = "Energy", Width = 230, Height = 26, Text = "AP", Value = 2, Max = 2, Color = color, BarText = BarText.Inside, BarStyle = BarStyle.Blocks };
+            return Texts(ScreenRenderer.Create(bar, new RenderContext { Live = true })).First(t => t.Text == "AP");
+        }
+        bool IsDark(TextBlock text) => text.Foreground is SolidColorBrush { Color: var c } && c.R + c.G + c.B < 200;
+
+        Assert.True(IsDark(Label(GameEngine.Color.Hex("#FFD21A"))));    // amarelo: letra escura
+        Assert.False(IsDark(Label(GameEngine.Color.Hex("#A31F1F"))));   // vermelho escuro: letra branca
+
+        static IEnumerable<TextBlock> Texts(object root)
+        {
+            if (root is TextBlock text) yield return text;
+            if (root is not DependencyObject node) yield break;
+            foreach (var child in LogicalTreeHelper.GetChildren(node))
+                foreach (var inner in Texts(child)) yield return inner;
+        }
+    });
 }

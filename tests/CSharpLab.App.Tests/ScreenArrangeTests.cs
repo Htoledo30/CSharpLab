@@ -177,6 +177,7 @@ public sealed class ScreenArrangeTests
         var doc = new DocumentViewModel(Menu, path, TextFileIO.Utf8NoBom, null);
         using var vm = new MainViewModel(new AppSettings()) { Dialogs = new FakeDialogs(), Terminal = new FakeTerminal() };
         var view = new ScreenEditorView(doc, vm);
+        view.Properties.AllTabs = true;   // confere o painel inteiro, com as três abas juntas
         var window = new Window { Content = view, Width = 1280, Height = 1200, WindowStyle = WindowStyle.None, ShowInTaskbar = false, ShowActivated = false, Left = -10000, Top = -10000 };
         window.Show();
         try

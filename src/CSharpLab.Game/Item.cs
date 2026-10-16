@@ -17,6 +17,8 @@ public sealed class Item
     private readonly string _scene;
     private readonly DesignedScene? _owner;
     private List<Card> _cards = [];
+    private List<object?> _cardValues = [];
+    private Type? _cardValueType;
 
     internal Item(Piece piece, string scene, DesignedScene? owner = null)
     {
@@ -53,8 +55,8 @@ public sealed class Item
     }
 
     /// <summary>
-    /// Value = valor. Quanto a Barra tem agora (vida, mana…), ou o número do Contador (ele fica sempre entre o Min
-    /// e o Max).
+    /// Value = valor. Quanto a Barra tem agora (vida, mana…), o número do Contador (ele fica sempre entre o Min
+    /// e o Max) ou a face que o Dado mostra.
     /// </summary>
     /// <example><code>game.Find("PlayerHealth").Value = health;</code></example>
     public int Value
@@ -62,13 +64,93 @@ public sealed class Item
         get
         {
             var piece = Check(nameof(Value));
-            return piece.Type == PieceType.Counter ? piece.CounterValue : piece.BarValue;
+            return piece.Type switch
+            {
+                PieceType.Counter => piece.CounterValue,
+                PieceType.Dice => piece.DiceValue,
+                _ => piece.BarValue,
+            };
         }
         set
         {
             var piece = Check(nameof(Value));
-            piece.Value = piece.Type == PieceType.Counter ? Math.Clamp(value, piece.CounterMin, piece.CounterMax) : value;
+            piece.Value = piece.Type switch
+            {
+                PieceType.Counter => Math.Clamp(value, piece.CounterMin, piece.CounterMax),
+                PieceType.Dice => Math.Clamp(value, 1, piece.DiceSides),
+                _ => value,
+            };
         }
+    }
+
+    /// <summary>
+    /// Icon = ícone. O desenho da peça Ícone, ou o desenho antes do texto de um Botão. Null tira o ícone do botão.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// game.Find("EnemyIcon").Icon = Icon.Goblin;
+    /// game.Find("Attack").Icon = Icon.Sword;
+    /// </code>
+    /// </example>
+    public Icon? Icon
+    {
+        get
+        {
+            var piece = Check(nameof(Icon));
+            return piece.Icon ?? (piece.Type == PieceType.Icon ? GameEngine.Icon.Star : null);
+        }
+        set
+        {
+            var piece = Check(nameof(Icon));
+            if (value == null && piece.Type == PieceType.Icon)
+                throw new GameException($"O ícone \"{Name}\" precisa de um desenho. Para sumir com ele, use game.Find(\"{Name}\").Visible = false;");
+            piece.Icon = value;
+        }
+    }
+
+    /// <summary>Frame = moldura. A moldura atrás do desenho do Ícone: nenhuma, círculo ou quadrado.</summary>
+    /// <example><code>game.Find("EnemyIcon").Frame = IconFrame.Circle;</code></example>
+    public IconFrame Frame
+    {
+        get => Check(nameof(Frame)).Frame ?? IconFrame.None;
+        set => Check(nameof(Frame)).Frame = value == IconFrame.None ? null : value;
+    }
+
+    /// <summary>Sides = lados. Quantos lados o Dado tem: 4, 6, 8, 10, 12, 20 ou 100.</summary>
+    /// <example><code>game.Find("Dice").Sides = 6;</code></example>
+    public int Sides
+    {
+        get => Check(nameof(Sides)).DiceSides;
+        set
+        {
+            var piece = Check(nameof(Sides));
+            if (Array.IndexOf(Piece.DiceSizes, value) < 0)
+                throw new GameException($"O dado \"{Name}\" pode ter 4, 6, 8, 10, 12, 20 ou 100 lados (veio {value}).");
+            piece.Sides = value;
+            piece.Value = piece.DiceValue;
+        }
+    }
+
+    /// <summary>
+    /// Roll = rolar. Rola o Dado: ele gira, mostra os números passando, para num deles e devolve o número.
+    /// Funciona dentro de um clique (o OnClick de um botão "Rolar"), como o game.Wait: o jogador vê o dado
+    /// rolando e o código continua depois, com o número que saiu.
+    /// </summary>
+    /// <returns>O número que saiu, de 1 até o número de lados.</returns>
+    /// <example>
+    /// <code>
+    /// game.Find("Attack").OnClick(() =>
+    /// {
+    ///     int roll = game.Find("D20").Roll();
+    ///     if (roll == 20) game.Write("Crítico!", Color.Gold);
+    /// });
+    /// </code>
+    /// </example>
+    public int Roll()
+    {
+        if (Piece.Type != PieceType.Dice) throw Wrong("Roll", "só o Dado tem Roll");
+        var game = _owner?.Game ?? throw new GameException($"\"{Name}\" não está numa cena desenhada.");
+        return game.RollDice(this);
     }
 
     /// <summary>Max = máximo. O valor da Barra cheia, ou o maior número do Contador.</summary>
@@ -290,7 +372,7 @@ public sealed class Item
         {
             var piece = Check(nameof(BorderColor));
             piece.BorderColor = value;
-            piece.Border ??= true;
+            piece.Border = true;
         }
     }
 
@@ -347,7 +429,7 @@ public sealed class Item
     public Font Font
     {
         get => Check(nameof(Font)).Font ?? Font.Normal;
-        set => Check(nameof(Font)).Font = value == Font.Normal ? null : value;
+        set => Check(nameof(Font)).Font = value;
     }
 
     /// <summary>Bold = negrito. true deixa as letras mais grossas (em qualquer peça com letras; o nome da Barra já começa em negrito).</summary>
@@ -676,16 +758,34 @@ public sealed class Item
             throw new GameException($"A lista \"{Name}\" ainda não tem cartão modelo. No Estúdio, ponha as peças (nome, preço, botão…) dentro do primeiro cartão dela.");
 
         var cards = new List<Card>();
+        var values = new List<object?>();
+        var reused = new bool[_cards.Count];
         foreach (var value in items)
         {
             if (cards.Count >= MaxCards)
                 throw new GameException($"A lista \"{Name}\" recebeu mais de {MaxCards} itens. Mostre menos de uma vez (por exemplo, só os da página atual).");
             var card = owner.NewCard(this, cards.Count);
+            // Vincula pela coisa mostrada, não pela posição: ordenar ou remover itens não
+            // pode mandar um efeito (ou texto digitado) para o cartão de outra coisa.
+            if (_cardValueType == typeof(T))
+            {
+                for (int i = 0; i < _cards.Count; i++)
+                {
+                    if (reused[i] || !EqualityComparer<T>.Default.Equals((T)_cardValues[i]!, value)) continue;
+                    reused[i] = true;
+                    foreach (var item in card.Items)
+                        item.Piece.RuntimeId = _cards[i].Find(item.Name).Piece.RuntimeId;
+                    break;
+                }
+            }
             fill(card, value);
             cards.Add(card);
+            values.Add(value);
         }
         owner.ReplaceCards(_cards, cards);
         _cards = cards;
+        _cardValues = values;
+        _cardValueType = typeof(T);
     }
 
     private const int MaxCards = 300;
@@ -732,7 +832,11 @@ public sealed class Item
         throw Wrong(property, property switch
         {
             nameof(Text) => "só Texto, Botão, Barra, Campo de escrita e Lista têm Text",
-            nameof(Value) or nameof(Max) => $"só a Barra e o Contador têm {property}",
+            nameof(Value) => "só a Barra, o Contador e o Dado têm Value",
+            nameof(Max) => "só a Barra e o Contador têm Max",
+            nameof(Icon) => "só o Ícone e o Botão têm Icon",
+            nameof(Frame) => "só o Ícone tem Frame",
+            nameof(Sides) => "só o Dado tem Sides",
             nameof(Image) => "só imagens têm Image",
             nameof(Color) or nameof(Shade) => $"Imagem, Campo de escrita, Mensagens e Lista não têm {property}",
             nameof(Opacity) or nameof(Border) or nameof(BorderColor) or nameof(BorderWidth) or nameof(Gradient) or nameof(GradientDirection) =>
@@ -745,7 +849,7 @@ public sealed class Item
             nameof(Corner) => "só Caixa, Botão, Barra, Escolha, Contador e Grade têm Corner",
             nameof(Italic) or nameof(Bold) or nameof(Font) =>
                 $"só as peças com letras (Texto, Botão, Barra, Campo de escrita, Mensagens e Lista) têm {property}",
-            nameof(Shadow) => "Imagem não tem Shadow",
+            nameof(Shadow) => $"{Piece.Describe(Piece.Type)} não tem Shadow",
             nameof(TextShadow) => "só o Botão tem TextShadow (nas outras peças, a sombra das letras é o Shadow)",
             nameof(Style) => "só botões têm Style",
             nameof(GameWrite) => "só a peça Mensagens tem GameWrite",

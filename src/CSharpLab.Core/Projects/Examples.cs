@@ -20,7 +20,7 @@ public static class Examples
         new("RpgBattle", "Batalha RPG", "Classes e objetos, em dois arquivos"),
         new("Snake", "Cobrinha", "Jogo em tempo real: teclas, cores e posição na tela"),
         new("RpgScreens", "RPG com botões", "Telas desenhadas no Estúdio; o código diz o que cada botão faz", IsGame: true),
-        new("RpgAdventure", "RPG completo: A Coroa Perdida", "Classes, loja, níveis, eventos com escolhas, um enigma e o chefe final", IsGame: true),
+        new("RpgAdventure", "RPG completo: A Coroa Perdida", "23 cenas com todas as peças: mapa, loja, ferreiro, missões, mochila, dados, roleta, salvar e o chefe final", IsGame: true),
         new("RpgButtons", "RPG só com código", "As mesmas ideias sem desenhar: game.Title, game.Button, game.Bar", IsGame: true),
     ];
 

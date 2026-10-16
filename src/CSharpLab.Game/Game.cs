@@ -37,6 +37,7 @@ public sealed partial class Game
     private bool _inAction;
     private bool _started;
     private bool _entering;
+    private object _sceneVisit = new();
     private DesignedScene? _designed;
     private IGameView? _view;
 
@@ -231,6 +232,23 @@ public sealed partial class Game
         piece.Selected = result;
         _designed?.AddEffect(new PieceEffect(piece, Effect.Spin, before));
         ShowAndPause(SpinSeconds);
+        return result;
+    }
+
+    /// <summary>Quanto o Roll espera: o dado rolando e um instantinho parado no número.</summary>
+    private const double RollSeconds = 1.8;
+
+    /// <summary>O Dado: sorteia um número, mostra ele rolando até lá e devolve o número (Item.Roll).</summary>
+    internal int RollDice(Item dice)
+    {
+        if (!_started || _building != null || !_inAction)
+            throw new GameException(
+                $"O Roll rola o dado dentro de um clique, para o jogador ver: game.Find(\"RollButton\").OnClick(() => {{ int roll = game.Find(\"{dice.Name}\").Roll(); ... }});");
+        var piece = dice.Piece;
+        int result = Random.Shared.Next(1, piece.DiceSides + 1);
+        piece.Value = result;
+        _designed?.AddEffect(new PieceEffect(piece, Effect.Roll));
+        ShowAndPause(RollSeconds);
         return result;
     }
 
@@ -485,12 +503,15 @@ public sealed partial class Game
     {
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
         Theme.Current = _look;   // a janela tem a thread dela: o tema vai junto
-        var window = new GameWindow(this);
+        var window = new GameWindow(this) { WindowState = WindowState.Maximized };
         window.Closed += (_, _) => WindowClosed();   // um game.Wait em andamento para junto
         _view = window;
         Redraw();
         app.Run(window);
     }
+
+    /// <summary>Um clique ou uma resposta pode começar agora (fora de outra ação e com o jogo aberto).</summary>
+    internal bool CanAcceptInput => !_inAction && !_closed;
 
     /// <summary>O jogador clicou num botão ou respondeu uma pergunta: roda o código dele e redesenha.</summary>
     internal void Act(Action action)
@@ -589,7 +610,7 @@ public sealed partial class Game
     internal void StepPiece(Piece piece, int direction)
     {
         if (!piece.Enabled || _inAction || _closed) return;
-        int next = Math.Clamp(piece.CounterValue + Math.Sign(direction) * piece.CounterStep, piece.CounterMin, piece.CounterMax);
+        int next = (int)Math.Clamp((long)piece.CounterValue + (long)Math.Sign(direction) * piece.CounterStep, piece.CounterMin, piece.CounterMax);
         if (next == piece.CounterValue) return;
         piece.Value = next;
         var change = ItemFor(piece)?.Change;
@@ -625,6 +646,8 @@ public sealed partial class Game
         while (true)
         {
             screen = new Screen();
+            if (_entering) _sceneVisit = new object();
+            screen.Visit = _sceneVisit;
             // Ao entrar na cena, as peças desenhadas começam como no arquivo; depois guardam as mudanças do código.
             if (_entering || _designed?.SceneName != _current)
             {

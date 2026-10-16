@@ -77,6 +77,8 @@ internal static partial class ScreenRenderer
             PieceType.Counter => CounterPiece(piece, context),
             PieceType.Wheel => WheelPiece(piece),
             PieceType.Grid => GridPiece(piece, context),
+            PieceType.Icon => IconPiece(piece),
+            PieceType.Dice => DicePiece(piece),
             _ => new Border(),
         };
         element.Width = Math.Max(1, piece.Width);
@@ -95,7 +97,7 @@ internal static partial class ScreenRenderer
         PieceType.Text => piece.Scroll != true,
         PieceType.Box or PieceType.Bar => true,
         PieceType.Image => !(context.Click != null && piece.Enabled && context.IsClickable?.Invoke(piece) == true),
-        PieceType.Wheel => true,
+        PieceType.Wheel or PieceType.Icon or PieceType.Dice => true,
         PieceType.Grid => !(context.CellClick != null && piece.Enabled && context.IsClickable?.Invoke(piece) == true),
         _ => false,
     };
@@ -161,6 +163,20 @@ internal static partial class ScreenRenderer
 
     private static readonly DropShadowEffect DarkShadow = CreateShadow(Colors.Black, 0.9);
     private static readonly DropShadowEffect LightShadow = CreateShadow(Colors.White, 0.8);
+
+    /// <summary>Contorno em volta das letras dentro da barra: escuro atrás da letra clara, claro atrás da escura.</summary>
+    private static readonly DropShadowEffect DarkHalo = CreateHalo(Colors.Black, 1);
+    private static readonly DropShadowEffect LightHalo = CreateHalo(Colors.White, 0.85);
+
+    /// <summary>A letra escura em cima de uma cor clara.</summary>
+    private static readonly Brush InkOnLight = Theme.Freeze(System.Windows.Media.Color.FromRgb(0x17, 0x19, 0x1F));
+
+    private static DropShadowEffect CreateHalo(System.Windows.Media.Color color, double opacity)
+    {
+        var halo = new DropShadowEffect { Color = color, ShadowDepth = 0, BlurRadius = 4, Opacity = opacity };
+        halo.Freeze();
+        return halo;
+    }
 
     private static DropShadowEffect CreateShadow(System.Windows.Media.Color color, double opacity)
     {
@@ -231,7 +247,7 @@ internal static partial class ScreenRenderer
                 var label = ButtonLabel(piece, Theme.Text);
                 label.TextWrapping = TextWrapping.NoWrap;
                 label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                double needed = Math.Ceiling(label.DesiredSize.Width + ButtonPadding + 2);
+                double needed = Math.Ceiling(label.DesiredSize.Width + ButtonIconWidth(piece) + ButtonPadding + 2);
                 return needed > piece.Width + 1 ? new TextFit(needed, piece.Height) : null;
             }
             default:
@@ -266,7 +282,7 @@ internal static partial class ScreenRenderer
     private static FrameworkElement ButtonPiece(Piece piece, RenderContext context)
     {
         var look = Theme.LookOf(piece.Color, piece.Shade, piece.Style, piece.TextColor);
-        var button = Theme.MakeButton(ButtonLabel(piece, look.Text), piece.Color, piece.Shade, piece.Style, piece.TextColor,
+        var button = Theme.MakeButton(ButtonContent(piece, look.Text), piece.Color, piece.Shade, piece.Style, piece.TextColor,
             Theme.ButtonCorners(piece.Corner, piece.Height));
         if (piece.Shadow == true) button.Effect = Theme.DropShadow;
         button.HorizontalContentAlignment = HorizontalOf(piece.LetterAlign);
@@ -315,14 +331,16 @@ internal static partial class ScreenRenderer
         }
         if (place == BarText.None) return track;
 
-        // Dentro: letra branca com sombra por cima da barra, como nos jogos de luta.
+        // Dentro: a letra por cima da barra, como nos jogos de luta. Numa barra clara (amarelo, branco) a letra
+        // é escura; numa escura, branca. Um contorno da cor oposta deixa ela legível também em cima do pedaço vazio.
         var inside = new Grid();
         inside.Children.Add(track);
         var insideSize = Math.Clamp(trackHeight * 0.5, 10, Math.Max(10, piece.FontSize));
-        var label = Letters(new TextBlock { Text = piece.Text ?? "", FontFamily = font, FontSize = insideSize, TextTrimming = TextTrimming.CharacterEllipsis }, piece, Brushes.White);
-        var number = Letters(new TextBlock { Text = $"{value} / {max}", FontFamily = font, FontSize = insideSize }, piece, Brushes.White);
-        // Dentro da barra a sombra escura é sempre usada: é ela que deixa a letra legível em cima da cor.
-        label.Effect = number.Effect = DarkShadow;
+        var ink = Theme.IsLight(color) ? InkOnLight : Brushes.White;
+        var label = Letters(new TextBlock { Text = piece.Text ?? "", FontFamily = font, FontSize = insideSize, TextTrimming = TextTrimming.CharacterEllipsis }, piece, ink);
+        var number = Letters(new TextBlock { Text = $"{value} / {max}", FontFamily = font, FontSize = insideSize }, piece, ink);
+        bool lightLetters = label.Foreground is SolidColorBrush { Color: var letters } && Theme.IsLight(letters);
+        label.Effect = number.Effect = lightLetters ? DarkHalo : LightHalo;
         var line = BarLine(label, number, piece.LetterAlign);
         line.Margin = new Thickness(Math.Max(8, corners.TopLeft * 0.6), 0, Math.Max(8, corners.TopLeft * 0.6), 0);
         line.VerticalAlignment = VerticalAlignment.Center;
@@ -645,7 +663,7 @@ internal static partial class ScreenRenderer
         panel.Children.Add(question);
         panel.Children.Add(new Border { Child = row, VerticalAlignment = VerticalAlignment.Top, MaxHeight = 52 });
         if (!piece.Enabled) panel.Opacity = 0.5;
-        panel.Tag = piece.Enabled ? box : null; // a janela do jogo põe o cursor aqui
+        panel.Tag = box; // a janela preserva a escrita; só campos ativos recebem o foco
         return panel;
     }
 

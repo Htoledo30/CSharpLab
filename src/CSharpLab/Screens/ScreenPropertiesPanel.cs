@@ -78,6 +78,7 @@ public sealed class ScreenPropertiesPanel : Border
     public void FocusText()
     {
         if (_textField == null) return;
+        ShowTab(PanelTab.Piece);
         _textField.Focus();
         _textField.SelectAll();
     }
@@ -122,6 +123,7 @@ public sealed class ScreenPropertiesPanel : Border
         _refreshers.Clear();
         _refreshCode = null;
         _textField = null;
+        _tabs.Clear();
         var piece = _model.Selected;
         _shownName = piece?.Name;
         _shownType = piece?.Type;
@@ -307,6 +309,9 @@ public sealed class ScreenPropertiesPanel : Border
         spacing.Children.Add(SmallAction("Mesma altura", $"Todas ficam com a altura de {first} (a primeira que você selecionou).", () => _model.SameSize(width: false, height: true)));
         _content.Children.Add(spacing);
 
+        _content.Children.Add(Section("MEUS ESTILOS"));
+        _content.Children.Add(MyStylesField(null));
+
         _content.Children.Add(Section("FAZER COM TODAS"));
         foreach (var (text, action) in new (string, Action)[]
                  {
@@ -350,17 +355,27 @@ public sealed class ScreenPropertiesPanel : Border
 
         if (_model.Layout?.ListOf(piece) is { } owner)
         {
-            var info = Bullet($"Faz parte do cartão da lista \"{owner.Name}\": aparece uma vez para cada item. No código, use card.Find(\"{name}\") dentro do Show.", "Accent");
-            info.Margin = new Thickness(0, 6, 0, 0);
-            _content.Children.Add(info);
+            var inCard = Bullet($"Faz parte do cartão da lista \"{owner.Name}\": aparece uma vez para cada item. No código, use card.Find(\"{name}\") dentro do Show.", "Accent");
+            inCard.Margin = new Thickness(0, 6, 0, 0);
+            _content.Children.Add(inCard);
         }
 
-        _content.Children.Add(Section("NOME"));
-        _content.Children.Add(NameField());
+        // Três abas: o que a peça é e faz (com o código), como ela aparece, e onde fica.
+        var info = new StackPanel();
+        var look = new StackPanel();
+        var place = new StackPanel();
+        _content.Children.Add(Tabs((PanelTab.Piece, "Peça", info), (PanelTab.Look, "Aparência", look), (PanelTab.Place, "Posição", place)));
+        _content.Children.Add(info);
+        _content.Children.Add(look);
+        _content.Children.Add(place);
+        var page = info;
+
+        page.Children.Add(Section("NOME"));
+        page.Children.Add(NameField());
 
         if (Piece.Supports(type, nameof(Piece.Text)))
         {
-            _content.Children.Add(Section(type switch
+            page.Children.Add(Section(type switch
             {
                 PieceType.Bar => "RÓTULO",
                 PieceType.Counter => "RÓTULO (À ESQUERDA, SE QUISER)",
@@ -370,16 +385,16 @@ public sealed class ScreenPropertiesPanel : Border
             }));
             var field = TextField(() => Current()?.Text ?? "", v => Edit(p => p.Text = v, "text"), multiline: type == PieceType.Text);
             _textField = field;
-            _content.Children.Add(field);
+            page.Children.Add(field);
 
             // Texto que não cabe: o aviso aparece logo embaixo, com o conserto ao lado.
-            if (type is PieceType.Text or PieceType.Button) _content.Children.Add(OverflowWarning(Current));
+            if (type is PieceType.Text or PieceType.Button) page.Children.Add(OverflowWarning(Current));
             if (Piece.Supports(type, nameof(Piece.Scroll)))
             {
                 var scroll = SwitchRow("Rolagem", "Ligado: texto comprido ganha uma barra de rolagem no jogo, em vez de ser cortado.",
                     () => Current()?.Scroll == true, v => Edit(p => p.Scroll = v ? true : null, "scroll"));
                 scroll.Margin = new Thickness(0, 10, 0, 0);
-                _content.Children.Add(scroll);
+                page.Children.Add(scroll);
             }
         }
 
@@ -389,24 +404,25 @@ public sealed class ScreenPropertiesPanel : Border
         var handler = HandlerOf(type);
         if (handler != null && linksCode)
         {
-            _content.Children.Add(Section(handler.Section));
-            _content.Children.Add(HandlerField(handler, inCard: piece.List != null));
+            page.Children.Add(Section(handler.Section));
+            page.Children.Add(HandlerField(handler, inCard: piece.List != null));
         }
         else if (linksCode)
         {
-            _content.Children.Add(Section("NO CÓDIGO"));
-            _content.Children.Add(PieceCodeField(type, inCard: piece.List != null));
+            page.Children.Add(Section("NO CÓDIGO"));
+            page.Children.Add(PieceCodeField(type, inCard: piece.List != null));
         }
 
         if (type == PieceType.Button)
         {
-            _content.Children.Add(Section("ATALHO"));
-            _content.Children.Add(ShortcutField(() => Current()?.Shortcut, v => Edit(p => p.Shortcut = v, "shortcut")));
+            page.Children.Add(Section("ATALHO"));
+            page.Children.Add(ShortcutField(() => Current()?.Shortcut, v => Edit(p => p.Shortcut = v, "shortcut")));
             var shortcutHelp = Muted("A tecla executa o mesmo código de Ao clicar. Só funciona com este botão visível e ativo, fora dos campos de escrita.");
             shortcutHelp.Margin = new Thickness(0, 6, 0, 0);
-            _content.Children.Add(shortcutHelp);
-            _content.Children.Add(Section("ESTILO"));
-            _content.Children.Add(PreviewPicker(
+            page.Children.Add(shortcutHelp);
+            page = look;
+            page.Children.Add(Section("ESTILO"));
+            page.Children.Add(PreviewPicker(
                 [(ButtonStyle.Filled, "Cheio", "ButtonStyle.Filled: fundo colorido, a ação principal (Atacar)"),
                  (ButtonStyle.Gradient, "Degradê", "ButtonStyle.Gradient: claro em cima e escuro embaixo, com borda: botão de videogame"),
                  (ButtonStyle.Soft, "Suave", "ButtonStyle.Soft: fundo clarinho da cor, sem borda (opções, abas)"),
@@ -414,28 +430,29 @@ public sealed class ScreenPropertiesPanel : Border
                  (ButtonStyle.Text, "Só texto", "ButtonStyle.Text: sem fundo nem borda (Voltar)")],
                 3, style => MiniButton(Current(), style),
                 () => Current()?.Style ?? ButtonStyle.Filled, v => Edit(p => p.Style = v == ButtonStyle.Filled ? null : v, "style")));
-            _content.Children.Add(Section("CANTOS"));
-            _content.Children.Add(Segmented(
+            page.Children.Add(Section("CANTOS"));
+            page.Children.Add(Segmented(
                 [(Corner.Round, "Do tema", "Os cantos do tema do jogo"), (Corner.Square, "Retos", "Cantos em ângulo"), (Corner.Circle, "Pílula", "Pontas todas redondas")],
                 () => Current()?.Corner ?? Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
             var shadow = SwitchRow("Sombra embaixo", "Uma sombra embaixo do botão: ele parece saltar da tela.",
                 () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
             shadow.Margin = new Thickness(0, 10, 0, 0);
-            _content.Children.Add(shadow);
+            page.Children.Add(shadow);
         }
 
+        page = info;
         if (type == PieceType.List)
         {
-            _content.Children.Add(Section("CARTÃO DE CADA ITEM"));
+            page.Children.Add(Section("CARTÃO DE CADA ITEM"));
             var card = new UniformGrid { Columns = 2 };
             card.Children.Add(Labeled("Largura", NumberField(() => Current()?.CardW ?? 180, v => Edit(p => p.CardWidth = v, "cardw"), 24, 960)));
             card.Children.Add(Labeled("Altura", NumberField(() => Current()?.CardH ?? 220, v => Edit(p => p.CardHeight = v, "cardh"), 24, 540), left: 8));
             card.Children.Add(Labeled("Espaço entre eles", NumberField(() => Current()?.CardGap ?? 16, v => Edit(p => p.Gap = v, "gap"), 0, 200), top: 8));
-            _content.Children.Add(card);
+            page.Children.Add(card);
             var how = Muted("Ponha as peças de um item (nome, preço, botão…) dentro do primeiro cartão, o tracejado. " +
                             "O jogo repete esse cartão para cada item da lista; se não couber, aparece uma rolagem.");
             how.Margin = new Thickness(0, 8, 0, 0);
-            _content.Children.Add(how);
+            page.Children.Add(how);
         }
 
         if (type == PieceType.Bar)
@@ -443,23 +460,24 @@ public sealed class ScreenPropertiesPanel : Border
             var row = new UniformGrid { Columns = 2, Margin = new Thickness(0, 10, 0, 0) };
             row.Children.Add(Labeled("Valor", NumberField(() => Current()?.BarValue ?? 0, v => Edit(p => p.Value = (int)v, "value"), 0, 99999)));
             row.Children.Add(Labeled("Máximo", NumberField(() => Current()?.BarMax ?? 100, v => Edit(p => p.Max = (int)v, "max"), 1, 99999), left: 8));
-            _content.Children.Add(row);
-            _content.Children.Add(OverflowWarning(Current));
-            _content.Children.Add(Section("ESTILO DA BARRA"));
-            _content.Children.Add(PreviewPicker(
+            page.Children.Add(row);
+            page.Children.Add(OverflowWarning(Current));
+            page = look;
+            page.Children.Add(Section("ESTILO DA BARRA"));
+            page.Children.Add(PreviewPicker(
                 [(BarStyle.Smooth, "Lisa", "BarStyle.Smooth: uma cor só"),
                  (BarStyle.Shine, "Brilhante", "BarStyle.Shine: degradê com brilho e fundo da mesma cor (mana, magia)"),
                  (BarStyle.Blocks, "Em blocos", "BarStyle.Blocks: um pedaço por ponto, até 20 (corações, energia, munição)")],
                 3, style => MiniBar(Current(), style),
                 () => Current()?.BarStyle ?? BarStyle.Smooth, v => Edit(p => p.BarStyle = v == BarStyle.Smooth ? null : v, "barstyle")));
-            _content.Children.Add(Section("NOME E NÚMERO"));
-            _content.Children.Add(Segmented(
+            page.Children.Add(Section("NOME E NÚMERO"));
+            page.Children.Add(Segmented(
                 [(BarText.Above, "Em cima", "BarText.Above: \"Vida\" e \"30 / 50\" em cima da barra"),
                  (BarText.Inside, "Dentro", "BarText.Inside: dentro da barra, como nos jogos de luta (a barra fica da altura da peça)"),
                  (BarText.None, "Sem texto", "BarText.None: só a barra")],
                 () => Current()?.BarText ?? BarText.Above, v => Edit(p => p.BarText = v == BarText.Above ? null : v, "bartext")));
-            _content.Children.Add(Section("CANTOS"));
-            _content.Children.Add(Segmented(
+            page.Children.Add(Section("CANTOS"));
+            page.Children.Add(Segmented(
                 [(Corner.Round, "Redondos", "Pontas redondas"), (Corner.Square, "Retos", "Pontas retas")],
                 () => Current()?.Corner == Corner.Square ? Corner.Square : Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
             var animate = SwitchRow("Animar no jogo",
@@ -474,31 +492,65 @@ public sealed class ScreenPropertiesPanel : Border
             DockPanel.SetDock(see, Dock.Right);
             animateRow.Children.Add(see);
             animateRow.Children.Add(animate);
-            _content.Children.Add(animateRow);
+            page.Children.Add(animateRow);
         }
 
+        page = info;
         if (type == PieceType.Image)
         {
-            _content.Children.Add(Section("IMAGEM"));
-            _content.Children.Add(ImagePicker(() => Current()?.Image, image => Edit(p => p.Image = image, "image"), "Escolher imagem…"));
+            page.Children.Add(Section("IMAGEM"));
+            page.Children.Add(ImagePicker(() => Current()?.Image, image => Edit(p => p.Image = image, "image"), "Escolher imagem…"));
+        }
+
+        if (type == PieceType.Icon)
+        {
+            page.Children.Add(Section("DESENHO"));
+            page.Children.Add(IconPicker(() => Current()?.Icon ?? GameEngine.Icon.Star, v => Edit(p => p.Icon = v ?? GameEngine.Icon.Star, "icon"), allowNone: false));
+            var how = Muted("Desenhos prontos, que ficam da cor da peça (em Aparência: cor e moldura). No código: game.Find(\"" + name + "\").Icon = Icon.Goblin;");
+            how.Margin = new Thickness(0, 6, 0, 0);
+            page.Children.Add(how);
+        }
+
+        if (type == PieceType.Dice)
+        {
+            page.Children.Add(Section("LADOS"));
+            page.Children.Add(Segmented(
+                Piece.DiceSizes.Select(n => (n, $"d{n}", n == 6 ? "Dado comum de 6 lados (com bolinhas)" : $"Dado de {n} lados")).ToList(),
+                () => Current()?.DiceSides ?? 20, v => Edit(p =>
+                {
+                    p.Sides = v;
+                    if (p.Value > v) p.Value = v;
+                }, "sides")));
+            var face = new DockPanel { Margin = new Thickness(0, 10, 0, 0) };
+            var roll = SmallAction("▶ Rolar", "Mostra aqui no palco o dado rolando (a tela não muda).",
+                () => { if (_shownName != null) _model.Preview(_shownName, PiecePreview.Roll); });
+            roll.Width = 86;
+            roll.Margin = new Thickness(10, 16, 0, 0);
+            DockPanel.SetDock(roll, Dock.Right);
+            face.Children.Add(roll);
+            face.Children.Add(Labeled("Mostra o número", NumberField(() => Current()?.DiceValue ?? 20, v => Edit(p => p.Value = (int)v, "value"), 1, 100)));
+            page.Children.Add(face);
+            var how = Muted($"No jogo, ele rola pelo código, dentro do clique de um botão: int roll = game.Find(\"{name}\").Roll(); — o maior número acende dourado e o 1 dá uma tremidinha.");
+            how.Margin = new Thickness(0, 6, 0, 0);
+            page.Children.Add(how);
         }
 
         if (type is PieceType.Choice or PieceType.Wheel)
         {
-            _content.Children.Add(Section(type == PieceType.Choice ? "OPÇÕES" : "FATIAS"));
-            _content.Children.Add(TextField(() => string.Join("\n", Current()?.OptionList ?? []),
+            page.Children.Add(Section(type == PieceType.Choice ? "OPÇÕES" : "FATIAS"));
+            page.Children.Add(TextField(() => string.Join("\n", Current()?.OptionList ?? []),
                 v => Edit(p => p.Options = v.Split('\n').Select(line => line.Trim()).Where(line => line.Length > 0).Take(ScreenFile.MaxOptions).ToList(), "options"),
                 multiline: true));
             var how = Muted(type == PieceType.Choice
                 ? "Uma opção por linha. No jogo, o jogador clica numa para escolher; ela fica cheia, com a cor da peça."
                 : "Uma fatia por linha. Para uma sair mais vezes, repita a linha (ex.: \"Nada\" duas vezes).");
             how.Margin = new Thickness(0, 6, 0, 0);
-            _content.Children.Add(how);
+            page.Children.Add(how);
             if (type == PieceType.Choice)
             {
-                _content.Children.Add(FieldLabel("Começa escolhida"));
-                _content.Children.Add(SelectedField(Current, v => Edit(p => p.Selected = v, "selected")));
-                _content.Children.Add(Labeled("Opções por linha (0 = automático)",
+                page.Children.Add(FieldLabel("Começa escolhida"));
+                page.Children.Add(SelectedField(Current, v => Edit(p => p.Selected = v, "selected")));
+                page.Children.Add(Labeled("Opções por linha (0 = automático)",
                     NumberField(() => Current()?.Columns ?? 0, v => Edit(p => p.Columns = (int)v == 0 ? null : (int)v, "columns"), 0, Piece.MaxCells), top: 10));
             }
             else
@@ -508,16 +560,16 @@ public sealed class ScreenPropertiesPanel : Border
                 spin.Margin = new Thickness(0, 10, 0, 0);
                 spin.HorizontalAlignment = HorizontalAlignment.Left;
                 spin.Width = 90;
-                _content.Children.Add(spin);
+                page.Children.Add(spin);
                 var spinHow = Muted($"No jogo, ela gira pelo código, dentro do clique de um botão: string prize = game.Find(\"{name}\").Spin();");
                 spinHow.Margin = new Thickness(0, 4, 0, 0);
-                _content.Children.Add(spinHow);
+                page.Children.Add(spinHow);
             }
         }
 
         if (type == PieceType.Counter)
         {
-            _content.Children.Add(Section("NÚMEROS"));
+            page.Children.Add(Section("NÚMEROS"));
             var numbers = new UniformGrid { Columns = 2 };
             numbers.Children.Add(Labeled("Começa em", NumberField(() => Current()?.CounterValue ?? 0, v => Edit(p => p.Value = (int)v, "value"), -99999, 99999)));
             numbers.Children.Add(Labeled("Passo (− e +)", NumberField(() => Current()?.CounterStep ?? 1, v => Edit(p => p.Step = (int)v == 1 ? null : (int)v, "step"), 1, 99999), left: 8));
@@ -531,28 +583,35 @@ public sealed class ScreenPropertiesPanel : Border
                 p.Max = (int)v;
                 if (p.Max < p.CounterMin) p.Min = p.Max;
             }, "max"), -99999, 99999), left: 8, top: 8));
-            _content.Children.Add(numbers);
+            page.Children.Add(numbers);
             var how = Muted("O jogador muda com o − e o +, sem passar do mínimo nem do máximo. No código, o número está em .Value.");
             how.Margin = new Thickness(0, 8, 0, 0);
-            _content.Children.Add(how);
+            page.Children.Add(how);
         }
 
         if (type == PieceType.Grid)
         {
-            _content.Children.Add(Section("CASAS"));
+            page.Children.Add(Section("CASAS"));
             var size = new UniformGrid { Columns = 2 };
             size.Children.Add(Labeled("Colunas", NumberField(() => Current()?.GridColumns ?? 3, v => Edit(p => p.Columns = (int)v, "columns"), 1, Piece.MaxCells)));
             size.Children.Add(Labeled("Linhas", NumberField(() => Current()?.GridRows ?? 3, v => Edit(p => p.Rows = (int)v, "rows"), 1, Piece.MaxCells), left: 8));
-            _content.Children.Add(size);
+            page.Children.Add(size);
             var how = Muted($"Cada casa mostra aqui o x e o y dela (a de cima à esquerda é 0,0). No código: game.Find(\"{name}\").Cell(x, y).Text = \"X\";");
             how.Margin = new Thickness(0, 8, 0, 0);
-            _content.Children.Add(how);
+            page.Children.Add(how);
+        }
+
+        page = look;
+        if (type == PieceType.Button)
+        {
+            page.Children.Add(Section("ÍCONE ANTES DO TEXTO"));
+            page.Children.Add(IconPicker(() => Current()?.Icon, v => Edit(p => p.Icon = v, "icon"), allowNone: true));
         }
 
         if (type is PieceType.Choice or PieceType.Counter or PieceType.Grid)
         {
-            _content.Children.Add(Section("CANTOS"));
-            _content.Children.Add(Segmented(
+            page.Children.Add(Section("CANTOS"));
+            page.Children.Add(Segmented(
                 [(Corner.Round, "Do tema", "Os cantos do tema do jogo"), (Corner.Square, "Retos", "Cantos em ângulo"),
                  (Corner.Circle, type == PieceType.Grid ? "Bolinhas" : "Pílula", type == PieceType.Grid ? "Casas redondas" : "Pontas todas redondas")],
                 () => Current()?.Corner ?? Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
@@ -560,52 +619,76 @@ public sealed class ScreenPropertiesPanel : Border
 
         if (Piece.Supports(type, nameof(Piece.Color)))
         {
-            _content.Children.Add(Section(type switch
+            page.Children.Add(Section(type switch
             {
                 PieceType.Button => "COR DO BOTÃO", PieceType.Bar => "COR DA BARRA", PieceType.Box => "COR DA CAIXA", PieceType.Text => "COR DA LETRA",
                 PieceType.Choice => "COR DA ESCOLHIDA", PieceType.Counter => "COR DOS BOTÕES", PieceType.Wheel => "COR DAS FATIAS", PieceType.Grid => "COR DAS CASAS",
+                PieceType.Icon => "COR DO DESENHO", PieceType.Dice => "COR DO DADO",
                 _ => "COR",
             }));
-            _content.Children.Add(ColorField(() => Current()?.Color, v => Edit(p => p.Color = v, "color"), type switch
+            page.Children.Add(ColorField(() => Current()?.Color, v => Edit(p => p.Color = v, "color"), type switch
             {
                 PieceType.Wheel => "Arco-íris: cada fatia de uma cor do tema",
                 PieceType.Grid => "A cor dos painéis do tema",
+                PieceType.Icon => "A cor das letras do tema",
                 _ => "Cor padrão",
             }));
             var shade = Segmented(
                 [(Shade.Normal, "Normal", "A cor como ela é"), (Shade.Dark, "Escuro", "A cor mais escura (vermelho escuro, azul escuro…)"), (Shade.Light, "Claro", "A cor mais clarinha")],
                 () => Current()?.Shade ?? Shade.Normal, v => Edit(p => p.Shade = v == Shade.Normal ? null : v, "shade"));
             shade.Margin = new Thickness(0, 6, 0, 0);
-            _content.Children.Add(shade);
+            page.Children.Add(shade);
+        }
+
+        if (type == PieceType.Icon)
+        {
+            page.Children.Add(Section("MOLDURA"));
+            page.Children.Add(Segmented(
+                [(IconFrame.None, "Nenhuma", "IconFrame.None: só o desenho"), (IconFrame.Circle, "Círculo", "IconFrame.Circle: num círculo (retratos)"),
+                 (IconFrame.Square, "Quadrado", "IconFrame.Square: num quadrado de cantos redondos (itens, habilidades)")],
+                () => Current()?.Frame ?? IconFrame.None, v => Edit(p => p.Frame = v == IconFrame.None ? null : v, "frame")));
+            var back = new StackPanel();
+            back.Children.Add(FieldLabel("Cor da moldura", top: 8));
+            back.Children.Add(ColorField(() => Current()?.Back, v => Edit(p => p.Back = v, "back"), "Automática: a cor do desenho, bem escurinha"));
+            page.Children.Add(back);
+            _refreshers.Add(() => back.Visibility = (Current()?.Frame ?? IconFrame.None) != IconFrame.None ? Visibility.Visible : Visibility.Collapsed);
+        }
+
+        if (type is PieceType.Icon or PieceType.Dice)
+        {
+            var dropShadow = SwitchRow("Sombra embaixo", "Uma sombra embaixo: parece saltar da tela.",
+                () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
+            dropShadow.Margin = new Thickness(0, 12, 0, 0);
+            page.Children.Add(dropShadow);
         }
 
         if (type == PieceType.Messages)
         {
-            _content.Children.Add(Section("O QUE APARECE AQUI"));
+            info.Children.Add(Section("O QUE APARECE AQUI"));
             var shared = SwitchRow("Recebe o game.Write",
                 "Ligado: as mensagens do game.Write aparecem aqui. Desligado: só o que for escrito nesta caixa, " +
                 "com game.Find(\"Nome\").Write(...) — por exemplo, uma caixa só para o que o inimigo faz.",
                 () => Current()?.GameWrite != false, v => Edit(p => p.GameWrite = v, "gamewrite"));
-            _content.Children.Add(shared);
+            info.Children.Add(shared);
             var how = Muted("Para escrever só nesta caixa: game.Find(\"" + name + "\").Write(\"...\");");
             how.Margin = new Thickness(0, 6, 0, 0);
-            _content.Children.Add(how);
+            info.Children.Add(how);
         }
 
         if (Piece.HasLetters(type))
         {
             // As mesmas opções de letra em toda peça que tem texto: fonte, tamanho, negrito, itálico,
             // alinhamento, sombra e cor da letra.
-            _content.Children.Add(Section(type switch
+            page.Children.Add(Section(type switch
             {
                 PieceType.Bar => "LETRA (NOME E NÚMERO)",
                 PieceType.Input => "LETRA (PERGUNTA)",
                 PieceType.List => "LETRA (QUANDO VAZIA)",
                 _ => "LETRA",
             }));
-            var fonts = FontField(() => Current()?.Font ?? GameFont.Normal, v => Edit(p => p.Font = v == GameFont.Normal ? null : v, "font"));
+            var fonts = FontField(() => Current()?.Font, v => Edit(p => p.Font = v, "font"));
             fonts.Margin = new Thickness(0, 0, 0, 8);
-            _content.Children.Add(fonts);
+            page.Children.Add(fonts);
 
             var row = new DockPanel();
             var size = NumberField(() => Current()?.FontSize ?? 20, v => Edit(p => p.Size = v, "size"), 8, 120);
@@ -628,7 +711,7 @@ public sealed class ScreenPropertiesPanel : Border
                 v => Edit(p => p.Align = v == Piece.DefaultAlign(p.Type) ? null : v, "align"));
             align.HorizontalAlignment = HorizontalAlignment.Right;
             row.Children.Add(align);
-            _content.Children.Add(row);
+            page.Children.Add(row);
 
             // No Botão a sombra das letras é o TextShadow (o Shadow dele é a sombra embaixo do botão).
             var letterShadow = type == PieceType.Button
@@ -637,14 +720,14 @@ public sealed class ScreenPropertiesPanel : Border
                 : SwitchRow("Sombra nas letras", "Uma sombra atrás das letras: ficam legíveis em cima de qualquer fundo.",
                     () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
             letterShadow.Margin = new Thickness(0, 10, 0, 0);
-            _content.Children.Add(letterShadow);
+            page.Children.Add(letterShadow);
 
             if (Piece.Supports(type, nameof(Piece.TextColor)))
             {
                 var label = new TextBlock { Text = "Cor da letra", FontSize = 11, Margin = new Thickness(0, 12, 0, 6) };
                 label.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
-                _content.Children.Add(label);
-                _content.Children.Add(ColorField(() => Current()?.TextColor, v => Edit(p => p.TextColor = v, "textcolor"), type switch
+                page.Children.Add(label);
+                page.Children.Add(ColorField(() => Current()?.TextColor, v => Edit(p => p.TextColor = v, "textcolor"), type switch
                 {
                     PieceType.Button => "Automática: escura num botão claro, branca num botão escuro",
                     PieceType.Messages => "Automática (as mensagens com cor no game.Write continuam com a cor delas)",
@@ -655,8 +738,8 @@ public sealed class ScreenPropertiesPanel : Border
 
         if (type == PieceType.Box)
         {
-            _content.Children.Add(Section("DEGRADÊ"));
-            _content.Children.Add(ColorField(() => Current()?.Gradient, v => Edit(p => p.Gradient = v, "gradient"), "Sem degradê: uma cor só"));
+            page.Children.Add(Section("DEGRADÊ"));
+            page.Children.Add(ColorField(() => Current()?.Gradient, v => Edit(p => p.Gradient = v, "gradient"), "Sem degradê: uma cor só"));
             var direction = Segmented(
                 [(GradientDirection.Down, "↓  Para baixo", "GradientDirection.Down: a cor da caixa em cima, esta embaixo"),
                  (GradientDirection.Right, "→  Para o lado", "GradientDirection.Right: a cor da caixa à esquerda, esta à direita"),
@@ -664,10 +747,10 @@ public sealed class ScreenPropertiesPanel : Border
                 () => Current()?.GradientDirection ?? GradientDirection.Down,
                 v => Edit(p => p.GradientDirection = v == GradientDirection.Down ? null : v, "gradientdirection"));
             direction.Margin = new Thickness(0, 6, 0, 0);
-            _content.Children.Add(direction);
+            page.Children.Add(direction);
             var gradientHint = Muted("A caixa vai da cor dela (lá em cima) até esta. Escolha uma para ligar o degradê.");
             gradientHint.Margin = new Thickness(0, 6, 0, 0);
-            _content.Children.Add(gradientHint);
+            page.Children.Add(gradientHint);
             _refreshers.Add(() =>
             {
                 bool on = Current()?.Gradient != null;
@@ -675,7 +758,7 @@ public sealed class ScreenPropertiesPanel : Border
                 gradientHint.Visibility = on ? Visibility.Collapsed : Visibility.Visible;
             });
 
-            _content.Children.Add(Section("PREENCHIMENTO"));
+            page.Children.Add(Section("PREENCHIMENTO"));
             var fill = new DockPanel();
             var percent = new TextBlock { Text = "%  (0 = invisível, 100 = cheia)", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
             percent.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
@@ -685,10 +768,10 @@ public sealed class ScreenPropertiesPanel : Border
             DockPanel.SetDock(opacity, Dock.Left);
             fill.Children.Add(opacity);
             fill.Children.Add(percent);
-            _content.Children.Add(fill);
+            page.Children.Add(fill);
             var border = SwitchRow("Borda", "Uma linha em volta da caixa.", () => Current()?.HasBorder == true, v => Edit(p => p.Border = v, "border"));
             border.Margin = new Thickness(0, 12, 0, 0);
-            _content.Children.Add(border);
+            page.Children.Add(border);
             // Com a borda ligada: a cor e a grossura dela.
             var borderOptions = new StackPanel();
             borderOptions.Children.Add(FieldLabel("Cor da borda", top: 8));
@@ -703,23 +786,28 @@ public sealed class ScreenPropertiesPanel : Border
             widthText.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
             widthRow.Children.Add(widthText);
             borderOptions.Children.Add(widthRow);
-            _content.Children.Add(borderOptions);
+            page.Children.Add(borderOptions);
             _refreshers.Add(() => borderOptions.Visibility = Current()?.HasBorder == true ? Visibility.Visible : Visibility.Collapsed);
             var boxShadow = SwitchRow("Sombra embaixo", "Uma sombra embaixo da caixa: ela parece flutuar em cima do fundo.",
                 () => Current()?.Shadow == true, v => Edit(p => p.Shadow = v ? true : null, "shadow"));
             boxShadow.Margin = new Thickness(0, 10, 0, 0);
-            _content.Children.Add(boxShadow);
-            _content.Children.Add(Section("CANTOS"));
-            _content.Children.Add(Segmented(
+            page.Children.Add(boxShadow);
+            page.Children.Add(Section("CANTOS"));
+            page.Children.Add(Segmented(
                 [(Corner.Round, "Redondos", "Cantos arredondados"), (Corner.Square, "Retos", "Cantos em ângulo"), (Corner.Circle, "Círculo", "Círculo (numa caixa quadrada) ou oval: retratos redondos")],
                 () => Current()?.Corner ?? Corner.Round, v => Edit(p => p.Corner = v == Corner.Round ? null : v, "corner")));
         }
 
-        _content.Children.Add(Section("APARÊNCIA"));
-        _content.Children.Add(StyleRow());
+        // Meus estilos no alto da Aparência: escolher um estilo guardado primeiro, e depois ajustar o resto.
+        var mineTitle = Section("MEUS ESTILOS");
+        mineTitle.Margin = new Thickness(0, 6, 0, 6);
+        look.Children.Insert(0, mineTitle);
+        look.Children.Insert(1, MyStylesField(piece));
+        page.Children.Add(Section("APARÊNCIA"));
+        page.Children.Add(StyleRow());
 
         // Os movimentos do código, para ver antes de escrever: cada botão mostra no palco e diz a linha.
-        _content.Children.Add(Section("MOVIMENTOS (PELO CÓDIGO)"));
+        page.Children.Add(Section("MOVIMENTOS (PELO CÓDIGO)"));
         var moves = new UniformGrid { Columns = 3, Margin = new Thickness(0, 0, -6, 0) };
         foreach (var (text, kind, line, what) in new[]
                  {
@@ -731,30 +819,31 @@ public sealed class ScreenPropertiesPanel : Border
             moves.Children.Add(SmallAction(text, $"{what}\nVer aqui no palco. No código, dentro de um clique:\n{line}",
                 () => { if (_shownName != null) _model.Preview(_shownName, kind); }));
         }
-        _content.Children.Add(moves);
+        page.Children.Add(moves);
 
-        _content.Children.Add(Section(piece.List != null ? "POSIÇÃO NO CARTÃO E TAMANHO" : "POSIÇÃO E TAMANHO"));
+        page = place;
+        page.Children.Add(Section(piece.List != null ? "POSIÇÃO NO CARTÃO E TAMANHO" : "POSIÇÃO E TAMANHO"));
         var bounds = new UniformGrid { Columns = 2 };
         bounds.Children.Add(Labeled("X", NumberField(() => Current()?.X ?? 0, v => Edit(p => p.X = v, "x"), -2000, 3000)));
         bounds.Children.Add(Labeled("Y", NumberField(() => Current()?.Y ?? 0, v => Edit(p => p.Y = v, "y"), -2000, 3000), left: 8));
         bounds.Children.Add(Labeled("Largura", NumberField(() => Current()?.Width ?? 0, v => Edit(p => p.Width = v, "w"), ScreenDesignerModel.MinSize, 3000), top: 8));
         bounds.Children.Add(Labeled("Altura", NumberField(() => Current()?.Height ?? 0, v => Edit(p => p.Height = v, "h"), ScreenDesignerModel.MinSize, 3000), left: 8, top: 8));
-        _content.Children.Add(bounds);
+        page.Children.Add(bounds);
         var center = Muted(piece.List != null ? "Alinhar no cartão:" : "Alinhar na tela:");
         center.Margin = new Thickness(0, 10, 0, 4);
-        _content.Children.Add(center);
-        _content.Children.Add(AlignGrid(many: false));
+        page.Children.Add(center);
+        page.Children.Add(AlignGrid(many: false));
 
         var visible = SwitchRow("Aparece no começo", "Desligado: a peça começa escondida e o código mostra com .Visible = true.",
             () => Current()?.Visible != false, v => Edit(p => p.Visible = v, "visible"));
         visible.Margin = new Thickness(0, 14, 0, 0);
-        _content.Children.Add(visible);
+        page.Children.Add(visible);
         if (Piece.Supports(type, nameof(Piece.Enabled)))
         {
             var enabled = SwitchRow("Ativo no começo", "Desligado: começa apagado e sem clique; o código liga com .Enabled = true.",
                 () => Current()?.Enabled != false, v => Edit(p => p.Enabled = v, "enabled"));
             enabled.Margin = new Thickness(0, 10, 0, 0);
-            _content.Children.Add(enabled);
+            page.Children.Add(enabled);
         }
 
         var locked = SwitchRow("Travada no palco",
@@ -762,17 +851,377 @@ public sealed class ScreenPropertiesPanel : Border
             "Também dá para usar o cadeado nas Camadas. No jogo não muda nada.",
             () => Current()?.Locked == true, v => { if (_shownName != null) _model.SetLocked(_shownName, v); });
         locked.Margin = new Thickness(0, 10, 0, 0);
-        _content.Children.Add(locked);
+        page.Children.Add(locked);
 
         if (linksCode) return;   // o código dela já aparece lá em cima ("Ao clicar" ou "No código")
 
-        _content.Children.Add(Section("NO CÓDIGO"));
+        page = info;
+        page.Children.Add(Section("NO CÓDIGO"));
         var code = CodeBox(ScreenDesignerModel.CodeExample(piece));
         _refreshers.Add(() =>
         {
             if (Current() is { } p && code.Tag is TextBlock text) text.Text = ScreenDesignerModel.CodeExample(p);
         });
-        _content.Children.Add(code);
+        page.Children.Add(code);
+    }
+
+    // ------------------------------------------------------------------ abas da peça
+
+    /// <summary>As abas do painel de uma peça.</summary>
+    internal enum PanelTab { Piece, Look, Place }
+
+    /// <summary>A aba aberta: continua a mesma ao clicar em outra peça (quem está mexendo nas cores segue nas cores).</summary>
+    private static PanelTab _openTab = PanelTab.Piece;
+
+    private readonly List<(PanelTab Tab, ToggleButton Button, FrameworkElement Page)> _tabs = [];
+
+    /// <summary>A aba aberta agora (para os testes).</summary>
+    internal PanelTab OpenTab => _openTab;
+
+    /// <summary>Para os testes que conferem o painel inteiro: as três abas aparecem juntas, uma embaixo da outra.</summary>
+    internal bool AllTabs
+    {
+        get => _allTabs;
+        set
+        {
+            _allTabs = value;
+            ShowTab(_openTab);
+        }
+    }
+
+    private bool _allTabs;
+
+    /// <summary>Abre uma aba do painel da peça.</summary>
+    internal void ShowTab(PanelTab tab)
+    {
+        _openTab = tab;
+        foreach (var (each, button, page) in _tabs)
+        {
+            button.IsChecked = each == tab;
+            page.Visibility = each == tab || _allTabs ? Visibility.Visible : Visibility.Collapsed;
+        }
+    }
+
+    private FrameworkElement Tabs(params (PanelTab Tab, string Text, FrameworkElement Page)[] tabs)
+    {
+        var grid = new UniformGrid { Columns = tabs.Length };
+        foreach (var (tab, text, page) in tabs)
+        {
+            var button = new ToggleButton
+            {
+                Content = text,
+                Height = 28,
+                Padding = new Thickness(6, 0, 6, 1),
+                Margin = new Thickness(0, 0, 2, 0),
+                Focusable = false,
+                Cursor = Cursors.Hand,
+                ToolTip = tab switch
+                {
+                    PanelTab.Piece => "Nome, texto, o que ela faz no código e os valores dela",
+                    PanelTab.Look => "Estilo, cores, letra, cantos e movimentos",
+                    _ => "Lugar, tamanho, alinhar e como ela começa no jogo",
+                },
+            };
+            button.SetResourceReference(StyleProperty, "IconToggle");
+            button.Width = double.NaN;
+            button.Click += (_, _) => ShowTab(tab);
+            System.Windows.Automation.AutomationProperties.SetName(button, "Aba " + text);
+            _tabs.Add((tab, button, page));
+            grid.Children.Add(button);
+        }
+        var border = new Border { Child = grid, CornerRadius = new CornerRadius(6), Padding = new Thickness(2, 2, 0, 2), Margin = new Thickness(0, 10, 0, 0) };
+        border.SetResourceReference(Border.BackgroundProperty, "BgBase");
+        ShowTab(_openTab);
+        return border;
+    }
+
+    // ------------------------------------------------------------------ meus estilos
+
+    /// <summary>
+    /// Meus estilos: os estilos guardados (com uma amostra de cada) e "Guardar o estilo desta peça". Clicar numa
+    /// amostra passa a aparência dela para a peça (ou para todas as selecionadas). Botão direito: atualizar,
+    /// renomear ou apagar. <paramref name="piece"/> null: várias peças selecionadas (aparecem todos os estilos).
+    /// </summary>
+    private FrameworkElement MyStylesField(Piece? piece)
+    {
+        var stack = new StackPanel();
+        var styles = MyStyles.Load();
+        var mine = piece == null ? styles : styles.Where(st => st.Type == piece.Type).ToList();
+        var info = Muted("");
+        info.Margin = new Thickness(0, 4, 0, 0);
+        info.Visibility = Visibility.Collapsed;
+        void Say(string text)
+        {
+            info.Text = text;
+            info.Visibility = Visibility.Visible;
+        }
+
+        if (mine.Count > 0)
+        {
+            var wrap = new WrapPanel { Margin = new Thickness(0, 0, -6, 0) };
+            foreach (var style in mine) wrap.Children.Add(StyleChip(style, Say));
+            stack.Children.Add(wrap);
+        }
+        else
+        {
+            var empty = Muted(piece == null
+                ? "Nenhum estilo guardado ainda. Selecione uma peça só e use \"Guardar o estilo desta peça\"."
+                : $"Guarde a aparência desta peça com um nome, para usar de novo em outras peças, em outras telas e em outros jogos.");
+            empty.Margin = new Thickness(0, 0, 0, 6);
+            stack.Children.Add(empty);
+        }
+        if (piece != null)
+        {
+            int others = styles.Count - mine.Count;
+            if (others > 0 && mine.Count > 0)
+            {
+                var more = Muted($"(Mais {others} {(others == 1 ? "estilo" : "estilos")} de outros tipos de peça: aparecem quando você seleciona uma peça daquele tipo.)");
+                more.FontSize = 11;
+                more.Margin = new Thickness(0, 0, 0, 6);
+                stack.Children.Add(more);
+            }
+            var save = SmallAction("＋  Guardar o estilo desta peça", "Dá um nome para a aparência desta peça (cores, letra, cantos, sombra…). O texto e o lugar não entram.", () =>
+            {
+                if (_model.Layout?.Find(_shownName ?? "") is not { } current || CodeLinks?.Dialogs is not { } dialogs) return;
+                var title = dialogs.AskText("Guardar estilo", "Nome do estilo (para você reconhecer depois):", MyStyles.SuggestTitle(current.Type), MyStyles.TitleProblem);
+                if (title == null) return;
+                if (MyStyles.Exists(title) && !dialogs.Confirm("Guardar estilo", $"Já existe um estilo \"{title.Trim()}\". Trocar pelo desta peça?", "Trocar")) return;
+                MyStyles.Save(title, current);
+                Build();
+            });
+            save.HorizontalAlignment = HorizontalAlignment.Stretch;
+            save.Margin = new Thickness(0, 4, 0, 0);
+            stack.Children.Add(save);
+        }
+        stack.Children.Add(info);
+        return stack;
+    }
+
+    /// <summary>A amostra de um estilo guardado: a peça desenhada pequenininha, com o nome embaixo.</summary>
+    private FrameworkElement StyleChip(SavedStyle style, Action<string> say)
+    {
+        var sample = style.Piece.Clone();
+        sample.Name = "Sample";
+        if (string.IsNullOrEmpty(sample.Text) && Piece.Supports(sample.Type, nameof(Piece.Text))) sample.Text = "Aa";
+        FrameworkElement drawing;
+        try
+        {
+            drawing = ScreenRenderer.Create(sample, new RenderContext { Live = false });
+        }
+        catch (Exception ex)
+        {
+            Core.Settings.AppPaths.Log(ex, "Amostra de estilo");
+            drawing = new Border();
+        }
+        var preview = new Viewbox { Child = drawing, Stretch = Stretch.Uniform, Height = 40, MaxWidth = 116, Margin = new Thickness(4) };
+        var back = new Border { Child = preview, Background = Theme.Background, CornerRadius = new CornerRadius(5), Height = 48 };
+        var title = new TextBlock { Text = style.Title, FontSize = 11.5, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(2, 4, 2, 0), HorizontalAlignment = HorizontalAlignment.Center };
+        title.SetResourceReference(TextBlock.ForegroundProperty, "TextPrimary");
+        var content = new StackPanel();
+        content.Children.Add(back);
+        content.Children.Add(title);
+        var chip = new Border
+        {
+            Child = content,
+            Width = 128,
+            Padding = new Thickness(4),
+            Margin = new Thickness(0, 0, 6, 6),
+            CornerRadius = new CornerRadius(7),
+            BorderThickness = new Thickness(1),
+            Background = Brushes.Transparent,
+            Cursor = Cursors.Hand,
+            ToolTip = $"{style.Title} ({Piece.Describe(style.Type)})\nClique: usar nesta peça. Botão direito: atualizar, renomear ou apagar.",
+        };
+        chip.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
+        System.Windows.Automation.AutomationProperties.SetName(chip, "Estilo " + style.Title);
+        chip.MouseEnter += (_, _) => chip.SetResourceReference(Border.BackgroundProperty, "BgHover");
+        chip.MouseLeave += (_, _) => chip.Background = Brushes.Transparent;
+        chip.MouseLeftButtonUp += (_, e) =>
+        {
+            e.Handled = true;
+            int changed = _model.UseStyle(style.Piece);
+            if (changed == 0) say($"Já estava com o estilo \"{style.Title}\".");
+        };
+
+        var menu = new ContextMenu();
+        var update = new MenuItem { Header = "Trocar pelo estilo da peça selecionada" };
+        update.IsEnabled = _model.Selected is { } selected && selected.Type == style.Type && _model.SelectedNames.Count == 1;
+        update.Click += (_, _) =>
+        {
+            if (_model.Selected is not { } current) return;
+            MyStyles.Save(style.Title, current);
+            Build();
+        };
+        var rename = new MenuItem { Header = "Renomear…" };
+        rename.Click += (_, _) =>
+        {
+            if (CodeLinks?.Dialogs is not { } dialogs) return;
+            var name = dialogs.AskText("Renomear estilo", "Nome novo do estilo:", style.Title, text =>
+                MyStyles.TitleProblem(text) ?? (!string.Equals(text.Trim(), style.Title, StringComparison.OrdinalIgnoreCase) && MyStyles.Exists(text) ? "Já existe um estilo com esse nome." : null));
+            if (name == null) return;
+            MyStyles.Rename(style.Title, name);
+            Build();
+        };
+        var remove = new MenuItem { Header = "Apagar" };
+        remove.Click += (_, _) =>
+        {
+            if (CodeLinks?.Dialogs is { } dialogs && !dialogs.Confirm("Apagar estilo", $"Apagar o estilo \"{style.Title}\"? As peças que já usam ele continuam como estão.", "Apagar", danger: true)) return;
+            MyStyles.Remove(style.Title);
+            Build();
+        };
+        menu.Items.Add(update);
+        menu.Items.Add(rename);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(remove);
+        chip.ContextMenu = menu;
+        return chip;
+    }
+
+    // ------------------------------------------------------------------ ícones
+
+    /// <summary>
+    /// O botão que escolhe o desenho: mostra o atual e abre a lista dos ícones prontos, por grupo, com busca em
+    /// português ou em inglês. <paramref name="allowNone"/>: o Botão pode ficar sem ícone.
+    /// </summary>
+    private FrameworkElement IconPicker(Func<GameEngine.Icon?> get, Action<GameEngine.Icon?> set, bool allowNone)
+    {
+        var shown = new ContentControl { Width = 22, Height = 22, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        var label = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        var arrow = new TextBlock { Text = "▾", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0) };
+        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        row.Children.Add(shown);
+        row.Children.Add(label);
+        row.Children.Add(arrow);
+        var pick = new Button
+        {
+            Content = row,
+            Style = (Style)FindResource("DialogButton"),
+            HorizontalContentAlignment = HorizontalAlignment.Left,
+            Height = 36,
+            Padding = new Thickness(10, 0, 10, 0),
+            Margin = new Thickness(0),
+            Focusable = false,
+        };
+        System.Windows.Automation.AutomationProperties.SetName(pick, "Escolher o ícone");
+        _refreshers.Add(() =>
+        {
+            var icon = get();
+            label.Text = icon is { } i ? IconSet.Describe(i) : "Sem ícone";
+            shown.Content = icon is { } j ? ScreenRenderer.IconShape(j, (Brush)FindResource("TextPrimary")) : null;
+        });
+
+        var popup = new Popup { PlacementTarget = pick, Placement = PlacementMode.Bottom, StaysOpen = false, AllowsTransparency = true, VerticalOffset = 4 };
+        pick.Tag = popup;   // para os testes abrirem a lista
+        pick.Click += (_, _) =>
+        {
+            popup.Child = IconChooser(get(), allowNone, chosen =>
+            {
+                popup.IsOpen = false;
+                _model.EndMerge();
+                set(chosen);
+                _model.EndMerge();
+            });
+            popup.IsOpen = true;
+        };
+        return pick;
+    }
+
+    /// <summary>A lista dos ícones prontos: a busca em cima e os grupos (Luta, Criaturas, Itens…) embaixo.</summary>
+    private FrameworkElement IconChooser(GameEngine.Icon? current, bool allowNone, Action<GameEngine.Icon?> choose)
+    {
+        var search = new TextBox { Height = 30, Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 0, 0, 8) };
+        var hint = new TextBlock { Text = "Procurar: espada, dragão, potion…", IsHitTestVisible = false, Margin = new Thickness(11, 7, 0, 0), FontSize = 12 };
+        hint.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+        var searchHost = new Grid();
+        searchHost.Children.Add(search);
+        searchHost.Children.Add(hint);
+        var list = new StackPanel();
+        var scroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Height = 330 };
+        var tileText = (Brush)FindResource("TextPrimary");
+
+        Border Tile(object content, string tip, bool chosen, Action click)
+        {
+            var tile = new Border
+            {
+                Width = 38,
+                Height = 38,
+                Margin = new Thickness(0, 0, 4, 4),
+                Padding = new Thickness(8),
+                CornerRadius = new CornerRadius(6),
+                BorderThickness = new Thickness(chosen ? 1.5 : 0),
+                Background = Brushes.Transparent,
+                Cursor = Cursors.Hand,
+                ToolTip = tip,
+                Child = content as UIElement,
+            };
+            if (chosen)
+            {
+                tile.SetResourceReference(Border.BorderBrushProperty, "Accent");
+                tile.SetResourceReference(Border.BackgroundProperty, "AccentSoft");
+            }
+            System.Windows.Automation.AutomationProperties.SetName(tile, tip);
+            tile.MouseEnter += (_, _) => { if (!chosen) tile.SetResourceReference(Border.BackgroundProperty, "BgHover"); };
+            tile.MouseLeave += (_, _) => { if (!chosen) tile.Background = Brushes.Transparent; };
+            tile.MouseLeftButtonUp += (_, e) =>
+            {
+                e.Handled = true;
+                click();
+            };
+            return tile;
+        }
+
+        void Fill()
+        {
+            list.Children.Clear();
+            var found = IconSet.Search(search.Text).ToList();
+            hint.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (allowNone && search.Text.Length == 0)
+            {
+                var none = new TextBlock { Text = "∅", FontSize = 15, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, Foreground = tileText };
+                var wrapNone = new WrapPanel { Margin = new Thickness(0, 0, 0, 4) };
+                wrapNone.Children.Add(Tile(none, "Sem ícone", current == null, () => choose(null)));
+                list.Children.Add(wrapNone);
+            }
+            foreach (var group in IconSet.Groups)
+            {
+                var icons = found.Where(e => e.Group == group).ToList();
+                if (icons.Count == 0) continue;
+                var title = new TextBlock { Text = group.ToUpperInvariant(), FontSize = 10.5, FontWeight = FontWeights.SemiBold, Margin = new Thickness(2, 6, 0, 4) };
+                title.SetResourceReference(TextBlock.ForegroundProperty, "TextMuted");
+                list.Children.Add(title);
+                var wrap = new WrapPanel();
+                foreach (var entry in icons)
+                {
+                    var icon = entry.Icon;
+                    wrap.Children.Add(Tile(ScreenRenderer.IconShape(icon, tileText), IconSet.Describe(icon), icon == current, () => choose(icon)));
+                }
+                list.Children.Add(wrap);
+            }
+            if (list.Children.Count == 0)
+            {
+                var nothing = Muted("Nenhum ícone com esse nome. Tente outra palavra (em português ou em inglês).");
+                nothing.Margin = new Thickness(2, 8, 2, 0);
+                list.Children.Add(nothing);
+            }
+        }
+        search.TextChanged += (_, _) => Fill();
+        Fill();
+
+        var stack = new StackPanel();
+        stack.Children.Add(searchHost);
+        stack.Children.Add(scroll);
+        var border = new Border
+        {
+            Child = stack,
+            Width = 300,
+            Padding = new Thickness(10),
+            CornerRadius = new CornerRadius(8),
+            BorderThickness = new Thickness(1),
+        };
+        border.SetResourceReference(Border.BackgroundProperty, "BgElevated");
+        border.SetResourceReference(Border.BorderBrushProperty, "BorderStrong");
+        border.Loaded += (_, _) => search.Focus();
+        return border;
     }
 
     // ------------------------------------------------------------------ campos
@@ -933,6 +1382,8 @@ public sealed class ScreenPropertiesPanel : Border
             PieceType.List => "Encher a lista pelo código",
             PieceType.Messages => "Escrever uma mensagem",
             PieceType.Wheel => "Girar a roleta",
+            PieceType.Dice => "Rolar o dado",
+            PieceType.Icon => "Trocar o desenho pelo código",
             _ => "Usar no código",
         });
         PieceCode? found = null;
@@ -957,6 +1408,7 @@ public sealed class ScreenPropertiesPanel : Border
                 PieceType.Bar => "health",
                 PieceType.Box => "true",
                 PieceType.List => "items",
+                PieceType.Icon => "Goblin",
                 _ => "...",
             }).Split('\n')[0];
             if (type == PieceType.Messages && piece?.GameWrite != false)
@@ -967,6 +1419,16 @@ public sealed class ScreenPropertiesPanel : Border
             }
             found = CodeLinks.FindPieceCode(dir, _model.SceneName, name, "");
             string where = found != null ? $"{System.IO.Path.GetFileName(found.File)}, linha {found.Line}" : "";
+            if (type == PieceType.Dice)
+            {
+                // O dado rola dentro do clique de um botão (o Roll espera ele parar), não solto na cena.
+                if (found != null)
+                    card.Show(ok: true, "Já está no código", where, showAction: false, "Ali o código usa este dado. Clique para ir até lá.");
+                else
+                    card.Show(ok: false, "Ainda não rola", null, showAction: false,
+                        $"Ele rola pelo código, dentro do OnClick de um botão: int roll = game.Find(\"{name}\").Roll(); — o roll é o número que saiu.");
+                return;
+            }
             if (type == PieceType.Wheel)
             {
                 // A Roleta gira dentro do clique de um botão (o Spin espera ela parar), não solta na cena.
@@ -1657,12 +2119,13 @@ public sealed class ScreenPropertiesPanel : Border
     }
 
     /// <summary>As fontes, cada nome escrito na própria fonte (assim dá para ver antes de escolher).</summary>
-    private FrameworkElement FontField(Func<GameFont> get, Action<GameFont> set)
+    private FrameworkElement FontField(Func<GameFont?> get, Action<GameFont?> set)
     {
         var grid = new UniformGrid { Columns = 2 };
-        var buttons = new List<(GameFont Font, ToggleButton Button)>();
-        foreach (var (font, text, tip) in new[]
+        var buttons = new List<(GameFont? Font, ToggleButton Button)>();
+        foreach (var (font, text, tip) in new (GameFont? Font, string Text, string Tip)[]
                  {
+                     (null, "Do tema", "Usar a fonte escolhida pelo tema do jogo"),
                      (GameFont.Normal, "Normal", "Font.Normal: limpa e fácil de ler"),
                      (GameFont.Fantasy, "Fantasia", "Font.Fantasy: de conto de fadas, boa para títulos"),
                      (GameFont.Book, "Livro", "Font.Book: de livro antigo, boa para pergaminhos e histórias"),
